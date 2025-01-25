@@ -1,6 +1,9 @@
+import { useState } from "react";
 import type { Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, ChevronDown, ChevronUp } from "lucide-react";
+import { TeamMembersCard } from "./team-members-card";
 
 interface TeamCardProps {
   team: Team & { members?: Array<any> };
@@ -8,11 +11,13 @@ interface TeamCardProps {
 }
 
 export function TeamCard({ team, status }: TeamCardProps) {
+  const [showMembers, setShowMembers] = useState(false);
+
   return (
     <Card
       className={`
         ${status === "eliminated" ? "opacity-50" : ""}
-        hover:bg-accent transition-colors
+        hover:bg-accent/50 transition-colors
       `}
     >
       <CardContent className="p-4">
@@ -39,7 +44,24 @@ export function TeamCard({ team, status }: TeamCardProps) {
               </p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowMembers(!showMembers)}
+          >
+            {showMembers ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
         </div>
+
+        {showMembers && (
+          <div className="mt-4">
+            <TeamMembersCard teamId={team.id} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

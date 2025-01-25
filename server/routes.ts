@@ -71,7 +71,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     // Update user profile
-    const updateData: any = { 
+    const updateData: any = {
       username,
       firstName,
       preferredPlayTimes,
@@ -95,7 +95,7 @@ export function registerRoutes(app: Express): Server {
       .where(eq(users.id, req.user.id))
       .returning();
 
-    res.json({ 
+    res.json({
       message: "Profile updated successfully",
       user: {
         id: updatedUser.id,
@@ -159,6 +159,37 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Teams fetch error:", error);
       res.status(500).send("Failed to fetch teams");
+    }
+  });
+
+  // Get team members endpoint
+  app.get("/api/teams/:teamId/members", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      if (isNaN(teamId)) {
+        return res.status(400).send("Invalid team ID");
+      }
+
+      // Get team members
+      const members = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          firstName: users.firstName,
+          avatar: users.avatar,
+        })
+        .from(teamMembers)
+        .innerJoin(users, eq(teamMembers.userId, users.id))
+        .where(eq(teamMembers.teamId, teamId));
+
+      res.json(members);
+    } catch (error) {
+      console.error("Team members fetch error:", error);
+      res.status(500).send("Failed to fetch team members");
     }
   });
 

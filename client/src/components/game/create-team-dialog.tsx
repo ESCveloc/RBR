@@ -21,12 +21,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { insertTeamSchema } from "@db/schema";
 
-const formSchema = insertTeamSchema.pick({
-  name: true,
+const formSchema = z.object({
+  name: z.string().min(3, "Team name must be at least 3 characters"),
 });
 
 export function CreateTeamDialog() {
@@ -82,7 +81,7 @@ export function CreateTeamDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4 mr-2" />
+          <Users className="h-4 w-4 mr-2" />
           Create Team
         </Button>
       </DialogTrigger>
