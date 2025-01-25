@@ -48,6 +48,7 @@ interface MapViewProps {
   onAreaSelect?: (area: Feature<Polygon>) => void;
   selectedArea?: Feature<Polygon> | null;
   defaultCenter?: { lat: number; lng: number };
+  defaultRadiusMiles?: number;
 }
 
 export function MapView({
@@ -55,10 +56,12 @@ export function MapView({
   mode = "view",
   onAreaSelect,
   selectedArea,
-  defaultCenter = { lat: 37.7749, lng: -122.4194 }, // San Francisco as fallback
+  defaultCenter = { lat: 37.7749, lng: -122.4194 },
+  defaultRadiusMiles = 1,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const drawLayerRef = useRef<L.FeatureGroup | null>(null);
+  const defaultCircleRef = useRef<L.Circle | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -77,6 +80,18 @@ export function MapView({
       const drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
       drawLayerRef.current = drawnItems;
+
+      // Add default circle (1 mile = 1609.34 meters)
+      const circle = L.circle([defaultCenter.lat, defaultCenter.lng], {
+        radius: defaultRadiusMiles * 1609.34,
+        color: '#0969da',
+        fillColor: '#0969da',
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '5, 10',
+      });
+      circle.addTo(map);
+      defaultCircleRef.current = circle;
 
       if (mode === "draw") {
         // Add draw controls
@@ -123,9 +138,10 @@ export function MapView({
         mapRef.current.remove();
         mapRef.current = null;
         drawLayerRef.current = null;
+        defaultCircleRef.current = null;
       }
     };
-  }, [mode, onAreaSelect, defaultCenter]);
+  }, [mode, onAreaSelect, defaultCenter, defaultRadiusMiles]);
 
   // Update map when game boundaries change
   useEffect(() => {
@@ -136,6 +152,9 @@ export function MapView({
       // Clear existing layers except the base tile layer
       if (drawLayer) {
         drawLayer.clearLayers();
+      }
+      if (defaultCircleRef.current) {
+        defaultCircleRef.current.removeFrom(map);
       }
 
       // Add game boundaries

@@ -33,6 +33,7 @@ export const teamMembers = pgTable("team_members", {
 type ZoneConfig = {
   durationMinutes: number;
   radiusMultiplier: number;
+  intervalMinutes: number;
 };
 
 export const games = pgTable("games", {
@@ -86,6 +87,7 @@ export const gameRelations = relations(games, ({ many, one }) => ({
 const zoneConfigSchema = z.object({
   durationMinutes: z.number().min(5).max(60),
   radiusMultiplier: z.number().min(0.1).max(1),
+  intervalMinutes: z.number().min(5).max(60),
 });
 
 // Schemas for validation

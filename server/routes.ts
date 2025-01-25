@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, games, teams, teamMembers, insertGameSchema } from "@db/schema";
+import { users, games, teams, teamMembers } from "@db/schema";
 import { eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -15,30 +15,30 @@ const scryptAsync = promisify(scrypt);
 const zoneConfigSchema = z.object({
   durationMinutes: z.number().min(5).max(60),
   radiusMultiplier: z.number().min(0.1).max(1),
+  intervalMinutes: z.number().min(5).max(60),
 });
 
-// Update game schema to include zone configurations
-export const gameSchema = insertGameSchema.extend({
-  name: z.string().min(1, "Game name is required"),
-  zoneConfigs: z.array(zoneConfigSchema).min(1),
-}).pick({
-  name: true,
-  gameLengthMinutes: true,
-  maxTeams: true,
-  playersPerTeam: true,
-  boundaries: true,
-  zoneConfigs: true,
-});
-
-// Settings validation schema
+// Update settings schema to include zone configurations
 const settingsSchema = z.object({
   defaultCenter: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }),
   defaultRadiusMiles: z.number().min(0.1).max(10),
-  numberOfZones: z.number().min(2).max(10),
-  zoneIntervalMinutes: z.number().min(5).max(60),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60),
+  })).min(1),
+});
+
+// Game schema no longer needs zone configurations as they come from settings
+const gameSchema = z.object({
+  name: z.string().min(1, "Game name is required"),
+  gameLengthMinutes: z.number().min(10).max(180),
+  maxTeams: z.number().min(2).max(50),
+  playersPerTeam: z.number().min(1).max(10),
+  boundaries: z.any(),
 });
 
 export function registerRoutes(app: Express): Server {
@@ -65,9 +65,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Store settings in database or cache
-      // For now, we'll store it in memory since it's just for demo
-      // In a real app, you'd want to store this in the database
+      // Store settings in memory for now
       global.gameSettings = result.data;
 
       res.json({ message: "Settings updated successfully" });
@@ -90,8 +88,11 @@ export function registerRoutes(app: Express): Server {
         lng: -122.4194,
       },
       defaultRadiusMiles: 1,
-      numberOfZones: 3,
-      zoneIntervalMinutes: 15,
+      zoneConfigs: [
+        { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
+        { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
+        { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
+      ],
     };
 
     res.json(settings);
@@ -492,8 +493,16 @@ export function registerRoutes(app: Express): Server {
         gameLengthMinutes,
         maxTeams,
         playersPerTeam,
-        zoneConfigs,
       } = result.data;
+
+      // Use zone configurations from settings
+      const settings = global.gameSettings || {
+        zoneConfigs: [
+          { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
+          { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
+          { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
+        ],
+      };
 
       const [game] = await db
         .insert(games)
@@ -503,7 +512,7 @@ export function registerRoutes(app: Express): Server {
           gameLengthMinutes,
           maxTeams,
           playersPerTeam,
-          zoneConfigs,
+          zoneConfigs: settings.zoneConfigs,
           createdBy: req.user.id,
           status: "pending",
         })
@@ -520,7 +529,7 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-//This is added to handle the global variable.  It is likely this should be replaced with a database call.
+// This is added to handle the global variable
 declare global {
   var gameSettings: any;
 }
