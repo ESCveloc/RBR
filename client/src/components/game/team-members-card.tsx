@@ -17,8 +17,9 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: members, isLoading } = useQuery<User[]>({
+  const { data: members = [], isLoading } = useQuery<User[]>({
     queryKey: [`/api/teams/${teamId}/members`],
+    enabled: !!teamId // Only fetch if we have a teamId
   });
 
   const updateCaptain = useMutation({
@@ -37,6 +38,7 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both team and member queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: [`/api/teams/${teamId}/members`] });
       toast({
@@ -69,7 +71,7 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {members?.map((member) => (
+          {members.map((member) => (
             <div key={member.id} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8">
@@ -79,27 +81,29 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium">{member.firstName || member.username}</p>
-                  <p className="text-xs text-muted-foreground">{member.username}</p>
+                  <p className="text-sm font-medium">
+                    {member.firstName || member.username}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.username}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {member.id === captainId ? (
                   <Crown className="h-4 w-4 text-yellow-500" />
-                ) : (
-                  isCaptain && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateCaptain.mutate(member.id)}
-                      disabled={updateCaptain.isPending}
-                    >
-                      {updateCaptain.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Make Captain
-                    </Button>
-                  )
+                ) : isCaptain && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateCaptain.mutate(member.id)}
+                    disabled={updateCaptain.isPending}
+                  >
+                    {updateCaptain.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Make Captain
+                  </Button>
                 )}
               </div>
             </div>

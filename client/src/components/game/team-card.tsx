@@ -5,21 +5,28 @@ import { Button } from "@/components/ui/button";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { TeamMembersCard } from "./team-members-card";
 import { useUser } from "@/hooks/use-user";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface TeamCardProps {
-  team: Team & { members?: Array<User> };
+  team: Team;
   status?: "alive" | "eliminated";
 }
 
 export function TeamCard({ team, status }: TeamCardProps) {
   const [showMembers, setShowMembers] = useState(false);
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const isCaptain = user?.id === team.captainId;
 
+  // Use suspense: false to prevent loading states from causing UI flicker
   const { data: members = [] } = useQuery<User[]>({
     queryKey: [`/api/teams/${team.id}/members`],
-    enabled: true, // Always fetch members to show accurate count
+    enabled: true,
+    suspense: false,
+    onSuccess: () => {
+      // Ensure team data is refreshed when members change
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+    }
   });
 
   return (
@@ -49,7 +56,7 @@ export function TeamCard({ team, status }: TeamCardProps) {
               <p className="text-sm text-muted-foreground">
                 {status
                   ? status.charAt(0).toUpperCase() + status.slice(1)
-                  : `${members.length} members`}
+                  : `${members.length} member${members.length !== 1 ? 's' : ''}`}
               </p>
             </div>
           </div>
@@ -70,7 +77,7 @@ export function TeamCard({ team, status }: TeamCardProps) {
           <div className="mt-4">
             <TeamMembersCard 
               teamId={team.id} 
-              captainId={team.captainId} 
+              captainId={team.captainId}
               isCaptain={isCaptain}
             />
           </div>

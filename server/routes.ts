@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, teams, gameParticipants, teamMembers } from "@db/schema";
-import { eq, ilike } from "drizzle-orm";
+import { eq, ilike, or } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
@@ -152,9 +152,25 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      const userTeams = await db.query.teams.findMany({
-        where: (teams, { eq }) => eq(teams.captainId, req.user.id),
-      });
+      // Get all teams where user is either captain or member
+      const userTeams = await db
+        .select({
+          id: teams.id,
+          name: teams.name,
+          captainId: teams.captainId,
+          createdAt: teams.createdAt,
+          active: teams.active
+        })
+        .from(teams)
+        .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+        .where(
+          or(
+            eq(teams.captainId, req.user.id),
+            eq(teamMembers.userId, req.user.id)
+          )
+        )
+        .groupBy(teams.id);
+
       res.json(userTeams);
     } catch (error) {
       console.error("Teams fetch error:", error);
