@@ -21,8 +21,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Camera } from "lucide-react";
+import { Loader2, Camera, ArrowLeft } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 
 const PLAY_TIME_OPTIONS = [
   "Morning (6AM-12PM)",
@@ -46,6 +47,7 @@ export default function Profile() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -80,14 +82,7 @@ export default function Profile() {
         title: "Success",
         description: "Profile updated successfully",
       });
-      form.reset({ 
-        username: form.getValues("username"),
-        firstName: form.getValues("firstName"),
-        currentPassword: "",
-        newPassword: "",
-        avatar: form.getValues("avatar"),
-        preferredPlayTimes: form.getValues("preferredPlayTimes")
-      });
+      setLocation("/");
     },
     onError: (error: Error) => {
       toast({
@@ -104,6 +99,15 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
+      <header className="container max-w-2xl mx-auto mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold">Profile Settings</h1>
+        </div>
+      </header>
+
       <div className="container max-w-2xl mx-auto">
         <Card>
           <CardHeader>
@@ -227,16 +231,24 @@ export default function Profile() {
                   )}
                 />
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Save Changes
-                </Button>
+                <div className="flex justify-end gap-4 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setLocation("/")}
+                  >
+                    Discard Changes
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save & Close
+                  </Button>
+                </div>
               </form>
             </Form>
           </CardContent>
