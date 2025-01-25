@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, teams, gameParticipants, teamMembers } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
@@ -190,6 +190,90 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Team members fetch error:", error);
       res.status(500).send("Failed to fetch team members");
+    }
+  });
+
+  // Search users endpoint
+  app.get("/api/users/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).send("Search query is required");
+      }
+
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          firstName: users.firstName,
+          avatar: users.avatar,
+        })
+        .from(users)
+        .where(ilike(users.username, `%${query}%`))
+        .limit(10);
+
+      res.json(searchResults);
+    } catch (error) {
+      console.error("User search error:", error);
+      res.status(500).send("Failed to search users");
+    }
+  });
+
+  // Add team member endpoint
+  app.post("/api/teams/:teamId/members", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { userId } = req.body;
+
+      if (isNaN(teamId)) {
+        return res.status(400).send("Invalid team ID");
+      }
+
+      // Verify team exists and user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== req.user.id) {
+        return res.status(403).send("Only team captain can add members");
+      }
+
+      // Check if user is already a member
+      const [existingMember] = await db
+        .select()
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, teamId))
+        .where(eq(teamMembers.userId, userId))
+        .limit(1);
+
+      if (existingMember) {
+        return res.status(400).send("User is already a team member");
+      }
+
+      // Add new team member
+      await db.insert(teamMembers).values({
+        teamId,
+        userId,
+      });
+
+      res.json({ message: "Member added successfully" });
+    } catch (error) {
+      console.error("Add team member error:", error);
+      res.status(500).send("Failed to add team member");
     }
   });
 

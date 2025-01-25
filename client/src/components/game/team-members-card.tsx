@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import type { User } from "@db/schema";
+import { InviteMemberDialog } from "./invite-member-dialog";
 
 interface TeamMembersCardProps {
   teamId: number;
@@ -23,8 +24,9 @@ export function TeamMembersCard({ teamId }: TeamMembersCardProps) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Team Members</CardTitle>
+        <InviteMemberDialog teamId={teamId} />
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
