@@ -1,15 +1,20 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Plus, Trophy } from "lucide-react";
+import { Loader2, Plus, Trophy, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 import { TeamCard } from "@/components/game/team-card";
 import { useUser } from "@/hooks/use-user";
 import type { Game, Team } from "@db/schema";
 
 export default function Home() {
   const { user } = useUser();
-  
+
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
   });
@@ -35,11 +40,19 @@ export default function Home() {
           </h1>
           <p className="text-muted-foreground">Welcome back, {user?.username}</p>
         </div>
-        {user?.role === "admin" && (
-          <Link href="/admin">
-            <Button>Admin Dashboard</Button>
+        <div className="flex gap-2">
+          <Link href="/profile">
+            <Button variant="outline">
+              <UserCircle className="h-4 w-4 mr-2" />
+              Profile
+            </Button>
           </Link>
-        )}
+          {user?.role === "admin" && (
+            <Link href="/admin">
+              <Button>Admin Dashboard</Button>
+            </Link>
+          )}
+        </div>
       </header>
 
       <div className="grid gap-8">
