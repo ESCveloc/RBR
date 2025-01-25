@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
-// Simplified crypto implementation with proper error handling
+// Crypto implementation with proper error handling
 const crypto = {
   hash: async (password: string): Promise<string> => {
     const salt = randomBytes(16).toString("hex");
@@ -21,7 +21,6 @@ const crypto = {
   compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
     try {
       const [hashedPassword, salt] = storedPassword.split(".");
-
       if (!hashedPassword || !salt) {
         console.error("Invalid stored password format");
         return false;
@@ -29,11 +28,6 @@ const crypto = {
 
       const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
       const suppliedPasswordBuf = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
-
-      if (hashedPasswordBuf.length !== suppliedPasswordBuf.length) {
-        console.error("Password buffer length mismatch");
-        return false;
-      }
 
       return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
     } catch (error) {
@@ -142,7 +136,7 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      // Auto login
+      // Auto login after registration
       req.login(user, (err) => {
         if (err) {
           return res.status(500).json({ error: "Login failed after registration" });
