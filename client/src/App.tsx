@@ -7,6 +7,7 @@ import AuthPage from "@/pages/auth-page";
 import Home from "@/pages/home";
 import Game from "@/pages/game";
 import Admin from "@/pages/admin";
+import Profile from "@/pages/profile";
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 
@@ -29,6 +30,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/game/:id" component={Game} />
+      <Route path="/profile" component={Profile} />
       {user.role === "admin" && <Route path="/admin" component={Admin} />}
       <Route component={NotFound} />
     </Switch>
