@@ -42,15 +42,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Extend form schema to make name required
+// Extend form schema to include zone configurations
 const formSchema = insertGameSchema.extend({
   name: z.string().min(1, "Game name is required"),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+  })).min(1),
 }).pick({
   name: true,
   gameLengthMinutes: true,
   maxTeams: true,
   playersPerTeam: true,
   boundaries: true,
+  zoneConfigs: true,
 });
 
 // Settings form schema
@@ -69,6 +74,18 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Add settings query
+  const { data: settings } = useQuery({
+    queryKey: ["/api/admin/settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/settings", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+  });
+
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
   });
@@ -77,7 +94,7 @@ export default function Admin() {
     queryKey: ["/api/admin/users"],
   });
 
-  // Game creation form
+  // Game creation form with zone configurations
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -86,6 +103,11 @@ export default function Admin() {
       gameLengthMinutes: 60,
       maxTeams: 10,
       playersPerTeam: 4,
+      zoneConfigs: [
+        { durationMinutes: 15, radiusMultiplier: 0.75 },
+        { durationMinutes: 10, radiusMultiplier: 0.5 },
+        { durationMinutes: 5, radiusMultiplier: 0.25 },
+      ],
     },
   });
 
@@ -331,6 +353,75 @@ export default function Admin() {
                       )}
                     />
 
+                    <FormField
+                      control={form.control}
+                      name="zoneConfigs"
+                      render={({ field }) => (
+                        <FormItem className="space-y-4">
+                          <FormLabel>Zone Configurations</FormLabel>
+                          <div className="space-y-4">
+                            {field.value.map((zone, index) => (
+                              <Card key={index} className="p-4">
+                                <CardHeader className="p-0 pb-4">
+                                  <CardTitle className="text-lg">Zone {index + 1}</CardTitle>
+                                </CardHeader>
+                                <div className="grid gap-4">
+                                  <div>
+                                    <FormLabel>Duration (minutes)</FormLabel>
+                                    <Slider
+                                      min={5}
+                                      max={60}
+                                      step={5}
+                                      value={[zone.durationMinutes]}
+                                      onValueChange={([value]) => {
+                                        const newConfigs = [...field.value];
+                                        newConfigs[index].durationMinutes = value;
+                                        field.onChange(newConfigs);
+                                      }}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                      <span>{zone.durationMinutes} minutes</span>
+                                      <span>60 minutes</span>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <FormLabel>Zone Size (% of previous)</FormLabel>
+                                    <Slider
+                                      min={10}
+                                      max={100}
+                                      step={5}
+                                      value={[zone.radiusMultiplier * 100]}
+                                      onValueChange={([value]) => {
+                                        const newConfigs = [...field.value];
+                                        newConfigs[index].radiusMultiplier = value / 100;
+                                        field.onChange(newConfigs);
+                                      }}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                      <span>{(zone.radiusMultiplier * 100).toFixed(0)}%</span>
+                                      <span>100%</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                field.onChange([
+                                  ...field.value,
+                                  { durationMinutes: 15, radiusMultiplier: 0.5 },
+                                ]);
+                              }}
+                            >
+                              Add Zone
+                            </Button>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
                     <div>
                       <FormLabel>Game Area</FormLabel>
                       <div className="h-[300px] rounded-lg overflow-hidden border mt-2">
@@ -338,6 +429,7 @@ export default function Admin() {
                           mode="draw"
                           onAreaSelect={setSelectedArea}
                           selectedArea={selectedArea}
+                          defaultCenter={settings?.defaultCenter}
                         />
                       </div>
                       {!selectedArea && (

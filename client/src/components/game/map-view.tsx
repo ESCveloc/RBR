@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import type { Feature, Polygon } from "geojson";
-import "leaflet-draw"; // Import at top level
+import "leaflet-draw";
 
 // Extend Leaflet types to include Draw functionality
 declare module 'leaflet' {
@@ -47,6 +47,7 @@ interface MapViewProps {
   mode?: "view" | "draw";
   onAreaSelect?: (area: Feature<Polygon>) => void;
   selectedArea?: Feature<Polygon> | null;
+  defaultCenter?: { lat: number; lng: number };
 }
 
 export function MapView({
@@ -54,14 +55,15 @@ export function MapView({
   mode = "view",
   onAreaSelect,
   selectedArea,
+  defaultCenter = { lat: 37.7749, lng: -122.4194 }, // San Francisco as fallback
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const drawLayerRef = useRef<L.FeatureGroup | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) {
-      // Initialize map centered on San Francisco
-      const map = L.map("map").setView([37.7749, -122.4194], 13);
+      // Initialize map with provided center or default
+      const map = L.map("map").setView([defaultCenter.lat, defaultCenter.lng], 13);
       mapRef.current = map;
 
       // Add OpenStreetMap tiles
@@ -123,7 +125,7 @@ export function MapView({
         drawLayerRef.current = null;
       }
     };
-  }, [mode, onAreaSelect]);
+  }, [mode, onAreaSelect, defaultCenter]);
 
   // Update map when game boundaries change
   useEffect(() => {

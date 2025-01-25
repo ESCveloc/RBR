@@ -3,9 +3,32 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, games } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { users, games, teams, teamMembers, insertGameSchema } from "@db/schema";
+import { eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+
+// Add zone configuration schema
+const zoneConfigSchema = z.object({
+  durationMinutes: z.number().min(5).max(60),
+  radiusMultiplier: z.number().min(0.1).max(1),
+});
+
+// Update game schema to include zone configurations
+export const gameSchema = insertGameSchema.extend({
+  name: z.string().min(1, "Game name is required"),
+  zoneConfigs: z.array(zoneConfigSchema).min(1),
+}).pick({
+  name: true,
+  gameLengthMinutes: true,
+  maxTeams: true,
+  playersPerTeam: true,
+  boundaries: true,
+  zoneConfigs: true,
+});
 
 // Settings validation schema
 const settingsSchema = z.object({
@@ -448,14 +471,54 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Games API endpoints
+  app.post("/api/games", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const result = gameSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid game data",
+          errors: result.error.issues,
+        });
+      }
+
+      const {
+        name,
+        boundaries,
+        gameLengthMinutes,
+        maxTeams,
+        playersPerTeam,
+        zoneConfigs,
+      } = result.data;
+
+      const [game] = await db
+        .insert(games)
+        .values({
+          name,
+          boundaries,
+          gameLengthMinutes,
+          maxTeams,
+          playersPerTeam,
+          zoneConfigs,
+          createdBy: req.user.id,
+          status: "pending",
+        })
+        .returning();
+
+      res.json(game);
+    } catch (error: any) {
+      console.error("Game creation error:", error);
+      res.status(500).send("Failed to create game");
+    }
+  });
+
+
   return httpServer;
 }
-
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
-const scryptAsync = promisify(scrypt);
-import { ilike, or } from "drizzle-orm";
-import { teamMembers, teams } from "@db/schema";
 
 //This is added to handle the global variable.  It is likely this should be replaced with a database call.
 declare global {

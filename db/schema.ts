@@ -29,6 +29,12 @@ export const teamMembers = pgTable("team_members", {
   joinedAt: timestamp("joined_at").defaultNow().notNull()
 });
 
+// Zone configuration type for the games table
+type ZoneConfig = {
+  durationMinutes: number;
+  radiusMultiplier: number;
+};
+
 export const games = pgTable("games", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -39,6 +45,7 @@ export const games = pgTable("games", {
   maxTeams: integer("max_teams").notNull().default(10),
   playersPerTeam: integer("players_per_team").notNull().default(4),
   boundaries: jsonb("boundaries").notNull(),
+  zoneConfigs: jsonb("zone_configs").$type<ZoneConfig[]>().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: serial("created_by").references(() => users.id).notNull()
 });
@@ -75,21 +82,32 @@ export const gameRelations = relations(games, ({ many, one }) => ({
   })
 }));
 
+// Zone configuration schema for validation
+const zoneConfigSchema = z.object({
+  durationMinutes: z.number().min(5).max(60),
+  radiusMultiplier: z.number().min(0.1).max(1),
+});
+
 // Schemas for validation
 export const insertUserSchema = createInsertSchema(users, {
   preferredPlayTimes: z.array(z.string()).optional(),
   firstName: z.string().min(1, "First name is required").optional(),
   avatar: z.string().optional()
 });
+
 export const selectUserSchema = createSelectSchema(users);
 export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
+
+// Extended game schema with zone configurations
 export const insertGameSchema = createInsertSchema(games, {
   boundaries: z.any(),
   gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
+  zoneConfigs: z.array(zoneConfigSchema).min(1)
 });
+
 export const selectGameSchema = createSelectSchema(games);
 
 // Types
