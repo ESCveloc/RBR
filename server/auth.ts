@@ -11,14 +11,7 @@ import { eq } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
-// Extend Express User type
-declare global {
-  namespace Express {
-    interface User extends SelectUser {}
-  }
-}
-
-// Simplified crypto implementation
+// Simplified crypto implementation with proper error handling
 const crypto = {
   hash: async (password: string): Promise<string> => {
     const salt = randomBytes(16).toString("hex");
@@ -27,19 +20,29 @@ const crypto = {
   },
   compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
     try {
-      const [hash, salt] = storedPassword.split(".");
-      if (!hash || !salt) return false;
+      const [hashedPassword, salt] = storedPassword.split(".");
+      if (!hashedPassword || !salt) {
+        console.error("Invalid stored password format");
+        return false;
+      }
 
-      const hashBuffer = Buffer.from(hash, "hex");
+      const hashBuffer = Buffer.from(hashedPassword, "hex");
       const suppliedBuffer = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
 
       return timingSafeEqual(hashBuffer, suppliedBuffer);
     } catch (error) {
-      console.error("Password comparison failed:", error);
+      console.error("Password comparison error:", error);
       return false;
     }
   }
 };
+
+// Extend Express User type
+declare global {
+  namespace Express {
+    interface User extends SelectUser {}
+  }
+}
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
@@ -57,6 +60,7 @@ export function setupAuth(app: Express) {
 
   passport.use(new LocalStrategy(async (username, password, done) => {
     try {
+      console.log(`Attempting login for user: ${username}`);
       const [user] = await db
         .select()
         .from(users)
@@ -64,10 +68,12 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (!user) {
+        console.log("User not found");
         return done(null, false, { message: "Invalid username or password" });
       }
 
       const isValid = await crypto.compare(password, user.password);
+      console.log(`Password validation result: ${isValid}`);
 
       if (!isValid) {
         return done(null, false, { message: "Invalid username or password" });
@@ -75,6 +81,7 @@ export function setupAuth(app: Express) {
 
       return done(null, user);
     } catch (error) {
+      console.error("Login error:", error);
       return done(error);
     }
   }));
