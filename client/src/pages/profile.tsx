@@ -19,15 +19,33 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const profileSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
+  firstName: z.string().min(1, "First name is required"),
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().optional(),
+  avatar: z.string().optional(),
+  preferredPlayTimes: z.array(z.string())
 });
+
+const PLAY_TIME_OPTIONS = [
+  "Morning (6AM-12PM)",
+  "Afternoon (12PM-5PM)",
+  "Evening (5PM-10PM)",
+  "Night (10PM-6AM)"
+] as const;
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
@@ -40,8 +58,11 @@ export default function ProfilePage() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       username: user?.username || "",
+      firstName: user?.firstName || "",
       currentPassword: "",
       newPassword: "",
+      avatar: user?.avatar || "",
+      preferredPlayTimes: Array.isArray(user?.preferredPlayTimes) ? user.preferredPlayTimes : []
     },
   });
 
@@ -68,8 +89,11 @@ export default function ProfilePage() {
       });
       form.reset({ 
         username: form.getValues("username"),
+        firstName: form.getValues("firstName"),
         currentPassword: "",
-        newPassword: "" 
+        newPassword: "",
+        avatar: form.getValues("avatar"),
+        preferredPlayTimes: form.getValues("preferredPlayTimes")
       });
     },
     onError: (error: Error) => {
@@ -92,12 +116,51 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Profile Settings</CardTitle>
             <CardDescription>
-              Update your account settings and change your password
+              Update your account settings and customize your profile
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-6 flex justify-center">
+              <div className="relative">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={form.getValues("avatar")} />
+                  <AvatarFallback className="bg-primary/10">
+                    {user?.username?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="absolute bottom-0 right-0 rounded-full"
+                  onClick={() => {
+                    // TODO: Implement avatar upload
+                    toast({
+                      title: "Coming Soon",
+                      description: "Avatar upload functionality will be available soon!",
+                    });
+                  }}
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="username"
@@ -106,6 +169,38 @@ export default function ProfilePage() {
                       <FormLabel>Username</FormLabel>
                       <FormControl>
                         <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="preferredPlayTimes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preferred Play Times</FormLabel>
+                      <FormControl>
+                        <div className="space-y-2">
+                          {PLAY_TIME_OPTIONS.map((time) => (
+                            <div key={time} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={time}
+                                checked={field.value.includes(time)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    field.onChange([...field.value, time]);
+                                  } else {
+                                    field.onChange(field.value.filter((t) => t !== time));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={time}>{time}</label>
+                            </div>
+                          ))}
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

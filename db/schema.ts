@@ -1,11 +1,15 @@
 import { pgTable, text, serial, timestamp, boolean, jsonb, decimal } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
+  firstName: text("first_name"),
+  avatar: text("avatar"),
+  preferredPlayTimes: jsonb("preferred_play_times").default('[]'),
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
@@ -69,7 +73,11 @@ export const gameRelations = relations(games, ({ many, one }) => ({
 }));
 
 // Schemas for validation
-export const insertUserSchema = createInsertSchema(users);
+export const insertUserSchema = createInsertSchema(users, {
+  preferredPlayTimes: z.array(z.string()).optional(),
+  firstName: z.string().min(1, "First name is required").optional(),
+  avatar: z.string().optional()
+});
 export const selectUserSchema = createSelectSchema(users);
 export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
