@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { TeamMembersCard } from "./team-members-card";
+import { useUser } from "@/hooks/use-user";
 
 interface TeamCardProps {
   team: Team & { members?: Array<any> };
@@ -12,6 +13,8 @@ interface TeamCardProps {
 
 export function TeamCard({ team, status }: TeamCardProps) {
   const [showMembers, setShowMembers] = useState(false);
+  const { user } = useUser();
+  const isCaptain = user?.id === team.captainId;
 
   return (
     <Card
@@ -59,7 +62,11 @@ export function TeamCard({ team, status }: TeamCardProps) {
 
         {showMembers && (
           <div className="mt-4">
-            <TeamMembersCard teamId={team.id} />
+            <TeamMembersCard 
+              teamId={team.id} 
+              captainId={team.captainId} 
+              isCaptain={isCaptain}
+            />
           </div>
         )}
       </CardContent>

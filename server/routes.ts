@@ -277,5 +277,59 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/teams/:teamId/captain", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { newCaptainId } = req.body;
+
+      if (isNaN(teamId) || !newCaptainId) {
+        return res.status(400).send("Invalid team ID or captain ID");
+      }
+
+      // Verify team exists and current user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== req.user.id) {
+        return res.status(403).send("Only the current captain can transfer leadership");
+      }
+
+      // Verify new captain is a team member
+      const [isMember] = await db
+        .select()
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, teamId))
+        .where(eq(teamMembers.userId, newCaptainId))
+        .limit(1);
+
+      if (!isMember) {
+        return res.status(400).send("New captain must be a team member");
+      }
+
+      // Update team captain
+      const [updatedTeam] = await db
+        .update(teams)
+        .set({ captainId: newCaptainId })
+        .where(eq(teams.id, teamId))
+        .returning();
+
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Update team captain error:", error);
+      res.status(500).send("Failed to update team captain");
+    }
+  });
+
   return httpServer;
 }
