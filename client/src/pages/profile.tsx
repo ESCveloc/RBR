@@ -23,13 +23,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Camera } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+const PLAY_TIME_OPTIONS = [
+  "Morning (6AM-12PM)",
+  "Afternoon (12PM-5PM)",
+  "Evening (5PM-10PM)",
+  "Night (10PM-6AM)"
+] as const;
 
 const profileSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -40,16 +40,9 @@ const profileSchema = z.object({
   preferredPlayTimes: z.array(z.string())
 });
 
-const PLAY_TIME_OPTIONS = [
-  "Morning (6AM-12PM)",
-  "Afternoon (12PM-5PM)",
-  "Evening (5PM-10PM)",
-  "Night (10PM-6AM)"
-] as const;
-
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-export default function ProfilePage() {
+export default function Profile() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,11 +60,11 @@ export default function ProfilePage() {
   });
 
   const updateProfile = useMutation({
-    mutationFn: async (data: ProfileFormValues) => {
+    mutationFn: async (values: ProfileFormValues) => {
       const response = await fetch("/api/user/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(values),
         credentials: "include",
       });
 
@@ -123,9 +116,9 @@ export default function ProfilePage() {
             <div className="mb-6 flex justify-center">
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={form.getValues("avatar")} />
+                  {user?.avatar && <AvatarImage src={user.avatar} />}
                   <AvatarFallback className="bg-primary/10">
-                    {user?.username?.charAt(0).toUpperCase()}
+                    {user?.username?.[0]?.toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <Button
@@ -133,7 +126,6 @@ export default function ProfilePage() {
                   variant="outline"
                   className="absolute bottom-0 right-0 rounded-full"
                   onClick={() => {
-                    // TODO: Implement avatar upload
                     toast({
                       title: "Coming Soon",
                       description: "Avatar upload functionality will be available soon!",

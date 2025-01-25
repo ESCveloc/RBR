@@ -36,7 +36,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(401).send("Not logged in");
     }
 
-    const { username, currentPassword, newPassword } = req.body;
+    const { username, currentPassword, newPassword, firstName, preferredPlayTimes, avatar } = req.body;
 
     // Verify current password
     const [user] = await db
@@ -71,7 +71,12 @@ export function registerRoutes(app: Express): Server {
     }
 
     // Update user profile
-    let updateData: any = { username };
+    const updateData: any = { 
+      username,
+      firstName,
+      preferredPlayTimes,
+      avatar
+    };
 
     // If new password is provided, hash it
     if (newPassword) {
@@ -95,6 +100,9 @@ export function registerRoutes(app: Express): Server {
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
+        firstName: updatedUser.firstName,
+        avatar: updatedUser.avatar,
+        preferredPlayTimes: updatedUser.preferredPlayTimes,
         role: updatedUser.role
       }
     });
