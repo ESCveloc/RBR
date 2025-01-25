@@ -17,6 +17,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Slider,
+  SliderTrack,
+  SliderRange,
+  SliderThumb,
+} from "@/components/ui/slider";
 import { MapView } from "@/components/game/map-view";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -43,6 +49,9 @@ import {
 const formSchema = insertGameSchema.pick({
   name: true,
   boundaries: true,
+  gameLengthMinutes: true,
+  maxTeams: true,
+  playersPerTeam: true,
 });
 
 type GeoJSONFeature = {
@@ -54,7 +63,6 @@ type GeoJSONFeature = {
   properties: Record<string, unknown>;
 };
 
-// Convert GeoJSON to a simpler structure that can be serialized
 function simplifyGeoJSON(feature: GeoJSONFeature): Record<string, unknown> {
   return {
     type: feature.type,
@@ -81,6 +89,9 @@ export default function Admin() {
     defaultValues: {
       name: "",
       boundaries: null,
+      gameLengthMinutes: 60,
+      maxTeams: 10,
+      playersPerTeam: 4,
     },
   });
 
@@ -106,37 +117,6 @@ export default function Admin() {
       toast({
         title: "Success",
         description: "Game created successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateUserRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: number; role: "admin" | "user" }) => {
-      const response = await fetch(`/api/admin/users/${userId}/role`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Success",
-        description: "User role updated successfully",
       });
     },
     onError: (error: Error) => {
@@ -201,7 +181,7 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <FormField
                       control={form.control}
                       name="name"
@@ -210,6 +190,84 @@ export default function Admin() {
                           <FormLabel>Game Name</FormLabel>
                           <FormControl>
                             <Input placeholder="Enter game name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="gameLengthMinutes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Game Length (minutes)</FormLabel>
+                          <FormControl>
+                            <div className="space-y-2">
+                              <Slider
+                                min={10}
+                                max={180}
+                                step={5}
+                                value={[field.value]}
+                                onValueChange={([value]) => field.onChange(value)}
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{field.value} minutes</span>
+                                <span>3 hours</span>
+                              </div>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="maxTeams"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Maximum Teams</FormLabel>
+                          <FormControl>
+                            <div className="space-y-2">
+                              <Slider
+                                min={2}
+                                max={50}
+                                step={1}
+                                value={[field.value]}
+                                onValueChange={([value]) => field.onChange(value)}
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{field.value} teams</span>
+                                <span>50 teams</span>
+                              </div>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="playersPerTeam"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Players per Team</FormLabel>
+                          <FormControl>
+                            <div className="space-y-2">
+                              <Slider
+                                min={1}
+                                max={10}
+                                step={1}
+                                value={[field.value]}
+                                onValueChange={([value]) => field.onChange(value)}
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{field.value} players</span>
+                                <span>10 players</span>
+                              </div>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -255,6 +313,12 @@ export default function Admin() {
                             <h3 className="font-semibold">{game.name}</h3>
                             <p className="text-sm text-muted-foreground">
                               {game.status}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Length: {game.gameLengthMinutes} minutes
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
                             </p>
                           </div>
                           <Button

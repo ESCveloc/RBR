@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, jsonb, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, jsonb, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -35,7 +35,10 @@ export const games = pgTable("games", {
   status: text("status", { enum: ["pending", "active", "completed"] }).default("pending").notNull(),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
-  boundaries: jsonb("boundaries").notNull(), // GeoJSON for game area
+  gameLengthMinutes: integer("game_length_minutes").notNull().default(60),
+  maxTeams: integer("max_teams").notNull().default(10),
+  playersPerTeam: integer("players_per_team").notNull().default(4),
+  boundaries: jsonb("boundaries").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: serial("created_by").references(() => users.id).notNull()
 });
@@ -81,7 +84,12 @@ export const insertUserSchema = createInsertSchema(users, {
 export const selectUserSchema = createSelectSchema(users);
 export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
-export const insertGameSchema = createInsertSchema(games);
+export const insertGameSchema = createInsertSchema(games, {
+  boundaries: z.any(),
+  gameLengthMinutes: z.number().min(10).max(180),
+  maxTeams: z.number().min(2).max(50),
+  playersPerTeam: z.number().min(1).max(10),
+});
 export const selectGameSchema = createSelectSchema(games);
 
 // Types
