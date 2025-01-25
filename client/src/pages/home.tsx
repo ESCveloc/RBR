@@ -17,7 +17,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
-  const { user } = useUser();
+  const { user, logout } = useUser();
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
@@ -26,6 +26,10 @@ export default function Home() {
   const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
   });
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   if (gamesLoading || teamsLoading) {
     return (
@@ -40,11 +44,16 @@ export default function Home() {
       <OctagonsBackground />
 
       <div className="relative z-10 p-4 md:p-8">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            Battle Royale
-          </h1>
-          <p className="text-muted-foreground">Welcome back, {user?.username}</p>
+        <header className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+              Battle Royale
+            </h1>
+            <p className="text-muted-foreground">Welcome back, {user?.username}</p>
+          </div>
+          <Button onClick={handleLogout} variant="outline">
+            Logout
+          </Button>
         </header>
 
         <div className="grid gap-8 md:grid-cols-[2fr_1fr]">
