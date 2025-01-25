@@ -3,67 +3,50 @@ import type { Game } from "@db/schema";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
-import "leaflet-draw";
-import type { Feature } from "geojson";
+import type { Feature, Polygon } from "geojson";
+import "leaflet-draw"; // Import at top level
 
-// Extend leaflet types to include Draw control
+// Extend Leaflet types to include Draw functionality
 declare module 'leaflet' {
   namespace Control {
     class Draw extends L.Control {
-      constructor(options?: DrawConstructorOptions)
+      constructor(options?: DrawConstructorOptions);
     }
-  }
 
-  interface DrawConstructorOptions {
-    draw?: DrawOptions;
-    edit?: {
-      featureGroup: L.FeatureGroup;
-    };
-  }
+    interface DrawConstructorOptions {
+      draw?: {
+        polyline?: boolean | DrawOptions;
+        polygon?: boolean | DrawOptions;
+        rectangle?: boolean | DrawOptions;
+        circle?: boolean | DrawOptions;
+        marker?: boolean | DrawOptions;
+        circlemarker?: boolean | DrawOptions;
+      };
+      edit?: {
+        featureGroup: L.FeatureGroup;
+      };
+    }
 
-  interface DrawOptions {
-    polyline?: boolean;
-    polygon?: boolean;
-    circle?: boolean;
-    rectangle?: boolean;
-    marker?: boolean;
-    circlemarker?: boolean;
+    interface DrawOptions {
+      shapeOptions?: L.PathOptions;
+      showArea?: boolean;
+      metric?: boolean;
+      repeatMode?: boolean;
+    }
   }
 
   namespace Draw {
     namespace Event {
-      const CREATED: 'draw:created';
+      const CREATED: string;
     }
   }
 }
 
-type DrawEventCreated = {
-  layer: L.Layer;
-  layerType: string;
-};
-
 interface MapViewProps {
   game?: Game;
   mode?: "view" | "draw";
-  onAreaSelect?: (area: Feature) => void;
-  selectedArea?: Feature | null;
-}
-
-type Coordinates = [number, number];
-
-interface Location {
-  type: "Point";
-  coordinates: Coordinates;
-}
-
-interface TeamWithLocation {
-  name: string;
-  location?: Location;
-}
-
-interface ParticipantWithTeam {
-  location?: Location;
-  team: TeamWithLocation;
+  onAreaSelect?: (area: Feature<Polygon>) => void;
+  selectedArea?: Feature<Polygon> | null;
 }
 
 export function MapView({
@@ -73,101 +56,111 @@ export function MapView({
   selectedArea,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
-  const drawControlRef = useRef<L.Control.Draw | null>(null);
+  const drawLayerRef = useRef<L.FeatureGroup | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) {
-      const map = L.map("map").setView([0, 0], 13);
+      // Initialize map centered on San Francisco
+      const map = L.map("map").setView([37.7749, -122.4194], 13);
+      mapRef.current = map;
 
+      // Add OpenStreetMap tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
       }).addTo(map);
 
-      if (mode === "draw") {
-        const drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
+      // Initialize draw feature group
+      const drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+      drawLayerRef.current = drawnItems;
 
+      if (mode === "draw") {
+        // Add draw controls
         const drawControl = new L.Control.Draw({
           draw: {
-            polygon: true,
+            polygon: {
+              shapeOptions: {
+                color: '#0969da'
+              }
+            },
+            rectangle: {
+              shapeOptions: {
+                color: '#0969da'
+              }
+            },
             circle: false,
             circlemarker: false,
             marker: false,
             polyline: false,
-            rectangle: true,
           },
           edit: {
             featureGroup: drawnItems,
           },
         });
-        map.addControl(drawControl);
-        drawControlRef.current = drawControl;
 
-        map.on('draw:created', (event: { layer: L.Layer; layerType: string }) => {
-          const layer = event.layer;
+        map.addControl(drawControl);
+
+        // Handle draw events
+        map.on(L.Draw.Event.CREATED, (e: any) => {
           drawnItems.clearLayers();
+          const layer = e.layer as L.Polygon;
           drawnItems.addLayer(layer);
 
           if (onAreaSelect) {
-            onAreaSelect(layer.toGeoJSON());
+            const geoJSON = layer.toGeoJSON() as Feature<Polygon>;
+            onAreaSelect(geoJSON);
           }
         });
       }
-
-      // Enable location tracking
-      map.locate({ watch: true, enableHighAccuracy: true });
-
-      mapRef.current = map;
     }
 
-    // Cleanup
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        drawLayerRef.current = null;
       }
     };
   }, [mode, onAreaSelect]);
 
+  // Update map when game boundaries change
   useEffect(() => {
-    if (mapRef.current && game?.boundaries) {
-      // Clear existing layers
-      mapRef.current.eachLayer((layer: L.Layer) => {
-        if (layer instanceof L.Marker || layer instanceof L.Polygon) {
-          mapRef.current?.removeLayer(layer);
-        }
-      });
+    const map = mapRef.current;
+    const drawLayer = drawLayerRef.current;
 
-      // Draw game boundaries
-      const boundariesLayer = L.geoJSON(game.boundaries as Feature);
-      boundariesLayer.addTo(mapRef.current);
-      mapRef.current.fitBounds(boundariesLayer.getBounds());
-
-      // Draw team locations
-      if ('participants' in game) {
-        const participants = game.participants as ParticipantWithTeam[];
-        participants.forEach((participant) => {
-          if (participant.location) {
-            const { coordinates } = participant.location;
-            L.marker([coordinates[1], coordinates[0]], {
-              icon: L.divIcon({
-                className: "team-marker",
-                html: `<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                        ${participant.team.name[0]}
-                      </div>`,
-              }),
-            }).addTo(mapRef.current!);
-          }
-        });
+    if (map && game?.boundaries) {
+      // Clear existing layers except the base tile layer
+      if (drawLayer) {
+        drawLayer.clearLayers();
       }
+
+      // Add game boundaries
+      const boundariesLayer = L.geoJSON(game.boundaries as any);
+      boundariesLayer.addTo(map);
+      map.fitBounds(boundariesLayer.getBounds());
     }
   }, [game]);
+
+  // Update drawn area when selectedArea changes
+  useEffect(() => {
+    const map = mapRef.current;
+    const drawLayer = drawLayerRef.current;
+
+    if (map && drawLayer && selectedArea) {
+      drawLayer.clearLayers();
+      L.geoJSON(selectedArea).getLayers().forEach(layer => {
+        drawLayer.addLayer(layer);
+      });
+    }
+  }, [selectedArea]);
 
   return (
     <div
       id="map"
-      className="w-full h-full min-h-[400px] rounded-lg overflow-hidden"
+      className="w-full h-full"
+      style={{ minHeight: "300px" }}
     />
   );
 }

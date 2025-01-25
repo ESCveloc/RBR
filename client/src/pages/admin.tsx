@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,13 +18,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { MapView } from "@/components/game/map-view";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertGameSchema } from "@db/schema";
-import { Loader2, Trophy, Users, Settings } from "lucide-react";
+import { Loader2, Trophy, Users, Settings, Plus } from "lucide-react";
 import type { Game, User } from "@db/schema";
+import type { Feature, Polygon } from "geojson";
 import {
   Tabs,
   TabsContent,
@@ -48,6 +51,7 @@ const formSchema = insertGameSchema.pick({
 });
 
 export default function Admin() {
+  const [selectedArea, setSelectedArea] = useState<Feature<Polygon> | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -102,11 +106,23 @@ export default function Admin() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!selectedArea) {
+      toast({
+        title: "Error",
+        description: "Please select a game area on the map",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          boundaries: selectedArea,
+        }),
         credentials: "include",
       });
 
@@ -116,6 +132,7 @@ export default function Admin() {
 
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
       form.reset();
+      setSelectedArea(null);
       toast({
         title: "Success",
         description: "Game created successfully",
@@ -259,6 +276,22 @@ export default function Admin() {
                       )}
                     />
 
+                    <div>
+                      <FormLabel>Game Area</FormLabel>
+                      <div className="h-[300px] rounded-lg overflow-hidden border mt-2">
+                        <MapView
+                          mode="draw"
+                          onAreaSelect={setSelectedArea}
+                          selectedArea={selectedArea}
+                        />
+                      </div>
+                      {!selectedArea && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Draw a polygon or rectangle on the map to set the game boundaries
+                        </p>
+                      )}
+                    </div>
+
                     <Button
                       type="submit"
                       className="w-full"
@@ -267,6 +300,7 @@ export default function Admin() {
                       {form.formState.isSubmitting && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       )}
+                      <Plus className="h-4 w-4 mr-2" />
                       Create Game
                     </Button>
                   </form>
