@@ -1,13 +1,14 @@
 import { useState } from "react";
-import type { Team } from "@db/schema";
+import type { Team, User } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { TeamMembersCard } from "./team-members-card";
 import { useUser } from "@/hooks/use-user";
+import { useQuery } from "@tanstack/react-query";
 
 interface TeamCardProps {
-  team: Team & { members?: Array<any> };
+  team: Team & { members?: Array<User> };
   status?: "alive" | "eliminated";
 }
 
@@ -15,6 +16,11 @@ export function TeamCard({ team, status }: TeamCardProps) {
   const [showMembers, setShowMembers] = useState(false);
   const { user } = useUser();
   const isCaptain = user?.id === team.captainId;
+
+  const { data: members = [] } = useQuery<User[]>({
+    queryKey: [`/api/teams/${team.id}/members`],
+    enabled: true, // Always fetch members to show accurate count
+  });
 
   return (
     <Card
@@ -43,7 +49,7 @@ export function TeamCard({ team, status }: TeamCardProps) {
               <p className="text-sm text-muted-foreground">
                 {status
                   ? status.charAt(0).toUpperCase() + status.slice(1)
-                  : `${team.members?.length || 0} members`}
+                  : `${members.length} members`}
               </p>
             </div>
           </div>

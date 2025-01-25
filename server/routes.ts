@@ -306,12 +306,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Verify new captain is a team member
-      const [isMember] = await db
+      const isMemberQuery = db
         .select()
         .from(teamMembers)
-        .where(eq(teamMembers.teamId, teamId))
-        .where(eq(teamMembers.userId, newCaptainId))
-        .limit(1);
+        .where((teamMembers) => eq(teamMembers.teamId, teamId))
+        .where((teamMembers) => eq(teamMembers.userId, newCaptainId));
+      const [isMember] = await isMemberQuery;
+
 
       if (!isMember) {
         return res.status(400).send("New captain must be a team member");
