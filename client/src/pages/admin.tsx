@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,19 +16,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Slider,
-  SliderTrack,
-  SliderRange,
-  SliderThumb,
-} from "@/components/ui/slider";
-import { MapView } from "@/components/game/map-view";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertGameSchema } from "@db/schema";
-import { Loader2, Plus, Users, Trophy, Settings } from "lucide-react";
+import { Loader2, Trophy, Users, Settings } from "lucide-react";
 import type { Game, User } from "@db/schema";
 import {
   Tabs,
@@ -48,31 +41,13 @@ import {
 
 const formSchema = insertGameSchema.pick({
   name: true,
-  boundaries: true,
   gameLengthMinutes: true,
   maxTeams: true,
   playersPerTeam: true,
+  boundaries: true,
 });
 
-type GeoJSONFeature = {
-  type: "Feature";
-  geometry: {
-    type: string;
-    coordinates: number[][][];
-  };
-  properties: Record<string, unknown>;
-};
-
-function simplifyGeoJSON(feature: GeoJSONFeature): Record<string, unknown> {
-  return {
-    type: feature.type,
-    geometry: feature.geometry,
-    properties: feature.properties,
-  };
-}
-
 export default function Admin() {
-  const [selectedArea, setSelectedArea] = useState<GeoJSONFeature | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -88,19 +63,19 @@ export default function Admin() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      boundaries: null,
+      boundaries: { type: "Feature", geometry: { type: "Polygon", coordinates: [[]] }, properties: {} },
       gameLengthMinutes: 60,
       maxTeams: 10,
       playersPerTeam: 4,
     },
   });
 
-  const createGame = useMutation({
-    mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const response = await fetch("/api/games", {
-        method: "POST",
+  const updateUserRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: number; role: "admin" | "user" }) => {
+      const response = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ role }),
         credentials: "include",
       });
 
@@ -111,12 +86,10 @@ export default function Admin() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
-      form.reset();
-      setSelectedArea(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "Success",
-        description: "Game created successfully",
+        description: "User role updated successfully",
       });
     },
     onError: (error: Error) => {
@@ -129,19 +102,31 @@ export default function Admin() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!selectedArea) {
+    try {
+      const response = await fetch("/api/games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Game created successfully",
+      });
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please select a game area on the map",
+        description: error.message,
         variant: "destructive",
       });
-      return;
     }
-
-    await createGame.mutateAsync({
-      ...values,
-      boundaries: simplifyGeoJSON(selectedArea),
-    });
   }
 
   if (gamesLoading || usersLoading) {
@@ -274,14 +259,6 @@ export default function Admin() {
                       )}
                     />
 
-                    <div className="h-[300px] rounded-lg overflow-hidden border">
-                      <MapView
-                        mode="draw"
-                        onAreaSelect={setSelectedArea}
-                        selectedArea={selectedArea}
-                      />
-                    </div>
-
                     <Button
                       type="submit"
                       className="w-full"
@@ -290,7 +267,6 @@ export default function Admin() {
                       {form.formState.isSubmitting && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       )}
-                      <Plus className="h-4 w-4 mr-2" />
                       Create Game
                     </Button>
                   </form>
@@ -323,9 +299,7 @@ export default function Admin() {
                           </div>
                           <Button
                             variant="outline"
-                            onClick={() =>
-                              window.location.assign(`/game/${game.id}`)
-                            }
+                            onClick={() => window.location.assign(`/game/${game.id}`)}
                           >
                             View
                           </Button>

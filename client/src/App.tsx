@@ -14,14 +14,14 @@ import { useEffect } from "react";
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
-  // Redirect admin users to admin dashboard by default
+  // Redirect admin users to admin dashboard by default if they're on the home page
   useEffect(() => {
-    if (user?.role === "admin") {
+    if (user?.role === "admin" && location === "/") {
       setLocation("/admin");
     }
-  }, [user, setLocation]);
+  }, [user, location, setLocation]);
 
   if (isLoading) {
     return (
