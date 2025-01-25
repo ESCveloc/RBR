@@ -82,3 +82,4 @@ export type InsertUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
 export type Game = typeof games.$inferSelect;
 export type GameParticipant = typeof gameParticipants.$inferSelect;
+export type SelectUser = User;
