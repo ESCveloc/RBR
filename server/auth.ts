@@ -21,15 +21,21 @@ const crypto = {
   compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
     try {
       const [hashedPassword, salt] = storedPassword.split(".");
+
       if (!hashedPassword || !salt) {
         console.error("Invalid stored password format");
         return false;
       }
 
-      const hashBuffer = Buffer.from(hashedPassword, "hex");
-      const suppliedBuffer = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
+      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
+      const suppliedPasswordBuf = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
 
-      return timingSafeEqual(hashBuffer, suppliedBuffer);
+      if (hashedPasswordBuf.length !== suppliedPasswordBuf.length) {
+        console.error("Password buffer length mismatch");
+        return false;
+      }
+
+      return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
     } catch (error) {
       console.error("Password comparison error:", error);
       return false;
@@ -61,6 +67,7 @@ export function setupAuth(app: Express) {
   passport.use(new LocalStrategy(async (username, password, done) => {
     try {
       console.log(`Attempting login for user: ${username}`);
+
       const [user] = await db
         .select()
         .from(users)
@@ -72,6 +79,7 @@ export function setupAuth(app: Express) {
         return done(null, false, { message: "Invalid username or password" });
       }
 
+      console.log("Found user, verifying password...");
       const isValid = await crypto.compare(password, user.password);
       console.log(`Password validation result: ${isValid}`);
 
@@ -86,7 +94,7 @@ export function setupAuth(app: Express) {
     }
   }));
 
-  passport.serializeUser((user: Express.User, done) => {
+  passport.serializeUser((user, done) => {
     done(null, user.id);
   });
 
@@ -103,9 +111,14 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Let's recreate the user with proper password hashing
   app.post("/api/register", async (req, res) => {
     try {
       const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).send("Username and password are required");
+      }
 
       // Check existing user
       const [existingUser] = await db
@@ -118,7 +131,7 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ error: "Username already exists" });
       }
 
-      // Create user
+      // Create user with properly hashed password
       const hashedPassword = await crypto.hash(password);
       const [user] = await db
         .insert(users)
@@ -144,6 +157,7 @@ export function setupAuth(app: Express) {
         });
       });
     } catch (error) {
+      console.error("Registration error:", error);
       res.status(500).json({ error: "Registration failed" });
     }
   });
@@ -151,6 +165,7 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false, info: IVerifyOptions) => {
       if (err) {
+        console.error("Authentication error:", err);
         return res.status(500).json({ error: "Login failed" });
       }
       if (!user) {
@@ -158,6 +173,7 @@ export function setupAuth(app: Express) {
       }
       req.login(user, (err) => {
         if (err) {
+          console.error("Login session error:", err);
           return res.status(500).json({ error: "Login failed" });
         }
         res.json({
@@ -175,7 +191,7 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
-        return res.status(500).json({ error: "Logout failed" });
+        return res.status(500).send("Logout failed");
       }
       res.json({ message: "Logged out successfully" });
     });
@@ -183,7 +199,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Not authenticated" });
+      return res.status(401).send("Not authenticated");
     }
     const user = req.user as Express.User;
     res.json({
@@ -191,13 +207,5 @@ export function setupAuth(app: Express) {
       username: user.username,
       role: user.role
     });
-  });
-
-  app.use("/api/admin/*", (req, res, next) => {
-    const user = req.user as Express.User;
-    if (!req.isAuthenticated() || user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-    next();
   });
 }

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { insertUserSchema } from "@db/schema";
 
 type AuthMode = "login" | "register";
@@ -33,6 +33,7 @@ const formSchema = insertUserSchema.pick({
 
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("login");
+  const [showPassword, setShowPassword] = useState(false);
   const { login, register } = useUser();
   const { toast } = useToast();
 
@@ -49,7 +50,6 @@ export default function AuthPage() {
       const action = mode === "login" ? login : register;
       console.log(`Attempting to ${mode}...`);
 
-      // Explicitly type the values to match the expected schema
       const credentials = {
         username: values.username,
         password: values.password,
@@ -117,11 +117,26 @@ export default function AuthPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter password"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter password"
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
