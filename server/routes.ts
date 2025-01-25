@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, teams, gameParticipants, teamMembers } from "@db/schema";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
@@ -108,6 +108,61 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
+  // Admin API routes
+  app.get("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).send("Forbidden");
+    }
+
+    try {
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .orderBy(users.createdAt);
+
+      res.json(allUsers);
+    } catch (error) {
+      console.error("Fetch users error:", error);
+      res.status(500).send("Failed to fetch users");
+    }
+  });
+
+  app.patch("/api/admin/users/:userId/role", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).send("Forbidden");
+    }
+
+    const userId = parseInt(req.params.userId);
+    const { role } = req.body;
+
+    if (isNaN(userId) || !["admin", "user"].includes(role)) {
+      return res.status(400).send("Invalid user ID or role");
+    }
+
+    // Prevent self-demotion
+    if (userId === req.user.id) {
+      return res.status(400).send("Cannot modify your own role");
+    }
+
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ role })
+        .where(eq(users.id, userId))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Update user role error:", error);
+      res.status(500).send("Failed to update user role");
+    }
+  });
+
   // Teams API endpoints
   app.post("/api/teams", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -121,7 +176,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Team name must be at least 3 characters long");
       }
 
-      // Create team with current user as captain
       const [team] = await db
         .insert(teams)
         .values({
@@ -130,7 +184,6 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
-      // Add captain as first team member
       await db.insert(teamMembers).values({
         teamId: team.id,
         userId: req.user.id,
@@ -138,7 +191,7 @@ export function registerRoutes(app: Express): Server {
 
       res.json(team);
     } catch (error: any) {
-      if (error.code === "23505") { // PostgreSQL unique constraint violation
+      if (error.code === "23505") {
         return res.status(400).send("Team name already exists");
       }
       console.error("Team creation error:", error);
@@ -152,15 +205,8 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Get all teams where user is either captain or member
       const userTeams = await db
-        .select({
-          id: teams.id,
-          name: teams.name,
-          captainId: teams.captainId,
-          createdAt: teams.createdAt,
-          active: teams.active
-        })
+        .select()
         .from(teams)
         .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
@@ -168,8 +214,7 @@ export function registerRoutes(app: Express): Server {
             eq(teams.captainId, req.user.id),
             eq(teamMembers.userId, req.user.id)
           )
-        )
-        .groupBy(teams.id);
+        );
 
       res.json(userTeams);
     } catch (error) {

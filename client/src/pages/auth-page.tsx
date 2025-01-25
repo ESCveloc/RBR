@@ -48,7 +48,14 @@ export default function AuthPage() {
     try {
       const action = mode === "login" ? login : register;
       console.log(`Attempting to ${mode}...`);
-      const result = await action(values);
+
+      // Explicitly type the values to match the expected schema
+      const credentials = {
+        username: values.username,
+        password: values.password,
+      };
+
+      const result = await action(credentials);
 
       if (!result.ok) {
         console.error(`${mode} failed:`, result.message);
@@ -60,7 +67,6 @@ export default function AuthPage() {
         return;
       }
 
-      // Success toast
       toast({
         title: "Success",
         description: mode === "login" ? "Successfully logged in!" : "Account created successfully!",
