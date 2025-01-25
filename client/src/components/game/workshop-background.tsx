@@ -12,61 +12,136 @@ export function WorkshopBackground({ className = "" }: WorkshopBackgroundProps) 
       preserveAspectRatio="xMidYMid slice"
     >
       <defs>
-        {/* Gradient for metallic effect */}
+        {/* Metal texture gradient */}
         <linearGradient id="metallic" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#2c3e50" />
-          <stop offset="50%" stopColor="#3498db" />
+          <stop offset="50%" stopColor="#34495e" />
           <stop offset="100%" stopColor="#2c3e50" />
         </linearGradient>
-        
-        {/* Gradient for workshop lighting */}
-        <radialGradient id="workshop-light" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-          <stop offset="0%" stopColor="rgba(255, 255, 255, 0.2)" />
-          <stop offset="100%" stopColor="rgba(0, 0, 0, 0.8)" />
+
+        {/* Tactical screen glow */}
+        <radialGradient id="screen-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3498db" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#2980b9" stopOpacity="0" />
         </radialGradient>
+
+        {/* Equipment highlight */}
+        <linearGradient id="equipment-highlight" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#e74c3c" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#c0392b" stopOpacity="0" />
+        </linearGradient>
+
+        {/* Military pattern */}
+        <pattern id="military-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="20" height="20" fill="#2c3e50" fillOpacity="0.1" />
+          <path d="M0 10 L20 10 M10 0 L10 20" stroke="#34495e" strokeWidth="0.5" />
+        </pattern>
       </defs>
 
-      {/* Background */}
+      {/* Workshop floor */}
       <rect width="100%" height="100%" fill="#1a1a1a" />
-      
-      {/* Workshop floor grid */}
-      <path
-        d="M0 700 L1200 700 M0 600 L1200 600 M0 500 L1200 500 M0 400 L1200 400
-           M200 800 L200 0 M400 800 L400 0 M600 800 L600 0 M800 800 L800 0 M1000 800 L1000 0"
-        stroke="rgba(255, 255, 255, 0.1)"
-        strokeWidth="1"
-      />
+      <rect width="100%" height="100%" fill="url(#military-pattern)" />
 
-      {/* Workbench */}
-      <rect x="100" y="400" width="400" height="200" fill="url(#metallic)" />
-      
-      {/* Tactical gear display */}
-      <g transform="translate(600, 300)">
-        {/* Helmet outline */}
-        <path
-          d="M50 0 C20 0 0 20 0 50 L0 80 C0 110 20 130 50 130 L80 130 C110 130 130 110 130 80 L130 50 C130 20 110 0 80 0 Z"
-          fill="url(#metallic)"
-          stroke="#3498db"
-          strokeWidth="2"
-        />
-        
-        {/* Visor */}
-        <path
-          d="M30 40 L100 40 L115 60 L15 60 Z"
-          fill="#3498db"
-          opacity="0.7"
-        />
+      {/* Grid lines */}
+      <g stroke="rgba(52, 152, 219, 0.1)" strokeWidth="1">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <path
+            key={`grid-${i}`}
+            d={`M${i * 60} 0 L${i * 60} 800 M0 ${i * 40} L1200 ${i * 40}`}
+          />
+        ))}
       </g>
 
-      {/* Tool rack */}
-      <g transform="translate(800, 200)">
-        <rect x="0" y="0" width="200" height="20" fill="url(#metallic)" />
-        <rect x="20" y="20" width="5" height="100" fill="url(#metallic)" />
-        <rect x="180" y="20" width="5" height="100" fill="url(#metallic)" />
+      {/* Main workbench */}
+      <g transform="translate(100, 300)">
+        <rect width="400" height="150" fill="url(#metallic)" />
+        <rect width="400" height="20" fill="#34495e" />
+        {/* Tools on workbench */}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <rect
+            key={`tool-${i}`}
+            x={50 + i * 70}
+            y="30"
+            width="40"
+            height="10"
+            fill="#7f8c8d"
+          />
+        ))}
+      </g>
+
+      {/* Weapon rack */}
+      <g transform="translate(800, 100)">
+        <rect width="300" height="400" fill="url(#metallic)" opacity="0.7" />
+        {/* Weapon silhouettes */}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <g key={`weapon-${i}`} transform={`translate(50, ${50 + i * 100})`}>
+            <rect width="200" height="30" rx="5" fill="#2c3e50" />
+            <rect
+              width="200"
+              height="30"
+              rx="5"
+              fill="url(#equipment-highlight)"
+            />
+          </g>
+        ))}
+      </g>
+
+      {/* Tactical screens */}
+      <g transform="translate(50, 50)">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <g key={`screen-${i}`} transform={`translate(${i * 250}, 0)`}>
+            <rect width="200" height="150" rx="10" fill="#2c3e50" />
+            <rect
+              width="180"
+              height="130"
+              x="10"
+              y="10"
+              fill="#34495e"
+              opacity="0.8"
+            />
+            <rect
+              width="180"
+              height="130"
+              x="10"
+              y="10"
+              fill="url(#screen-glow)"
+            />
+            {/* Screen content */}
+            <path
+              d={`M20 ${75 + Math.sin(i) * 20} L180 ${75 + Math.cos(i) * 20}`}
+              stroke="#3498db"
+              strokeWidth="2"
+              fill="none"
+            />
+          </g>
+        ))}
+      </g>
+
+      {/* Equipment storage */}
+      <g transform="translate(600, 500)">
+        <rect width="500" height="250" fill="url(#metallic)" />
+        {/* Compartments */}
+        {Array.from({ length: 10 }).map((_, i) => (
+          <rect
+            key={`compartment-${i}`}
+            x={i * 50}
+            y="0"
+            width="45"
+            height="250"
+            fill="#2c3e50"
+            stroke="#34495e"
+          />
+        ))}
       </g>
 
       {/* Ambient lighting */}
-      <circle cx="600" cy="100" r="400" fill="url(#workshop-light)" opacity="0.4" />
+      <g opacity="0.3">
+        <radialGradient id="ambient-light" cx="50%" cy="0%" r="70%">
+          <stop offset="0%" stopColor="#3498db" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#2c3e50" stopOpacity="0" />
+        </radialGradient>
+        <rect width="100%" height="100%" fill="url(#ambient-light)" />
+      </g>
     </svg>
   );
 }
