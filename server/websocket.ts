@@ -17,7 +17,7 @@ export function setupWebSocketServer(server: Server) {
     perMessageDeflate: false,
     maxPayload: 64 * 1024, // 64kb
     // Ignore Vite HMR WebSocket connections
-    verifyClient: (info) => {
+    verifyClient: (info: any) => {
       return !info.req.headers['sec-websocket-protocol']?.includes('vite-hmr');
     }
   });
