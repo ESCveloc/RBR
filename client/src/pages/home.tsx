@@ -10,10 +10,10 @@ import {
 import { TeamCard } from "@/components/game/team-card";
 import { ProfileCard } from "@/components/user/profile-card";
 import { CreateTeamDialog } from "@/components/game/create-team-dialog";
-import { WorkshopBackground } from "@/components/game/workshop-background";
 import { useUser } from "@/hooks/use-user";
 import type { Game, Team } from "@db/schema";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const { user } = useUser();
@@ -35,8 +35,17 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <WorkshopBackground className="opacity-20" />
+    <div 
+      className="relative min-h-screen bg-background"
+      style={{
+        backgroundImage: 'url("/assets/workshop-bg.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 p-4 md:p-8">
         <header className="mb-8">
