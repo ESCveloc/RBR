@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,6 +42,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Extend form schema to include zone configurations with individual intervals
 const formSchema = insertGameSchema.extend({
@@ -74,10 +77,89 @@ const settingsSchema = z.object({
   })).min(1),
 });
 
+function getStatusColor(status: string) {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20";
+    case "active":
+      return "bg-green-500/10 text-green-500 hover:bg-green-500/20";
+    case "completed":
+      return "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20";
+    default:
+      return "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20";
+  }
+}
+
+function getStatusText(status: string) {
+  switch (status) {
+    case "pending":
+      return "Waiting";
+    case "active":
+      return "In Progress";
+    case "completed":
+      return "Ended";
+    default:
+      return status;
+  }
+}
+
 export default function Admin() {
   const [selectedArea, setSelectedArea] = useState<Feature<Polygon> | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Create game mutation
+  const createGame = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      if (!selectedArea) {
+        throw new Error("Please select a game area on the map");
+      }
+
+      const response = await fetch("/api/games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...values,
+          boundaries: selectedArea,
+        }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to create game");
+      }
+
+      return response.json();
+    },
+    onSuccess: (game) => {
+      // Reset form state
+      form.reset();
+      setSelectedArea(null);
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Game created successfully",
+      });
+
+      // Refresh games list
+      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
+
+      // Redirect to the new game page after a short delay
+      setTimeout(() => {
+        setLocation(`/game/${game.id}`);
+      }, 1500);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Add settings query
   const { data: settings } = useQuery({
@@ -91,15 +173,17 @@ export default function Admin() {
     },
   });
 
+  // Update games query to enable automatic updates
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
+    refetchInterval: 5000, // Refetch every 5 seconds to keep the list updated
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  // Game creation form without zone configurations
+  // Form setup
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -112,20 +196,26 @@ export default function Admin() {
     },
   });
 
-  // Settings form
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!selectedArea) {
+      toast({
+        title: "Error",
+        description: "Please select a game area on the map",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createGame.mutate(values);
+  }
+
   const settingsForm = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: {
-      defaultCenter: {
-        lat: 37.7749,
-        lng: -122.4194,
-      },
+    defaultValues: settings || {
+      defaultCenter: { lat: 0, lng: 0 },
       defaultRadiusMiles: 1,
-      zoneConfigs: [
-        { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-        { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-        { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-      ],
+      numberOfZones: 2,
+      zoneConfigs: [{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }],
     },
   });
 
@@ -185,47 +275,6 @@ export default function Admin() {
       });
     },
   });
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!selectedArea) {
-      toast({
-        title: "Error",
-        description: "Please select a game area on the map",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/games", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...values,
-          boundaries: selectedArea,
-        }),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
-      form.reset();
-      setSelectedArea(null);
-      toast({
-        title: "Success",
-        description: "Game created successfully",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  }
 
   if (gamesLoading || usersLoading) {
     return (
@@ -379,13 +428,19 @@ export default function Admin() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={form.formState.isSubmitting}
+                      disabled={createGame.isPending || !selectedArea}
                     >
-                      {form.formState.isSubmitting && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {createGame.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Game
+                        </>
                       )}
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Game
                     </Button>
                   </form>
                 </Form>
@@ -399,32 +454,53 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {games?.map((game) => (
-                    <Card key={game.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-semibold">{game.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {game.status}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Length: {game.gameLengthMinutes} minutes
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
-                            </p>
+                  {games?.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No games available. Create a new game to get started.
+                    </div>
+                  ) : (
+                    games?.map((game) => (
+                      <Card key={game.id}>
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-center">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold">{game.name}</h3>
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "capitalize",
+                                    getStatusColor(game.status)
+                                  )}
+                                >
+                                  {getStatusText(game.status)}
+                                </Badge>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">
+                                  Length: {game.gameLengthMinutes} minutes
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
+                                </p>
+                                {game.startTime && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Starts: {new Date(game.startTime).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              onClick={() => setLocation(`/game/${game.id}`)}
+                            >
+                              View
+                            </Button>
                           </div>
-                          <Button
-                            variant="outline"
-                            onClick={() => window.location.assign(`/game/${game.id}`)}
-                          >
-                            View
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
