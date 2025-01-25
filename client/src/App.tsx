@@ -21,10 +21,12 @@ function Router() {
     );
   }
 
+  // Show auth page if user is not logged in
   if (!user) {
     return <AuthPage />;
   }
 
+  // Protected routes for authenticated users
   return (
     <Switch>
       <Route path="/" component={Home} />

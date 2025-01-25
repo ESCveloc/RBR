@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   firstName: text("first_name"),
   avatar: text("avatar"),
-  preferredPlayTimes: jsonb("preferred_play_times").default('[]'),
+  preferredPlayTimes: jsonb("preferred_play_times").$type<string[]>().default([]),
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
