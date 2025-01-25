@@ -1,7 +1,6 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Trophy } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -10,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { TeamCard } from "@/components/game/team-card";
 import { ProfileCard } from "@/components/user/profile-card";
+import { CreateTeamDialog } from "@/components/game/create-team-dialog";
 import { useUser } from "@/hooks/use-user";
 import type { Game, Team } from "@db/schema";
 import { Loader2 } from "lucide-react";
@@ -75,10 +75,7 @@ export default function Home() {
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-semibold">Your Teams</h2>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
+              <CreateTeamDialog />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {teams?.map((team) => (

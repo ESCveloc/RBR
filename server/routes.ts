@@ -108,5 +108,59 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
+  // Teams API endpoints
+  app.post("/api/teams", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const { name } = req.body;
+
+      if (!name || typeof name !== "string" || name.length < 3) {
+        return res.status(400).send("Team name must be at least 3 characters long");
+      }
+
+      // Create team with current user as captain
+      const [team] = await db
+        .insert(teams)
+        .values({
+          name,
+          captainId: req.user.id,
+        })
+        .returning();
+
+      // Add captain as first team member
+      await db.insert(teamMembers).values({
+        teamId: team.id,
+        userId: req.user.id,
+      });
+
+      res.json(team);
+    } catch (error: any) {
+      if (error.code === "23505") { // PostgreSQL unique constraint violation
+        return res.status(400).send("Team name already exists");
+      }
+      console.error("Team creation error:", error);
+      res.status(500).send("Failed to create team");
+    }
+  });
+
+  app.get("/api/teams", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const userTeams = await db.query.teams.findMany({
+        where: (teams, { eq }) => eq(teams.captainId, req.user.id),
+      });
+      res.json(userTeams);
+    } catch (error) {
+      console.error("Teams fetch error:", error);
+      res.status(500).send("Failed to fetch teams");
+    }
+  });
+
   return httpServer;
 }
