@@ -42,12 +42,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const formSchema = insertGameSchema.pick({
+// Extend form schema to make name required
+const formSchema = insertGameSchema.extend({
+  name: z.string().min(1, "Game name is required"),
+}).pick({
   name: true,
   gameLengthMinutes: true,
   maxTeams: true,
   playersPerTeam: true,
   boundaries: true,
+});
+
+// Settings form schema
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  numberOfZones: z.number().min(2).max(10),
+  zoneIntervalMinutes: z.number().min(5).max(60),
 });
 
 export default function Admin() {
@@ -63,6 +77,7 @@ export default function Admin() {
     queryKey: ["/api/admin/users"],
   });
 
+  // Game creation form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -73,6 +88,46 @@ export default function Admin() {
       playersPerTeam: 4,
     },
   });
+
+  // Settings form
+  const settingsForm = useForm<z.infer<typeof settingsSchema>>({
+    resolver: zodResolver(settingsSchema),
+    defaultValues: {
+      defaultCenter: {
+        lat: 37.7749,
+        lng: -122.4194,
+      },
+      defaultRadiusMiles: 1,
+      numberOfZones: 3,
+      zoneIntervalMinutes: 15,
+    },
+  });
+
+  const updateSettings = async (values: z.infer<typeof settingsSchema>) => {
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      toast({
+        title: "Success",
+        description: "Settings updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const updateUserRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: "admin" | "user" }) => {
@@ -400,13 +455,132 @@ export default function Admin() {
         <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>Configure global system settings</CardDescription>
+              <CardTitle>Game Settings</CardTitle>
+              <CardDescription>Configure default game settings</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                System settings will be implemented in the next phase.
-              </p>
+              <Form {...settingsForm}>
+                <form onSubmit={settingsForm.handleSubmit(updateSettings)} className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={settingsForm.control}
+                      name="defaultCenter.lat"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Center Latitude</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={settingsForm.control}
+                      name="defaultCenter.lng"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Center Longitude</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={settingsForm.control}
+                    name="defaultRadiusMiles"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Default Radius (miles)</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            <Slider
+                              min={0.1}
+                              max={10}
+                              step={0.1}
+                              value={[field.value]}
+                              onValueChange={([value]) => field.onChange(value)}
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{field.value.toFixed(1)} miles</span>
+                              <span>10 miles</span>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={settingsForm.control}
+                    name="numberOfZones"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of Zones</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            <Slider
+                              min={2}
+                              max={10}
+                              step={1}
+                              value={[field.value]}
+                              onValueChange={([value]) => field.onChange(value)}
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{field.value} zones</span>
+                              <span>10 zones</span>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={settingsForm.control}
+                    name="zoneIntervalMinutes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Zone Interval (minutes)</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            <Slider
+                              min={5}
+                              max={60}
+                              step={5}
+                              value={[field.value]}
+                              onValueChange={([value]) => field.onChange(value)}
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{field.value} minutes</span>
+                              <span>60 minutes</span>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={settingsForm.formState.isSubmitting}
+                  >
+                    {settingsForm.formState.isSubmitting && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save Settings
+                  </Button>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </TabsContent>

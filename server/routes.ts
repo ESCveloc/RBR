@@ -3,12 +3,20 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, teams, gameParticipants, teamMembers } from "@db/schema";
-import { eq, ilike, or, and } from "drizzle-orm";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { users, games } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
 
-const scryptAsync = promisify(scrypt);
+// Settings validation schema
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  numberOfZones: z.number().min(2).max(10),
+  zoneIntervalMinutes: z.number().min(5).max(60),
+});
 
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
@@ -18,6 +26,53 @@ export function registerRoutes(app: Express): Server {
 
   // Setup WebSocket server for real-time updates
   const wss = setupWebSocketServer(httpServer);
+
+  // Admin settings endpoint
+  app.put("/api/admin/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).send("Forbidden");
+    }
+
+    try {
+      const result = settingsSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid settings data",
+          errors: result.error.issues,
+        });
+      }
+
+      // Store settings in database or cache
+      // For now, we'll store it in memory since it's just for demo
+      // In a real app, you'd want to store this in the database
+      global.gameSettings = result.data;
+
+      res.json({ message: "Settings updated successfully" });
+    } catch (error) {
+      console.error("Update settings error:", error);
+      res.status(500).send("Failed to update settings");
+    }
+  });
+
+  // Get current settings
+  app.get("/api/admin/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).send("Forbidden");
+    }
+
+    // Return default settings if none are set
+    const settings = global.gameSettings || {
+      defaultCenter: {
+        lat: 37.7749,
+        lng: -122.4194,
+      },
+      defaultRadiusMiles: 1,
+      numberOfZones: 3,
+      zoneIntervalMinutes: 15,
+    };
+
+    res.json(settings);
+  });
 
   // Minimal API route for verification - check database connection
   app.get("/api/health", async (req, res) => {
@@ -394,4 +449,15 @@ export function registerRoutes(app: Express): Server {
   });
 
   return httpServer;
+}
+
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+const scryptAsync = promisify(scrypt);
+import { ilike, or } from "drizzle-orm";
+import { teamMembers, teams } from "@db/schema";
+
+//This is added to handle the global variable.  It is likely this should be replaced with a database call.
+declare global {
+  var gameSettings: any;
 }
