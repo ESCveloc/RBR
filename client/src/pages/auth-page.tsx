@@ -47,9 +47,11 @@ export default function AuthPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const action = mode === "login" ? login : register;
+      console.log(`Attempting to ${mode}...`);
       const result = await action(values);
-      
+
       if (!result.ok) {
+        console.error(`${mode} failed:`, result.message);
         toast({
           title: "Error",
           description: result.message,
@@ -57,7 +59,14 @@ export default function AuthPage() {
         });
         return;
       }
+
+      // Success toast
+      toast({
+        title: "Success",
+        description: mode === "login" ? "Successfully logged in!" : "Account created successfully!",
+      });
     } catch (error) {
+      console.error(`${mode} error:`, error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
