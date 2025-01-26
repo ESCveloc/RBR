@@ -142,9 +142,14 @@ export function MapView({
 
   // Function to draw game zones
   const drawGameZones = (map: L.Map, boundaries: any, zoneConfigs: any[]) => {
+    if (!boundaries) return;
+
+    // Clear existing zones
     if (zonesLayerRef.current) {
       zonesLayerRef.current.clearLayers();
+      zonesLayerRef.current.remove();
     }
+
     zonesLayerRef.current = L.layerGroup().addTo(map);
 
     // Draw the main boundary
@@ -156,28 +161,41 @@ export function MapView({
       },
     }).addTo(zonesLayerRef.current);
 
-    // Add label for main boundary
+    // Calculate center and initial radius
     const bounds = boundaryLayer.getBounds();
     const center = bounds.getCenter();
-    L.marker(center, {
-      icon: createZoneLabel(ZONE_COLORS[0].name, center),
-    }).addTo(zonesLayerRef.current);
-
-    // Calculate initial radius using bounds
     const initialRadius = bounds.getNorthEast().distanceTo(center);
 
-    // Draw each zone
+    // Add label for main boundary
+    L.marker(center, {
+      icon: L.divIcon({
+        className: 'zone-label',
+        html: `<div style="
+          background: rgba(255,255,255,0.95);
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          color: #111827;
+          border: 1px solid rgba(0,0,0,0.1);
+        ">${ZONE_COLORS[0].name}</div>`,
+      }),
+    }).addTo(zonesLayerRef.current);
+
+    // Draw each shrinking zone
     let currentRadius = initialRadius;
     if (Array.isArray(zoneConfigs)) {
       zoneConfigs.forEach((zone, index) => {
-        if (!zone || !zone.radiusMultiplier) return;
+        if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
+        // Calculate next radius based on current radius and multiplier
         const nextRadius = currentRadius * zone.radiusMultiplier;
         const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
-        // Create zone polygon using direct calculation
+        // Create zone polygon
         const vertices = calculateZoneBoundary(center, nextRadius);
-        L.polygon(vertices, {
+        const zonePolygon = L.polygon(vertices, {
           color: zoneColor.color,
           fillColor: zoneColor.color,
           ...ZONE_STYLES,
@@ -190,27 +208,38 @@ export function MapView({
           center.lng
         );
         L.marker(labelPos, {
-          icon: createZoneLabel(zoneColor.name, labelPos),
+          icon: L.divIcon({
+            className: 'zone-label',
+            html: `<div style="
+              background: rgba(255,255,255,0.95);
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 500;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              color: #111827;
+              border: 1px solid rgba(0,0,0,0.1);
+            ">${zoneColor.name}</div>`,
+          }),
         }).addTo(zonesLayerRef.current!);
 
         currentRadius = nextRadius;
       });
     }
 
-    // Fit map bounds to include all zones
+    // Fit map to show all zones
     map.fitBounds(boundaryLayer.getBounds());
   };
 
+  // Initialize map
   useEffect(() => {
     if (!mapRef.current) {
-      // Initialize map
       const map = L.map("map").setView([defaultCenter.lat, defaultCenter.lng], 13);
       mapRef.current = map;
 
       // Add OpenStreetMap tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map);
 
@@ -226,12 +255,10 @@ export function MapView({
       // Add default circle if no game boundaries
       if (!game?.boundaries) {
         const circle = L.circle([defaultCenter.lat, defaultCenter.lng], {
-          radius: defaultRadiusMiles * 1609.34,
+          radius: defaultRadiusMiles * 1609.34, // Convert miles to meters
           color: ZONE_COLORS[0].color,
           fillColor: ZONE_COLORS[0].color,
-          fillOpacity: 0.15,
-          weight: 3,
-          dashArray: '5, 10',
+          ...ZONE_STYLES,
         });
         circle.addTo(map);
         defaultCircleRef.current = circle;
@@ -244,15 +271,15 @@ export function MapView({
             polygon: {
               shapeOptions: {
                 color: ZONE_COLORS[0].color,
-                fillOpacity: 0.15,
-                weight: 3
+                fillColor: ZONE_COLORS[0].color,
+                ...ZONE_STYLES,
               }
             },
             rectangle: {
               shapeOptions: {
                 color: ZONE_COLORS[0].color,
-                fillOpacity: 0.15,
-                weight: 3
+                fillColor: ZONE_COLORS[0].color,
+                ...ZONE_STYLES,
               }
             },
             circle: false,
@@ -291,14 +318,12 @@ export function MapView({
         legendRef.current = null;
       }
     };
-  }, [mode, onAreaSelect, defaultCenter, defaultRadiusMiles]);
+  }, []);
 
   // Update map when game boundaries and zones change
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !game?.boundaries) return;
-
-    console.log('Drawing game zones with config:', game.zoneConfigs);
 
     // Remove default circle if it exists
     if (defaultCircleRef.current) {
@@ -307,20 +332,8 @@ export function MapView({
     }
 
     // Draw game boundaries and zones
-    if (game.zoneConfigs && game.zoneConfigs.length > 0) {
-      drawGameZones(map, game.boundaries, game.zoneConfigs);
-    } else {
-      // Just draw the boundary if no zones
-      const boundariesLayer = L.geoJSON(game.boundaries as any, {
-        style: {
-          color: ZONE_COLORS[0].color,
-          fillColor: ZONE_COLORS[0].color,
-          ...ZONE_STYLES,
-        },
-      }).addTo(map);
-      map.fitBounds(boundariesLayer.getBounds());
-    }
-  }, [game]);
+    drawGameZones(map, game.boundaries, game.zoneConfigs || []);
+  }, [game?.boundaries, game?.zoneConfigs]);
 
   // Update drawn area when selectedArea changes
   useEffect(() => {
