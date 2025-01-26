@@ -24,7 +24,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertGameSchema } from "@db/schema";
 import { Loader2, Trophy, Users, Settings, Plus } from "lucide-react";
 import type { Game, User } from "@db/schema";
 import type { Feature, Polygon } from "geojson";
@@ -44,38 +43,22 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
 
-// Extend form schema to include zone configurations with individual intervals
-const formSchema = insertGameSchema.extend({
+// Game creation form schema
+const formSchema = z.object({
   name: z.string().min(1, "Game name is required"),
+  gameLengthMinutes: z.number().min(10).max(180),
+  maxTeams: z.number().min(2).max(50),
+  playersPerTeam: z.number().min(1).max(10),
+  boundaries: z.any().optional(),
   zoneConfigs: z.array(z.object({
     durationMinutes: z.number().min(5).max(60),
     radiusMultiplier: z.number().min(0.1).max(1),
     intervalMinutes: z.number().min(5).max(60)
-  })).min(1),
-}).pick({
-  name: true,
-  gameLengthMinutes: true,
-  maxTeams: true,
-  playersPerTeam: true,
-  boundaries: true,
-  zoneConfigs: true,
+  })).min(1)
 });
 
-// Settings form schema
-const settingsSchema = z.object({
-  defaultCenter: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-  }),
-  defaultRadiusMiles: z.number().min(0.1).max(10),
-  numberOfZones: z.number().min(2).max(10),
-  zoneConfigs: z.array(z.object({
-    durationMinutes: z.number().min(5).max(60),
-    radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60),
-  })).min(1),
-});
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -134,15 +117,18 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { user } = useUser();
 
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
+      if (!user) {
+        throw new Error("You must be logged in to create a game");
+      }
+
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...values,
-        }),
+        body: JSON.stringify(values),
         credentials: "include",
       });
 
@@ -156,19 +142,20 @@ export default function Admin() {
     onSuccess: (game) => {
       form.reset();
       setSelectedArea(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
 
       toast({
         title: "Success",
         description: "Game created successfully",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/games"] });
-
+      // Navigate to the new game after a short delay
       setTimeout(() => {
         setLocation(`/game/${game.id}`);
       }, 1500);
     },
     onError: (error: Error) => {
+      console.error("Game creation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -201,24 +188,39 @@ export default function Admin() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      boundaries: { type: "Feature", geometry: { type: "Polygon", coordinates: [[]] }, properties: {} },
       gameLengthMinutes: 60,
       maxTeams: 10,
       playersPerTeam: 4,
+      boundaries: undefined,
       zoneConfigs: settings?.zoneConfigs || [],
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const boundaries = selectedArea || generateDefaultBoundaries(
-      settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
-      settings?.defaultRadiusMiles || 1
-    );
+    try {
+      console.log("Submitting form with values:", values);
 
-    createGame.mutate({
-      ...values,
-      boundaries,
-    });
+      const boundaries = selectedArea || generateDefaultBoundaries(
+        settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
+        settings?.defaultRadiusMiles || 1
+      );
+
+      const gameData = {
+        ...values,
+        boundaries,
+        zoneConfigs: settings?.zoneConfigs || [],
+      };
+
+      console.log("Sending game data:", gameData);
+      await createGame.mutateAsync(gameData);
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create game. Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   const settingsForm = useForm<z.infer<typeof settingsSchema>>({
@@ -740,3 +742,17 @@ export default function Admin() {
     </div>
   );
 }
+
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  numberOfZones: z.number().min(2).max(10),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60),
+  })).min(1),
+});

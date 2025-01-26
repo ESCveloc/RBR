@@ -30,10 +30,20 @@ export const teamMembers = pgTable("team_members", {
 });
 
 // Zone configuration type for the games table
-type ZoneConfig = {
+export type ZoneConfig = {
   durationMinutes: number;
   radiusMultiplier: number;
   intervalMinutes: number;
+};
+
+// Game boundaries type
+export type GameBoundaries = {
+  type: "Feature";
+  geometry: {
+    type: "Polygon";
+    coordinates: number[][][];
+  };
+  properties: Record<string, any>;
 };
 
 export const games = pgTable("games", {
@@ -83,39 +93,44 @@ export const gameRelations = relations(games, ({ many, one }) => ({
   })
 }));
 
-// Zone configuration schema for validation
-const zoneConfigSchema = z.object({
+// Schema for validating zone configurations
+export const zoneConfigSchema = z.object({
   durationMinutes: z.number().min(5).max(60),
   radiusMultiplier: z.number().min(0.1).max(1),
   intervalMinutes: z.number().min(5).max(60),
 });
 
-// Schemas for validation
-export const insertUserSchema = createInsertSchema(users, {
-  preferredPlayTimes: z.array(z.string()).optional(),
-  firstName: z.string().min(1, "First name is required").optional(),
-  avatar: z.string().optional()
+// Game boundaries schema
+export const gameBoundariesSchema = z.object({
+  type: z.literal("Feature"),
+  geometry: z.object({
+    type: z.literal("Polygon"),
+    coordinates: z.array(z.array(z.array(z.number())))
+  }),
+  properties: z.record(z.any())
 });
 
+// Base schemas
+export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
 
-// Extended game schema with zone configurations
-export const insertGameSchema = createInsertSchema(games, {
-  boundaries: z.any(),
+// Game schemas with proper validation
+export const insertGameSchema = z.object({
+  name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
+  boundaries: gameBoundariesSchema,
   zoneConfigs: z.array(zoneConfigSchema).min(1)
 });
 
 export const selectGameSchema = createSelectSchema(games);
 
-// Types
+// Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
 export type Game = typeof games.$inferSelect;
 export type GameParticipant = typeof gameParticipants.$inferSelect;
-export type SelectUser = User;

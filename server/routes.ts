@@ -479,8 +479,11 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      console.log("Received game creation request:", req.body);
+
       const result = gameSchema.safeParse(req.body);
       if (!result.success) {
+        console.error("Game validation failed:", result.error);
         return res.status(400).json({
           message: "Invalid game data",
           errors: result.error.issues,
@@ -514,6 +517,8 @@ export function registerRoutes(app: Express): Server {
         radiusMiles: settings.defaultRadiusMiles,
       };
 
+      console.log("Creating game with boundaries:", gameBoundaries);
+
       const [game] = await db
         .insert(games)
         .values({
@@ -528,6 +533,7 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
+      console.log("Game created successfully:", game);
       res.json(game);
     } catch (error: any) {
       console.error("Game creation error:", error);
