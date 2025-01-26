@@ -84,8 +84,8 @@ export function registerRoutes(app: Express): Server {
     // Return default settings if none are set
     const settings = global.gameSettings || {
       defaultCenter: {
-        lat: 37.7749,
-        lng: -122.4194,
+        lat: 35.8462,
+        lng: -86.3928,
       },
       defaultRadiusMiles: 1,
       zoneConfigs: [
