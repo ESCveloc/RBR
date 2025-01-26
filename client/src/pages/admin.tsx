@@ -45,18 +45,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
 
-// Game creation form schema
 const formSchema = z.object({
   name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
   boundaries: z.any().optional(),
-  zoneConfigs: z.array(z.object({
-    durationMinutes: z.number().min(5).max(60),
-    radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60)
-  })).min(1)
 });
 
 
@@ -125,6 +119,8 @@ export default function Admin() {
         throw new Error("You must be logged in to create a game");
       }
 
+      console.log("Attempting to create game with values:", values);
+
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,12 +130,14 @@ export default function Admin() {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Game creation failed:", errorText);
         throw new Error(errorText || "Failed to create game");
       }
 
       return response.json();
     },
     onSuccess: (game) => {
+      console.log("Game created successfully:", game);
       form.reset();
       setSelectedArea(null);
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
@@ -192,13 +190,12 @@ export default function Admin() {
       maxTeams: 10,
       playersPerTeam: 4,
       boundaries: undefined,
-      zoneConfigs: settings?.zoneConfigs || [],
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      console.log("Submitting form with values:", values);
+      console.log("Form submitted with values:", values);
 
       const boundaries = selectedArea || generateDefaultBoundaries(
         settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
@@ -208,10 +205,10 @@ export default function Admin() {
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: settings?.zoneConfigs || [],
+        zoneConfigs: settings?.zoneConfigs || []
       };
 
-      console.log("Sending game data:", gameData);
+      console.log("Submitting game data:", gameData);
       await createGame.mutateAsync(gameData);
     } catch (error) {
       console.error("Error in form submission:", error);

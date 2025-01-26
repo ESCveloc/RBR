@@ -23,15 +23,21 @@ export default function Game() {
     // Setup geolocation tracking
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = position.coords;
         updateLocation.mutate({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude,
+          longitude,
+          accuracy,
+          altitude,
+          altitudeAccuracy,
+          heading,
+          speed
         });
       },
       (error) => {
         toast({
           title: "Location Error",
-          description: "Failed to update location",
+          description: "Failed to update location: " + error.message,
           variant: "destructive",
         });
       },
@@ -88,7 +94,7 @@ export default function Game() {
                 {game.participants?.map((participant) => (
                   <TeamCard
                     key={participant.teamId}
-                    team={participant.team}
+                    team={participant}
                     status={participant.status}
                   />
                 ))}

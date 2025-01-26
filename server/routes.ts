@@ -4,12 +4,26 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, games, teams, teamMembers } from "@db/schema";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
+
+// Update game schema to match frontend
+const gameSchema = z.object({
+  name: z.string().min(1, "Game name is required"),
+  gameLengthMinutes: z.number().min(10).max(180),
+  maxTeams: z.number().min(2).max(50),
+  playersPerTeam: z.number().min(1).max(10),
+  boundaries: z.any().optional(),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60)
+  })).optional()
+});
 
 // Update zone configuration schema
 const zoneConfigSchema = z.object({
@@ -32,14 +46,6 @@ const settingsSchema = z.object({
   })).min(1),
 });
 
-// Game schema no longer needs boundaries as required
-const gameSchema = z.object({
-  name: z.string().min(1, "Game name is required"),
-  gameLengthMinutes: z.number().min(10).max(180),
-  maxTeams: z.number().min(2).max(50),
-  playersPerTeam: z.number().min(1).max(10),
-  boundaries: z.any().optional(), // Made boundaries optional
-});
 
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
@@ -259,13 +265,13 @@ export function registerRoutes(app: Express): Server {
         .insert(teams)
         .values({
           name,
-          captainId: req.user.id,
+          captainId: (req.user as any).id,
         })
         .returning();
 
       await db.insert(teamMembers).values({
         teamId: team.id,
-        userId: req.user.id,
+        userId: (req.user as any).id,
       });
 
       res.json(team);
@@ -290,8 +296,8 @@ export function registerRoutes(app: Express): Server {
         .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
           or(
-            eq(teams.captainId, req.user.id),
-            eq(teamMembers.userId, req.user.id)
+            eq(teams.captainId, (req.user as any).id),
+            eq(teamMembers.userId, (req.user as any).id)
           )
         );
 
@@ -388,17 +394,20 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captainId !== req.user.id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only team captain can add members");
       }
 
       // Check if user is already a member
-      const [existingMember] = await db
+      const existingMember = await db
         .select()
         .from(teamMembers)
-        .where(eq(teamMembers.teamId, teamId))
-        .where(eq(teamMembers.userId, userId))
-        .limit(1);
+        .where(and(
+          eq(teamMembers.teamId, teamId),
+          eq(teamMembers.userId, userId)
+        ))
+        .limit(1)
+        .then(results => results[0]);
 
       if (existingMember) {
         return res.status(400).send("User is already a team member");
@@ -441,7 +450,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captainId !== req.user.id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only the current captain can transfer leadership");
       }
 
@@ -472,7 +481,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the create game endpoint to use default boundaries if none provided
+  // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -480,7 +489,6 @@ export function registerRoutes(app: Express): Server {
 
     try {
       console.log("Received game creation request:", req.body);
-
       const result = gameSchema.safeParse(req.body);
       if (!result.success) {
         console.error("Game validation failed:", result.error);
@@ -496,12 +504,13 @@ export function registerRoutes(app: Express): Server {
         gameLengthMinutes,
         maxTeams,
         playersPerTeam,
+        zoneConfigs
       } = result.data;
 
       // Use default boundaries if none provided
       const settings = global.gameSettings || {
         defaultCenter: {
-          lat: 35.8462, // Murfreesboro, TN coordinates
+          lat: 35.8462,
           lng: -86.3928,
         },
         defaultRadiusMiles: 1,
@@ -517,6 +526,7 @@ export function registerRoutes(app: Express): Server {
         radiusMiles: settings.defaultRadiusMiles,
       };
 
+      const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
       console.log("Creating game with boundaries:", gameBoundaries);
 
       const [game] = await db
@@ -527,9 +537,9 @@ export function registerRoutes(app: Express): Server {
           gameLengthMinutes,
           maxTeams,
           playersPerTeam,
-          zoneConfigs: settings.zoneConfigs,
-          createdBy: req.user.id,
-          status: "pending", // Always start as pending
+          zoneConfigs: gameZoneConfigs,
+          createdBy: (req.user as any).id,
+          status: "pending",
         })
         .returning();
 
@@ -612,7 +622,13 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-// This is added to handle the global variable
 declare global {
   var gameSettings: any;
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      role: string;
+    }
+  }
 }
