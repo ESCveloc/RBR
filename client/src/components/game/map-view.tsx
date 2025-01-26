@@ -158,38 +158,40 @@ export function MapView({
       icon: createZoneLabel(ZONE_COLORS[0].name, center),
     }).addTo(zonesLayerRef.current);
 
-    // Calculate center and initial radius
+    // Calculate initial radius using bounds
     const initialRadius = bounds.getNorthEast().distanceTo(center);
 
     // Draw each zone
     let currentRadius = initialRadius;
-    zoneConfigs.forEach((zone, index) => {
-      if (!zone || !zone.radiusMultiplier) return;
+    if (Array.isArray(zoneConfigs)) {
+      zoneConfigs.forEach((zone, index) => {
+        if (!zone || !zone.radiusMultiplier) return;
 
-      const nextRadius = currentRadius * zone.radiusMultiplier;
-      const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
+        const nextRadius = currentRadius * zone.radiusMultiplier;
+        const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
-      // Create zone polygon using direct calculation
-      const vertices = calculateZoneBoundary(center, nextRadius);
-      L.polygon(vertices, {
-        color: zoneColor.color,
-        fillColor: zoneColor.color,
-        fillOpacity: 0.15,
-        weight: 3,
-        dashArray: '5, 10',
-      }).addTo(zonesLayerRef.current!);
+        // Create zone polygon using direct calculation
+        const vertices = calculateZoneBoundary(center, nextRadius);
+        L.polygon(vertices, {
+          color: zoneColor.color,
+          fillColor: zoneColor.color,
+          fillOpacity: 0.15,
+          weight: 3,
+          dashArray: '5, 10',
+        }).addTo(zonesLayerRef.current!);
 
-      // Add zone label
-      const labelPos = L.latLng(
-        center.lat + (nextRadius / 111111) * 0.7,
-        center.lng
-      );
-      L.marker(labelPos, {
-        icon: createZoneLabel(zoneColor.name, labelPos),
-      }).addTo(zonesLayerRef.current!);
+        // Add zone label
+        const labelPos = L.latLng(
+          center.lat + (nextRadius / 111111) * 0.7,
+          center.lng
+        );
+        L.marker(labelPos, {
+          icon: createZoneLabel(zoneColor.name, labelPos),
+        }).addTo(zonesLayerRef.current!);
 
-      currentRadius = nextRadius;
-    });
+        currentRadius = nextRadius;
+      });
+    }
 
     // Fit map bounds to include all zones
     map.fitBounds(boundaryLayer.getBounds());
@@ -291,6 +293,8 @@ export function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !game?.boundaries) return;
+
+    console.log('Drawing game zones with config:', game.zoneConfigs);
 
     // Remove default circle if it exists
     if (defaultCircleRef.current) {

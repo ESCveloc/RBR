@@ -147,7 +147,6 @@ export default function Admin() {
         description: "Game created successfully",
       });
 
-      // Navigate to the new game after a short delay
       setTimeout(() => {
         setLocation(`/game/${game.id}`);
       }, 1500);
@@ -197,6 +196,12 @@ export default function Admin() {
     try {
       console.log("Form submitted with values:", values);
 
+      const defaultZoneConfigs = [
+        { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 15 },
+        { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
+        { durationMinutes: 10, radiusMultiplier: 0.25, intervalMinutes: 10 }
+      ];
+
       const boundaries = selectedArea || generateDefaultBoundaries(
         settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
         settings?.defaultRadiusMiles || 1
@@ -205,7 +210,7 @@ export default function Admin() {
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: settings?.zoneConfigs || []
+        zoneConfigs: settings?.zoneConfigs || defaultZoneConfigs
       };
 
       console.log("Submitting game data:", gameData);
