@@ -18,40 +18,19 @@ export default function Game() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!game) return;
+    if (!game?.boundaries?.center) return;
 
-    // Setup geolocation tracking
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = position.coords;
-        updateLocation.mutate({
-          latitude,
-          longitude,
-          accuracy,
-          altitude,
-          altitudeAccuracy,
-          heading,
-          speed
-        });
-      },
-      (error) => {
-        toast({
-          title: "Location Error",
-          description: "Failed to update location: " + error.message,
-          variant: "destructive",
-        });
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000,
-      }
-    );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, [game, updateLocation, toast]);
+    // Update location based on game boundaries center
+    updateLocation.mutate({
+      latitude: game.boundaries.center.lat,
+      longitude: game.boundaries.center.lng,
+      accuracy: 0,
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null
+    });
+  }, [game?.boundaries]);
 
   if (isLoading || !game) {
     return (
