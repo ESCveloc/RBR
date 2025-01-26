@@ -12,16 +12,40 @@ import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
+function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
+  const { user, isLoading } = useUser();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/auth");
+    } else if (!isLoading && admin && user?.role !== "admin") {
+      setLocation("/");
+    }
+  }, [user, isLoading, admin, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  if (admin && user.role !== "admin") {
+    return null;
+  }
+
+  return <Component {...rest} />;
+}
+
 function Router() {
   const { user, isLoading } = useUser();
-  const [location, setLocation] = useLocation();
-
-  // Redirect unauthorized users to auth page
-  useEffect(() => {
-    if (!isLoading && !user && location !== "/auth") {
-      setLocation("/auth");
-    }
-  }, [user, isLoading, location, setLocation]);
+  const [location] = useLocation();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -32,19 +56,26 @@ function Router() {
     );
   }
 
-  // Show auth page if user is not logged in
-  if (!user && location !== "/auth") {
-    return <AuthPage />;
+  // If user is authenticated and tries to access auth page, redirect to home
+  if (user && location === "/auth") {
+    return <Home />;
   }
 
-  // Protected routes for authenticated users
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/" component={Home} />
-      <Route path="/game/:id" component={Game} />
-      <Route path="/profile" component={Profile} />
-      {user?.role === "admin" && <Route path="/admin" component={Admin} />}
+      <Route path="/">
+        <ProtectedRoute component={Home} />
+      </Route>
+      <Route path="/game/:id">
+        <ProtectedRoute component={Game} />
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute component={Profile} />
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute component={Admin} admin={true} />
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

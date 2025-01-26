@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@/hooks/use-user";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,8 +35,16 @@ const formSchema = insertUserSchema.pick({
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
-  const { login, register } = useUser();
+  const { login, register, user } = useUser();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,12 +59,10 @@ export default function AuthPage() {
       const action = mode === "login" ? login : register;
       console.log(`Attempting to ${mode}...`);
 
-      const credentials = {
+      const result = await action({
         username: values.username,
         password: values.password,
-      };
-
-      const result = await action(credentials);
+      });
 
       if (!result.ok) {
         console.error(`${mode} failed:`, result.message);
@@ -71,6 +78,9 @@ export default function AuthPage() {
         title: "Success",
         description: mode === "login" ? "Successfully logged in!" : "Account created successfully!",
       });
+
+      // Navigate to home page on success
+      setLocation("/");
     } catch (error) {
       console.error(`${mode} error:`, error);
       toast({
