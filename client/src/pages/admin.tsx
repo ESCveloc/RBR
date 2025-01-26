@@ -103,25 +103,45 @@ function getStatusText(status: string) {
   }
 }
 
+function generateDefaultBoundaries(center: { lat: number; lng: number }, radiusMiles: number) {
+  const radiusMeters = radiusMiles * 1609.34;
+
+  const points = [];
+  for (let i = 0; i < 32; i++) {
+    const angle = (i / 32) * 2 * Math.PI;
+    const dx = Math.cos(angle) * radiusMeters;
+    const dy = Math.sin(angle) * radiusMeters;
+
+    const latChange = dy / 111111;
+    const lngChange = dx / (111111 * Math.cos(center.lat * Math.PI / 180));
+
+    points.push([center.lng + lngChange, center.lat + latChange]);
+  }
+  points.push(points[0]);
+
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [points]
+    },
+    properties: {}
+  } as Feature<Polygon>;
+}
+
 export default function Admin() {
   const [selectedArea, setSelectedArea] = useState<Feature<Polygon> | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Create game mutation
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      if (!selectedArea) {
-        throw new Error("Please select a game area on the map");
-      }
-
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
-          boundaries: selectedArea,
         }),
         credentials: "include",
       });
@@ -134,20 +154,16 @@ export default function Admin() {
       return response.json();
     },
     onSuccess: (game) => {
-      // Reset form state
       form.reset();
       setSelectedArea(null);
 
-      // Show success message
       toast({
         title: "Success",
         description: "Game created successfully",
       });
 
-      // Refresh games list
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
 
-      // Redirect to the new game page after a short delay
       setTimeout(() => {
         setLocation(`/game/${game.id}`);
       }, 1500);
@@ -161,7 +177,6 @@ export default function Admin() {
     },
   });
 
-  // Add settings query
   const { data: settings } = useQuery({
     queryKey: ["/api/admin/settings"],
     queryFn: async () => {
@@ -173,17 +188,15 @@ export default function Admin() {
     },
   });
 
-  // Update games query to enable automatic updates
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
-    refetchInterval: 5000, // Refetch every 5 seconds to keep the list updated
+    refetchInterval: 5000,
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  // Form setup
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -197,16 +210,15 @@ export default function Admin() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!selectedArea) {
-      toast({
-        title: "Error",
-        description: "Please select a game area on the map",
-        variant: "destructive",
-      });
-      return;
-    }
+    const boundaries = selectedArea || generateDefaultBoundaries(
+      settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
+      settings?.defaultRadiusMiles || 1
+    );
 
-    createGame.mutate(values);
+    createGame.mutate({
+      ...values,
+      boundaries,
+    });
   }
 
   const settingsForm = useForm<z.infer<typeof settingsSchema>>({
@@ -428,7 +440,7 @@ export default function Admin() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={createGame.isPending || !selectedArea}
+                      disabled={createGame.isPending}
                     >
                       {createGame.isPending ? (
                         <>

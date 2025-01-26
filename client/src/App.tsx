@@ -16,13 +16,14 @@ function Router() {
   const { user, isLoading } = useUser();
   const [location, setLocation] = useLocation();
 
-  // Redirect admin users to admin dashboard by default if they're on the home page
+  // Redirect unauthorized users to auth page
   useEffect(() => {
-    if (user?.role === "admin" && location === "/") {
-      setLocation("/admin");
+    if (!isLoading && !user && location !== "/auth") {
+      setLocation("/auth");
     }
-  }, [user, location, setLocation]);
+  }, [user, isLoading, location, setLocation]);
 
+  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -32,17 +33,18 @@ function Router() {
   }
 
   // Show auth page if user is not logged in
-  if (!user) {
+  if (!user && location !== "/auth") {
     return <AuthPage />;
   }
 
   // Protected routes for authenticated users
   return (
     <Switch>
+      <Route path="/auth" component={AuthPage} />
       <Route path="/" component={Home} />
       <Route path="/game/:id" component={Game} />
       <Route path="/profile" component={Profile} />
-      {user.role === "admin" && <Route path="/admin" component={Admin} />}
+      {user?.role === "admin" && <Route path="/admin" component={Admin} />}
       <Route component={NotFound} />
     </Switch>
   );

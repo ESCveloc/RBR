@@ -11,7 +11,7 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
-// Add zone configuration schema
+// Update zone configuration schema
 const zoneConfigSchema = z.object({
   durationMinutes: z.number().min(5).max(60),
   radiusMultiplier: z.number().min(0.1).max(1),
@@ -32,13 +32,13 @@ const settingsSchema = z.object({
   })).min(1),
 });
 
-// Game schema no longer needs zone configurations as they come from settings
+// Game schema no longer needs boundaries as required
 const gameSchema = z.object({
   name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
-  boundaries: z.any(),
+  boundaries: z.any().optional(), // Made boundaries optional
 });
 
 export function registerRoutes(app: Express): Server {
@@ -75,7 +75,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get current settings
+  // Update the get settings endpoint to use Murfreesboro, TN coordinates
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
@@ -84,7 +84,7 @@ export function registerRoutes(app: Express): Server {
     // Return default settings if none are set
     const settings = global.gameSettings || {
       defaultCenter: {
-        lat: 35.8462,
+        lat: 35.8462, // Murfreesboro, TN coordinates
         lng: -86.3928,
       },
       defaultRadiusMiles: 1,
@@ -472,10 +472,10 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Games API endpoints
+  // Update the create game endpoint to use default boundaries if none provided
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).send("Not logged in");
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
     try {
@@ -495,8 +495,13 @@ export function registerRoutes(app: Express): Server {
         playersPerTeam,
       } = result.data;
 
-      // Use zone configurations from settings
+      // Use default boundaries if none provided
       const settings = global.gameSettings || {
+        defaultCenter: {
+          lat: 35.8462, // Murfreesboro, TN coordinates
+          lng: -86.3928,
+        },
+        defaultRadiusMiles: 1,
         zoneConfigs: [
           { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
           { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
@@ -504,11 +509,16 @@ export function registerRoutes(app: Express): Server {
         ],
       };
 
+      const gameBoundaries = boundaries || {
+        center: settings.defaultCenter,
+        radiusMiles: settings.defaultRadiusMiles,
+      };
+
       const [game] = await db
         .insert(games)
         .values({
           name,
-          boundaries,
+          boundaries: gameBoundaries,
           gameLengthMinutes,
           maxTeams,
           playersPerTeam,
@@ -521,7 +531,7 @@ export function registerRoutes(app: Express): Server {
       res.json(game);
     } catch (error: any) {
       console.error("Game creation error:", error);
-      res.status(500).send("Failed to create game");
+      res.status(500).json({ message: "Failed to create game" });
     }
   });
 
@@ -531,12 +541,12 @@ export function registerRoutes(app: Express): Server {
       const allGames = await db
         .select()
         .from(games)
-        .orderBy(games.createdAt, "desc");
+        .orderBy(games.createdAt);
 
       res.json(allGames);
     } catch (error) {
       console.error("Fetch games error:", error);
-      res.status(500).send("Failed to fetch games");
+      res.status(500).json({ message: "Failed to fetch games" });
     }
   });
 
