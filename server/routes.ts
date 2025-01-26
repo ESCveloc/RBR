@@ -514,7 +514,7 @@ export function registerRoutes(app: Express): Server {
           playersPerTeam,
           zoneConfigs: settings.zoneConfigs,
           createdBy: req.user.id,
-          status: "pending",
+          status: "pending", // Always start as pending
         })
         .returning();
 
@@ -525,6 +525,73 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get all games with status
+  app.get("/api/games", async (req, res) => {
+    try {
+      const allGames = await db
+        .select()
+        .from(games)
+        .orderBy(games.createdAt, "desc");
+
+      res.json(allGames);
+    } catch (error) {
+      console.error("Fetch games error:", error);
+      res.status(500).send("Failed to fetch games");
+    }
+  });
+
+  // Update game status
+  app.patch("/api/games/:gameId/status", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { status } = req.body;
+
+      if (!["pending", "active", "completed"].includes(status)) {
+        return res.status(400).send("Invalid status");
+      }
+
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      // Validate state transition
+      if (status === "active" && game.status !== "pending") {
+        return res.status(400).send("Can only activate pending games");
+      }
+
+      if (status === "completed" && game.status !== "active") {
+        return res.status(400).send("Can only complete active games");
+      }
+
+      const updateData: any = { status };
+      if (status === "active") {
+        updateData.startTime = new Date();
+      } else if (status === "completed") {
+        updateData.endTime = new Date();
+      }
+
+      const [updatedGame] = await db
+        .update(games)
+        .set(updateData)
+        .where(eq(games.id, gameId))
+        .returning();
+
+      res.json(updatedGame);
+    } catch (error) {
+      console.error("Update game status error:", error);
+      res.status(500).send("Failed to update game status");
+    }
+  });
 
   return httpServer;
 }
