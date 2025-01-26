@@ -15,6 +15,13 @@ const ZONE_COLORS = [
   { color: '#dc2626', name: 'Final Zone', description: 'Final combat area' },
 ];
 
+// Update the boundary styling
+const ZONE_STYLES = {
+  fillOpacity: 0.3,  // Increased from 0.15
+  weight: 4,         // Increased from 3
+  opacity: 0.8       // Added opacity for borders
+};
+
 // Custom control for zone legend
 class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
@@ -137,17 +144,15 @@ export function MapView({
   const drawGameZones = (map: L.Map, boundaries: any, zoneConfigs: any[]) => {
     if (zonesLayerRef.current) {
       zonesLayerRef.current.clearLayers();
-    } else {
-      zonesLayerRef.current = L.layerGroup().addTo(map);
     }
+    zonesLayerRef.current = L.layerGroup().addTo(map);
 
     // Draw the main boundary
     const boundaryLayer = L.geoJSON(boundaries, {
       style: {
         color: ZONE_COLORS[0].color,
         fillColor: ZONE_COLORS[0].color,
-        fillOpacity: 0.15,
-        weight: 3,
+        ...ZONE_STYLES,
       },
     }).addTo(zonesLayerRef.current);
 
@@ -175,8 +180,7 @@ export function MapView({
         L.polygon(vertices, {
           color: zoneColor.color,
           fillColor: zoneColor.color,
-          fillOpacity: 0.15,
-          weight: 3,
+          ...ZONE_STYLES,
           dashArray: '5, 10',
         }).addTo(zonesLayerRef.current!);
 
@@ -311,8 +315,7 @@ export function MapView({
         style: {
           color: ZONE_COLORS[0].color,
           fillColor: ZONE_COLORS[0].color,
-          fillOpacity: 0.15,
-          weight: 3,
+          ...ZONE_STYLES,
         },
       }).addTo(map);
       map.fitBounds(boundariesLayer.getBounds());
@@ -330,8 +333,7 @@ export function MapView({
         style: {
           color: ZONE_COLORS[0].color,
           fillColor: ZONE_COLORS[0].color,
-          fillOpacity: 0.15,
-          weight: 3,
+          ...ZONE_STYLES,
         },
       }).getLayers().forEach(layer => {
         drawLayer.addLayer(layer);

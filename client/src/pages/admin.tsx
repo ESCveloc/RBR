@@ -196,6 +196,7 @@ export default function Admin() {
     try {
       console.log("Form submitted with values:", values);
 
+      // Always use these default zone configs for new games
       const defaultZoneConfigs = [
         { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 15 },
         { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
@@ -210,7 +211,7 @@ export default function Admin() {
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: settings?.zoneConfigs || defaultZoneConfigs
+        zoneConfigs: defaultZoneConfigs  // Always use default configs
       };
 
       console.log("Submitting game data:", gameData);
