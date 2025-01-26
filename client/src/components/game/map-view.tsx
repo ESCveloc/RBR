@@ -5,41 +5,34 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
+import "leaflet-geometryutil";
 
-// Extend Leaflet types to include Draw functionality
-declare module 'leaflet' {
-  namespace Control {
-    class Draw extends L.Control {
-      constructor(options?: DrawConstructorOptions);
-    }
+// Zone colors for different stages
+const ZONE_COLORS = [
+  '#2563eb', // Blue
+  '#16a34a', // Green
+  '#ca8a04', // Yellow
+  '#dc2626', // Red
+];
 
-    interface DrawConstructorOptions {
-      draw?: {
-        polyline?: boolean | DrawOptions;
-        polygon?: boolean | DrawOptions;
-        rectangle?: boolean | DrawOptions;
-        circle?: boolean | DrawOptions;
-        marker?: boolean | DrawOptions;
-        circlemarker?: boolean | DrawOptions;
-      };
-      edit?: {
-        featureGroup: L.FeatureGroup;
-      };
-    }
+function calculateZoneBoundary(
+  center: L.LatLng,
+  radiusMeters: number,
+  points: number = 32
+): L.LatLng[] {
+  const vertices: L.LatLng[] = [];
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = Math.cos(angle) * radiusMeters;
+    const dy = Math.sin(angle) * radiusMeters;
 
-    interface DrawOptions {
-      shapeOptions?: L.PathOptions;
-      showArea?: boolean;
-      metric?: boolean;
-      repeatMode?: boolean;
-    }
+    const latChange = dy / 111111;
+    const lngChange = dx / (111111 * Math.cos(center.lat * Math.PI / 180));
+
+    vertices.push(L.latLng(center.lat + latChange, center.lng + lngChange));
   }
-
-  namespace Draw {
-    namespace Event {
-      const CREATED: string;
-    }
-  }
+  vertices.push(vertices[0]); // Close the polygon
+  return vertices;
 }
 
 interface MapViewProps {
@@ -56,16 +49,59 @@ export function MapView({
   mode = "view",
   onAreaSelect,
   selectedArea,
-  defaultCenter = { lat: 37.7749, lng: -122.4194 },
+  defaultCenter = { lat: 35.8462, lng: -86.3928 },
   defaultRadiusMiles = 1,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const drawLayerRef = useRef<L.FeatureGroup | null>(null);
+  const zonesLayerRef = useRef<L.LayerGroup | null>(null);
   const defaultCircleRef = useRef<L.Circle | null>(null);
+
+  // Function to draw game zones
+  const drawGameZones = (map: L.Map, boundaries: any, zoneConfigs: any[]) => {
+    if (zonesLayerRef.current) {
+      zonesLayerRef.current.clearLayers();
+    } else {
+      zonesLayerRef.current = L.layerGroup().addTo(map);
+    }
+
+    // Draw the main boundary
+    const boundaryLayer = L.geoJSON(boundaries, {
+      style: {
+        color: ZONE_COLORS[0],
+        fillColor: ZONE_COLORS[0],
+        fillOpacity: 0.1,
+        weight: 2,
+      },
+    }).addTo(zonesLayerRef.current);
+
+    // Calculate center and initial radius
+    const bounds = boundaryLayer.getBounds();
+    const center = bounds.getCenter();
+    const initialRadius = bounds.getNorthEast().distanceTo(center);
+
+    // Draw each zone
+    let currentRadius = initialRadius;
+    zoneConfigs.forEach((zone, index) => {
+      const nextRadius = currentRadius * zone.radiusMultiplier;
+
+      // Create zone polygon using direct calculation
+      const vertices = calculateZoneBoundary(center, nextRadius);
+      L.polygon(vertices, {
+        color: ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1],
+        fillColor: ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1],
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '5, 10',
+      }).addTo(zonesLayerRef.current!);
+
+      currentRadius = nextRadius;
+    });
+  };
 
   useEffect(() => {
     if (!mapRef.current) {
-      // Initialize map with provided center or default
+      // Initialize map
       const map = L.map("map").setView([defaultCenter.lat, defaultCenter.lng], 13);
       mapRef.current = map;
 
@@ -76,16 +112,16 @@ export function MapView({
         maxZoom: 19,
       }).addTo(map);
 
-      // Initialize draw feature group
+      // Initialize layers
       const drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
       drawLayerRef.current = drawnItems;
 
-      // Add default circle (1 mile = 1609.34 meters)
+      // Add default circle
       const circle = L.circle([defaultCenter.lat, defaultCenter.lng], {
         radius: defaultRadiusMiles * 1609.34,
-        color: '#0969da',
-        fillColor: '#0969da',
+        color: ZONE_COLORS[0],
+        fillColor: ZONE_COLORS[0],
         fillOpacity: 0.1,
         weight: 2,
         dashArray: '5, 10',
@@ -99,12 +135,12 @@ export function MapView({
           draw: {
             polygon: {
               shapeOptions: {
-                color: '#0969da'
+                color: ZONE_COLORS[0]
               }
             },
             rectangle: {
               shapeOptions: {
-                color: '#0969da'
+                color: ZONE_COLORS[0]
               }
             },
             circle: false,
@@ -138,18 +174,19 @@ export function MapView({
         mapRef.current.remove();
         mapRef.current = null;
         drawLayerRef.current = null;
+        zonesLayerRef.current = null;
         defaultCircleRef.current = null;
       }
     };
   }, [mode, onAreaSelect, defaultCenter, defaultRadiusMiles]);
 
-  // Update map when game boundaries change
+  // Update map when game boundaries and zones change
   useEffect(() => {
     const map = mapRef.current;
     const drawLayer = drawLayerRef.current;
 
     if (map && game?.boundaries) {
-      // Clear existing layers except the base tile layer
+      // Clear existing layers
       if (drawLayer) {
         drawLayer.clearLayers();
       }
@@ -157,10 +194,21 @@ export function MapView({
         defaultCircleRef.current.removeFrom(map);
       }
 
-      // Add game boundaries
-      const boundariesLayer = L.geoJSON(game.boundaries as any);
-      boundariesLayer.addTo(map);
-      map.fitBounds(boundariesLayer.getBounds());
+      // Draw game boundaries and zones
+      if (game.zoneConfigs && game.zoneConfigs.length > 0) {
+        drawGameZones(map, game.boundaries, game.zoneConfigs);
+      } else {
+        // Just draw the boundary if no zones
+        const boundariesLayer = L.geoJSON(game.boundaries as any, {
+          style: {
+            color: ZONE_COLORS[0],
+            fillColor: ZONE_COLORS[0],
+            fillOpacity: 0.1,
+            weight: 2,
+          },
+        }).addTo(map);
+        map.fitBounds(boundariesLayer.getBounds());
+      }
     }
   }, [game]);
 
@@ -171,7 +219,14 @@ export function MapView({
 
     if (map && drawLayer && selectedArea) {
       drawLayer.clearLayers();
-      L.geoJSON(selectedArea).getLayers().forEach(layer => {
+      L.geoJSON(selectedArea, {
+        style: {
+          color: ZONE_COLORS[0],
+          fillColor: ZONE_COLORS[0],
+          fillOpacity: 0.1,
+          weight: 2,
+        },
+      }).getLayers().forEach(layer => {
         drawLayer.addLayer(layer);
       });
     }
