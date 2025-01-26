@@ -27,12 +27,16 @@ class ZoneLegend extends L.Control {
       font-family: system-ui, sans-serif;
       font-size: 12px;
       max-width: 200px;
+      color: #1f2937;
     `;
 
     const title = document.createElement('h4');
     title.textContent = 'Zone Legend';
-    title.style.marginBottom = '8px';
-    title.style.fontWeight = 'bold';
+    title.style.cssText = `
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #111827;
+    `;
     div.appendChild(title);
 
     ZONE_COLORS.forEach(({ color, name, description }) => {
@@ -48,13 +52,17 @@ class ZoneLegend extends L.Control {
         background: ${color};
         display: inline-block;
         margin-right: 8px;
-        opacity: 0.7;
+        border-radius: 2px;
+        border: 1px solid rgba(0,0,0,0.1);
       `;
 
       const text = document.createElement('span');
       text.textContent = name;
       text.title = description;
-      text.style.cursor = 'help';
+      text.style.cssText = `
+        cursor: help;
+        color: #374151;
+      `;
 
       item.appendChild(colorBox);
       item.appendChild(text);
@@ -63,6 +71,23 @@ class ZoneLegend extends L.Control {
 
     return div;
   }
+}
+
+// Create zone label
+function createZoneLabel(name: string, center: L.LatLng) {
+  return L.divIcon({
+    className: 'zone-label',
+    html: `<div style="
+      background: rgba(255,255,255,0.95);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      color: #111827;
+      border: 1px solid rgba(0,0,0,0.1);
+    ">${name}</div>`,
+  });
 }
 
 function calculateZoneBoundary(
@@ -83,21 +108,6 @@ function calculateZoneBoundary(
   }
   vertices.push(vertices[0]); // Close the polygon
   return vertices;
-}
-
-// Create zone label
-function createZoneLabel(name: string, center: L.LatLng) {
-  return L.divIcon({
-    className: 'zone-label',
-    html: `<div style="
-      background: rgba(255,255,255,0.9);
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    ">${name}</div>`,
-  });
 }
 
 interface MapViewProps {
@@ -136,8 +146,8 @@ export function MapView({
       style: {
         color: ZONE_COLORS[0].color,
         fillColor: ZONE_COLORS[0].color,
-        fillOpacity: 0.1,
-        weight: 2,
+        fillOpacity: 0.15,
+        weight: 3,
       },
     }).addTo(zonesLayerRef.current);
 
@@ -154,6 +164,8 @@ export function MapView({
     // Draw each zone
     let currentRadius = initialRadius;
     zoneConfigs.forEach((zone, index) => {
+      if (!zone || !zone.radiusMultiplier) return;
+
       const nextRadius = currentRadius * zone.radiusMultiplier;
       const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
@@ -162,8 +174,8 @@ export function MapView({
       L.polygon(vertices, {
         color: zoneColor.color,
         fillColor: zoneColor.color,
-        fillOpacity: 0.1,
-        weight: 2,
+        fillOpacity: 0.15,
+        weight: 3,
         dashArray: '5, 10',
       }).addTo(zonesLayerRef.current!);
 
@@ -178,6 +190,9 @@ export function MapView({
 
       currentRadius = nextRadius;
     });
+
+    // Fit map bounds to include all zones
+    map.fitBounds(boundaryLayer.getBounds());
   };
 
   useEffect(() => {
@@ -202,17 +217,19 @@ export function MapView({
       map.addLayer(drawnItems);
       drawLayerRef.current = drawnItems;
 
-      // Add default circle
-      const circle = L.circle([defaultCenter.lat, defaultCenter.lng], {
-        radius: defaultRadiusMiles * 1609.34,
-        color: ZONE_COLORS[0].color,
-        fillColor: ZONE_COLORS[0].color,
-        fillOpacity: 0.1,
-        weight: 2,
-        dashArray: '5, 10',
-      });
-      circle.addTo(map);
-      defaultCircleRef.current = circle;
+      // Add default circle if no game boundaries
+      if (!game?.boundaries) {
+        const circle = L.circle([defaultCenter.lat, defaultCenter.lng], {
+          radius: defaultRadiusMiles * 1609.34,
+          color: ZONE_COLORS[0].color,
+          fillColor: ZONE_COLORS[0].color,
+          fillOpacity: 0.15,
+          weight: 3,
+          dashArray: '5, 10',
+        });
+        circle.addTo(map);
+        defaultCircleRef.current = circle;
+      }
 
       if (mode === "draw") {
         // Add draw controls
@@ -220,12 +237,16 @@ export function MapView({
           draw: {
             polygon: {
               shapeOptions: {
-                color: ZONE_COLORS[0].color
+                color: ZONE_COLORS[0].color,
+                fillOpacity: 0.15,
+                weight: 3
               }
             },
             rectangle: {
               shapeOptions: {
-                color: ZONE_COLORS[0].color
+                color: ZONE_COLORS[0].color,
+                fillOpacity: 0.15,
+                weight: 3
               }
             },
             circle: false,
@@ -269,32 +290,28 @@ export function MapView({
   // Update map when game boundaries and zones change
   useEffect(() => {
     const map = mapRef.current;
-    const drawLayer = drawLayerRef.current;
+    if (!map || !game?.boundaries) return;
 
-    if (map && game?.boundaries) {
-      // Clear existing layers
-      if (drawLayer) {
-        drawLayer.clearLayers();
-      }
-      if (defaultCircleRef.current) {
-        defaultCircleRef.current.removeFrom(map);
-      }
+    // Remove default circle if it exists
+    if (defaultCircleRef.current) {
+      defaultCircleRef.current.removeFrom(map);
+      defaultCircleRef.current = null;
+    }
 
-      // Draw game boundaries and zones
-      if (game.zoneConfigs && game.zoneConfigs.length > 0) {
-        drawGameZones(map, game.boundaries, game.zoneConfigs);
-      } else {
-        // Just draw the boundary if no zones
-        const boundariesLayer = L.geoJSON(game.boundaries as any, {
-          style: {
-            color: ZONE_COLORS[0].color,
-            fillColor: ZONE_COLORS[0].color,
-            fillOpacity: 0.1,
-            weight: 2,
-          },
-        }).addTo(map);
-        map.fitBounds(boundariesLayer.getBounds());
-      }
+    // Draw game boundaries and zones
+    if (game.zoneConfigs && game.zoneConfigs.length > 0) {
+      drawGameZones(map, game.boundaries, game.zoneConfigs);
+    } else {
+      // Just draw the boundary if no zones
+      const boundariesLayer = L.geoJSON(game.boundaries as any, {
+        style: {
+          color: ZONE_COLORS[0].color,
+          fillColor: ZONE_COLORS[0].color,
+          fillOpacity: 0.15,
+          weight: 3,
+        },
+      }).addTo(map);
+      map.fitBounds(boundariesLayer.getBounds());
     }
   }, [game]);
 
@@ -309,8 +326,8 @@ export function MapView({
         style: {
           color: ZONE_COLORS[0].color,
           fillColor: ZONE_COLORS[0].color,
-          fillOpacity: 0.1,
-          weight: 2,
+          fillOpacity: 0.15,
+          weight: 3,
         },
       }).getLayers().forEach(layer => {
         drawLayer.addLayer(layer);
