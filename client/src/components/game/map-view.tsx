@@ -6,6 +6,7 @@ import "leaflet-draw/dist/leaflet.draw.css";
 import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
 import "leaflet-geometryutil";
+import { motion } from "framer-motion";
 
 // Zone colors with semantic meanings
 const ZONE_COLORS = [
@@ -15,12 +16,28 @@ const ZONE_COLORS = [
   { color: '#dc2626', name: 'Final Zone', description: 'Final combat area' },
 ];
 
-// Update the boundary styling
+// Update the boundary styling with transition properties
 const ZONE_STYLES = {
-  fillOpacity: 0.3,  // Increased from 0.15
-  weight: 4,         // Increased from 3
-  opacity: 0.8       // Added opacity for borders
+  fillOpacity: 0.3,
+  weight: 4,
+  opacity: 0.8,
+  className: 'zone-transition'
 };
+
+// Add CSS for transitions
+const zoneTransitionStyles = `
+  .zone-transition {
+    transition: all 0.5s ease-in-out;
+  }
+
+  .zone-label {
+    transition: transform 0.5s ease-in-out;
+  }
+
+  .leaflet-interactive {
+    transition: all 0.5s ease-in-out;
+  }
+`;
 
 // Custom control for zone legend
 class ZoneLegend extends L.Control {
@@ -84,7 +101,7 @@ class ZoneLegend extends L.Control {
 function createZoneLabel(name: string, center: L.LatLng) {
   return L.divIcon({
     className: 'zone-label',
-    html: `<div style="
+    html: `<style>${zoneTransitionStyles}</style><div style="
       background: rgba(255,255,255,0.95);
       padding: 4px 8px;
       border-radius: 4px;
@@ -93,6 +110,7 @@ function createZoneLabel(name: string, center: L.LatLng) {
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       color: #111827;
       border: 1px solid rgba(0,0,0,0.1);
+      transition: all 0.5s ease-in-out;
     ">${name}</div>`,
   });
 }
@@ -140,95 +158,99 @@ export function MapView({
   const defaultCircleRef = useRef<L.Circle | null>(null);
   const legendRef = useRef<ZoneLegend | null>(null);
 
-  // Function to draw game zones
+  // Function to draw game zones with animations
   const drawGameZones = (map: L.Map, boundaries: any, zoneConfigs: any[]) => {
     if (!boundaries) return;
 
-    // Clear existing zones
+    // Clear existing zones with fade out
     if (zonesLayerRef.current) {
-      zonesLayerRef.current.clearLayers();
-      zonesLayerRef.current.remove();
-    }
-
-    zonesLayerRef.current = L.layerGroup().addTo(map);
-
-    // Draw the main boundary
-    const boundaryLayer = L.geoJSON(boundaries, {
-      style: {
-        color: ZONE_COLORS[0].color,
-        fillColor: ZONE_COLORS[0].color,
-        ...ZONE_STYLES,
-      },
-    }).addTo(zonesLayerRef.current);
-
-    // Calculate center and initial radius
-    const bounds = boundaryLayer.getBounds();
-    const center = bounds.getCenter();
-    const initialRadius = bounds.getNorthEast().distanceTo(center);
-
-    // Add label for main boundary
-    L.marker(center, {
-      icon: L.divIcon({
-        className: 'zone-label',
-        html: `<div style="
-          background: rgba(255,255,255,0.95);
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: 500;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          color: #111827;
-          border: 1px solid rgba(0,0,0,0.1);
-        ">${ZONE_COLORS[0].name}</div>`,
-      }),
-    }).addTo(zonesLayerRef.current);
-
-    // Draw each shrinking zone
-    let currentRadius = initialRadius;
-    if (Array.isArray(zoneConfigs)) {
-      zoneConfigs.forEach((zone, index) => {
-        if (!zone || typeof zone.radiusMultiplier !== 'number') return;
-
-        // Calculate next radius based on current radius and multiplier
-        const nextRadius = currentRadius * zone.radiusMultiplier;
-        const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
-
-        // Create zone polygon
-        const vertices = calculateZoneBoundary(center, nextRadius);
-        const zonePolygon = L.polygon(vertices, {
-          color: zoneColor.color,
-          fillColor: zoneColor.color,
-          ...ZONE_STYLES,
-          dashArray: '5, 10',
-        }).addTo(zonesLayerRef.current!);
-
-        // Add zone label
-        const labelPos = L.latLng(
-          center.lat + (nextRadius / 111111) * 0.7,
-          center.lng
-        );
-        L.marker(labelPos, {
-          icon: L.divIcon({
-            className: 'zone-label',
-            html: `<div style="
-              background: rgba(255,255,255,0.95);
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 12px;
-              font-weight: 500;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              color: #111827;
-              border: 1px solid rgba(0,0,0,0.1);
-            ">${zoneColor.name}</div>`,
-          }),
-        }).addTo(zonesLayerRef.current!);
-
-        currentRadius = nextRadius;
+      const layers = zonesLayerRef.current.getLayers();
+      layers.forEach(layer => {
+        if (layer instanceof L.Polygon) {
+          layer.setStyle({ opacity: 0, fillOpacity: 0 });
+        }
       });
-    }
+      setTimeout(() => {
+        zonesLayerRef.current?.clearLayers();
+        zonesLayerRef.current?.remove();
 
-    // Fit map to show all zones
-    map.fitBounds(boundaryLayer.getBounds());
+        // Create new layer group
+        zonesLayerRef.current = L.layerGroup().addTo(map);
+
+        // Draw the main boundary with fade in
+        const boundaryLayer = L.geoJSON(boundaries, {
+          style: {
+            ...ZONE_STYLES,
+            opacity: 0,
+            fillOpacity: 0,
+          },
+        }).addTo(zonesLayerRef.current);
+
+        setTimeout(() => {
+          boundaryLayer.setStyle({
+            ...ZONE_STYLES,
+            color: ZONE_COLORS[0].color,
+            fillColor: ZONE_COLORS[0].color,
+          });
+        }, 100);
+
+        // Calculate center and initial radius
+        const bounds = boundaryLayer.getBounds();
+        const center = bounds.getCenter();
+        const initialRadius = bounds.getNorthEast().distanceTo(center);
+
+        // Draw each shrinking zone
+        let currentRadius = initialRadius;
+        if (Array.isArray(zoneConfigs)) {
+          zoneConfigs.forEach((zone, index) => {
+            if (!zone || typeof zone.radiusMultiplier !== 'number') return;
+
+            // Calculate next radius based on current radius and multiplier
+            const nextRadius = currentRadius * zone.radiusMultiplier;
+            const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
+
+            // Create zone polygon with initial invisible state
+            const vertices = calculateZoneBoundary(center, nextRadius);
+            const zonePolygon = L.polygon(vertices, {
+              ...ZONE_STYLES,
+              opacity: 0,
+              fillOpacity: 0,
+              color: zoneColor.color,
+              fillColor: zoneColor.color,
+              dashArray: '5, 10',
+            }).addTo(zonesLayerRef.current!);
+
+            // Animate the zone appearing after a delay
+            setTimeout(() => {
+              zonePolygon.setStyle({
+                ...ZONE_STYLES,
+                opacity: ZONE_STYLES.opacity,
+                fillOpacity: ZONE_STYLES.fillOpacity,
+              });
+            }, 500 + (index * 300));
+
+            // Add zone label with animation
+            const labelPos = L.latLng(
+              center.lat + (nextRadius / 111111) * 0.7,
+              center.lng
+            );
+            L.marker(labelPos, {
+              icon: createZoneLabel(zoneColor.name, labelPos),
+            }).addTo(zonesLayerRef.current!);
+
+            currentRadius = nextRadius;
+          });
+        }
+
+        // Add label for main boundary
+        L.marker(center, {
+          icon: createZoneLabel(ZONE_COLORS[0].name, center),
+        }).addTo(zonesLayerRef.current);
+
+        // Fit map to show all zones
+        map.fitBounds(boundaryLayer.getBounds());
+      }, 500);
+    }
   };
 
   // Initialize map
