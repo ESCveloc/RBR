@@ -8,7 +8,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -41,74 +40,37 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
-    log("Starting server initialization...");
+    // Verify database connection
+    await db.query.users.findFirst();
 
-    // Verify database connection first
-    try {
-      log("Verifying database connection...");
-      await db.query.users.findFirst();
-      log("Database connection verified successfully");
-    } catch (dbError) {
-      log(`Database connection error: ${dbError}`);
-      throw dbError;
+    // Setup authentication
+    setupAuth(app);
+
+    const server = registerRoutes(app);
+
+    // Global error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // Setup Vite or static serving
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
     }
 
-    // Setup authentication before routes
-    try {
-      log("Setting up authentication...");
-      setupAuth(app);
-      log("Authentication setup completed");
-    } catch (authError) {
-      log(`Authentication setup error: ${authError}`);
-      throw authError;
-    }
-
-    // Register routes
-    try {
-      log("Registering routes...");
-      const server = registerRoutes(app);
-      log("Routes registered successfully");
-
-      // Global error handler
-      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-        const status = err.status || err.statusCode || 500;
-        const message = err.message || "Internal Server Error";
-        log(`Error: ${message}`);
-        res.status(status).json({ message });
-      });
-
-      if (app.get("env") === "development") {
-        log("Setting up Vite development server...");
-        await setupVite(app, server);
-        log("Vite setup completed");
-      } else {
-        log("Setting up static file serving...");
-        serveStatic(app);
-        log("Static file serving setup completed");
-      }
-
-      const PORT = 5000;
-      const HOST = "0.0.0.0";
-
-      server.on('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'EADDRINUSE') {
-          log(`Error: Port ${PORT} is already in use`);
-          process.exit(1);
-        } else {
-          log(`Server error: ${error.message}`);
-          throw error;
-        }
-      });
-
-      server.listen(PORT, HOST, () => {
-        log(`Server running at http://${HOST}:${PORT}`);
-      });
-    } catch (routeError) {
-      log(`Route setup error: ${routeError}`);
-      throw routeError;
-    }
+    // ALWAYS serve the app on port 5000
+    // this serves both the API and the client
+    const PORT = 5000;
+    server.listen(PORT, "0.0.0.0", () => {
+      log(`serving on port ${PORT}`);
+    });
   } catch (error) {
-    log(`Failed to start server: ${error}`);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 })();
