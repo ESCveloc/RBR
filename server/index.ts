@@ -54,7 +54,7 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    const PORT = Number(process.env.PORT || 5000);
+    const PORT = 5000; // Using the standard port as per development guidelines
     const HOST = "0.0.0.0";
 
     server.on('error', (error: NodeJS.ErrnoException) => {
