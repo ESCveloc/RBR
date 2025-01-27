@@ -8,6 +8,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -38,39 +39,81 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  try {
-    // Verify database connection
-    await db.query.users.findFirst();
+let server: any = null;
 
-    // Setup authentication
+async function startServer() {
+  try {
+    log("Starting server initialization...");
+
+    // Verify database connection first
+    log("Verifying database connection...");
+    try {
+      await db.query.users.findFirst();
+      log("Database connection successful");
+    } catch (error) {
+      log("Database connection failed, retrying in 5 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      throw error; // Re-throw to trigger retry
+    }
+
+    // Setup authentication after database is confirmed working
+    log("Setting up authentication...");
     setupAuth(app);
 
-    const server = registerRoutes(app);
+    // Register routes
+    log("Registering routes...");
+    server = registerRoutes(app);
 
     // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
+      log(`Error: ${status} - ${message}`);
       res.status(status).json({ message });
-      throw err;
     });
 
     // Setup Vite or static serving
     if (app.get("env") === "development") {
+      log("Setting up Vite development server...");
       await setupVite(app, server);
     } else {
+      log("Setting up static file serving...");
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
-    // this serves both the API and the client
+    // Start listening
     const PORT = 5000;
     server.listen(PORT, "0.0.0.0", () => {
-      log(`serving on port ${PORT}`);
+      log(`Server successfully started and listening on port ${PORT}`);
     });
+
+    // Handle graceful shutdown
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
   } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
+    log(`Server initialization failed: ${error}`);
+    // Wait 5 seconds and try again
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    return startServer();
   }
-})();
+}
+
+// Graceful shutdown handler
+async function shutdown() {
+  log("Shutting down server...");
+  if (server) {
+    server.close(() => {
+      log("Server closed");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+}
+
+// Start the server with retries
+startServer().catch((error) => {
+  log(`Fatal error, could not start server: ${error}`);
+  process.exit(1);
+});
