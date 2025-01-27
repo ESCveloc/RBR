@@ -40,11 +40,6 @@ const zoneTransitionStyles = `
     transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .zone-label {
-    transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0.9;
-  }
-
   .leaflet-interactive {
     transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -132,23 +127,6 @@ class ZoneLegend extends L.Control {
   }
 }
 
-// Create zone label
-function createZoneLabel(name: string, center: L.LatLng) {
-  return L.divIcon({
-    className: 'zone-label',
-    html: `<style>${zoneTransitionStyles}</style><div style="
-      background: rgba(255,255,255,0.95);
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      color: #111827;
-      border: 1px solid rgba(0,0,0,0.1);
-    ">${name}</div>`,
-  });
-}
-
 interface MapViewProps {
   game?: Game;
   mode?: "view" | "draw";
@@ -207,16 +185,11 @@ export function MapView({
           }
         ).addTo(map);
 
-        // Add label for initial zone
-        L.marker([defaultCenter.lat, defaultCenter.lng + initialRadius / 111111 * 0.7], {
-          icon: createZoneLabel(ZONE_COLORS[0].name, L.latLng(defaultCenter.lat, defaultCenter.lng)),
-        }).addTo(map);
-
         // Create shrinking zone circles
         let currentRadius = initialRadius;
         DEFAULT_GAME_SETTINGS.zoneConfigs.forEach((config, index) => {
           const nextRadius = currentRadius * config.radiusMultiplier;
-          const circle = L.circle(
+          L.circle(
             [defaultCenter.lat, defaultCenter.lng],
             nextRadius,
             {
@@ -229,15 +202,6 @@ export function MapView({
               dashArray: '5, 10',
             }
           ).addTo(map);
-
-          // Add label for this zone
-          const labelPos = L.latLng(
-            defaultCenter.lat,
-            defaultCenter.lng + (nextRadius / 111111) * 0.7
-          );
-          L.marker(labelPos, {
-            icon: createZoneLabel(ZONE_COLORS[index + 1].name, labelPos),
-          }).addTo(map);
 
           currentRadius = nextRadius;
         });
@@ -355,15 +319,6 @@ export function MapView({
             dashArray: '5, 10',
           }
         ).addTo(zonesLayerRef.current!);
-
-        // Add zone label
-        const labelPos = L.latLng(
-          center.lat + (nextRadius / 111111) * 0.7,
-          center.lng
-        );
-        L.marker(labelPos, {
-          icon: createZoneLabel(zoneColor.name, labelPos),
-        }).addTo(zonesLayerRef.current!);
 
         currentRadius = nextRadius;
       });
