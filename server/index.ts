@@ -1,30 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import session from "express-session";
-import MemoryStore from "memorystore";
 import { db } from "@db";
+import { setupAuth } from "./auth";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Setup session store
-const SessionStore = MemoryStore(session);
-app.use(
-  session({
-    secret: "your-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    store: new SessionStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    }),
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-  })
-);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -59,42 +41,72 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
+    log("Starting server initialization...");
+
     // Verify database connection first
-    await db.query.users.findFirst();
-    log("Database connection verified");
-
-    const server = registerRoutes(app);
-
-    // Global error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      log(`Error: ${message}`);
-      res.status(status).json({ message });
-    });
-
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
+    try {
+      log("Verifying database connection...");
+      await db.query.users.findFirst();
+      log("Database connection verified successfully");
+    } catch (dbError) {
+      log(`Database connection error: ${dbError}`);
+      throw dbError;
     }
 
-    const PORT = 5000;
-    const HOST = "0.0.0.0";
+    // Setup authentication before routes
+    try {
+      log("Setting up authentication...");
+      setupAuth(app);
+      log("Authentication setup completed");
+    } catch (authError) {
+      log(`Authentication setup error: ${authError}`);
+      throw authError;
+    }
 
-    server.on('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EADDRINUSE') {
-        log(`Error: Port ${PORT} is already in use`);
-        process.exit(1);
+    // Register routes
+    try {
+      log("Registering routes...");
+      const server = registerRoutes(app);
+      log("Routes registered successfully");
+
+      // Global error handler
+      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        log(`Error: ${message}`);
+        res.status(status).json({ message });
+      });
+
+      if (app.get("env") === "development") {
+        log("Setting up Vite development server...");
+        await setupVite(app, server);
+        log("Vite setup completed");
       } else {
-        log(`Server error: ${error.message}`);
-        throw error;
+        log("Setting up static file serving...");
+        serveStatic(app);
+        log("Static file serving setup completed");
       }
-    });
 
-    server.listen(PORT, HOST, () => {
-      log(`Server running at http://${HOST}:${PORT}`);
-    });
+      const PORT = 5000;
+      const HOST = "0.0.0.0";
+
+      server.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'EADDRINUSE') {
+          log(`Error: Port ${PORT} is already in use`);
+          process.exit(1);
+        } else {
+          log(`Server error: ${error.message}`);
+          throw error;
+        }
+      });
+
+      server.listen(PORT, HOST, () => {
+        log(`Server running at http://${HOST}:${PORT}`);
+      });
+    } catch (routeError) {
+      log(`Route setup error: ${routeError}`);
+      throw routeError;
+    }
   } catch (error) {
     log(`Failed to start server: ${error}`);
     process.exit(1);

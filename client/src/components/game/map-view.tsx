@@ -10,34 +10,125 @@ import { motion } from "framer-motion";
 
 // Zone colors with semantic meanings
 const ZONE_COLORS = [
-  { color: '#2563eb', name: 'Initial Zone', description: 'Starting play area' },
-  { color: '#16a34a', name: 'First Shrink', description: 'First zone reduction' },
-  { color: '#ca8a04', name: 'Second Shrink', description: 'Second zone reduction' },
-  { color: '#dc2626', name: 'Final Zone', description: 'Final combat area' },
+  { color: '#3b82f6', name: 'Initial Zone', description: 'Starting play area' },
+  { color: '#10b981', name: 'First Shrink', description: 'First zone reduction' },
+  { color: '#f59e0b', name: 'Second Shrink', description: 'Second zone reduction' },
+  { color: '#ef4444', name: 'Final Zone', description: 'Final combat area' },
 ];
 
 // Update the boundary styling with transition properties
 const ZONE_STYLES = {
-  fillOpacity: 0.3,
-  weight: 4,
-  opacity: 0.8,
+  fillOpacity: 0.2,
+  weight: 3,
+  opacity: 0.9,
   className: 'zone-transition'
 };
 
 // Add CSS for transitions
 const zoneTransitionStyles = `
   .zone-transition {
-    transition: all 1s ease-in-out;
+    transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .zone-label {
-    transition: transform 1s ease-in-out;
+    transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.9;
   }
 
   .leaflet-interactive {
-    transition: all 1s ease-in-out;
+    transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 `;
+
+// Custom control for zone legend
+class ZoneLegend extends L.Control {
+  onAdd(map: L.Map) {
+    const div = L.DomUtil.create('div', 'zone-legend');
+    div.style.cssText = `
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      max-width: 200px;
+      color: #1f2937;
+      margin: 10px;
+    `;
+
+    const title = document.createElement('h4');
+    title.textContent = 'Zone Legend';
+    title.style.cssText = `
+      margin: 0 0 8px 0;
+      font-weight: 600;
+      color: #111827;
+      font-size: 14px;
+    `;
+    div.appendChild(title);
+
+    ZONE_COLORS.forEach(({ color, name, description }) => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        margin-bottom: 6px;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+        cursor: help;
+      `;
+
+      item.addEventListener('mouseenter', () => {
+        item.style.backgroundColor = 'rgba(0,0,0,0.05)';
+      });
+
+      item.addEventListener('mouseleave', () => {
+        item.style.backgroundColor = 'transparent';
+      });
+
+      const colorBox = document.createElement('span');
+      colorBox.style.cssText = `
+        width: 12px;
+        height: 12px;
+        background: ${color};
+        display: inline-block;
+        margin-right: 8px;
+        border-radius: 3px;
+        border: 1px solid rgba(0,0,0,0.1);
+      `;
+
+      const textContainer = document.createElement('div');
+      textContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+      `;
+
+      const nameText = document.createElement('span');
+      nameText.textContent = name;
+      nameText.style.cssText = `
+        font-weight: 500;
+        color: #374151;
+        font-size: 12px;
+      `;
+
+      const descText = document.createElement('span');
+      descText.textContent = description;
+      descText.style.cssText = `
+        font-size: 10px;
+        color: #6b7280;
+        margin-top: 2px;
+      `;
+
+      textContainer.appendChild(nameText);
+      textContainer.appendChild(descText);
+      item.appendChild(colorBox);
+      item.appendChild(textContainer);
+      div.appendChild(item);
+    });
+
+    return div;
+  }
+}
 
 // Create zone label
 function createZoneLabel(name: string, center: L.LatLng) {
@@ -108,11 +199,6 @@ export function MapView({
 
     // Create new layer group
     zonesLayerRef.current = L.layerGroup().addTo(map);
-
-    // Add style tag for transitions
-    const styleTag = document.createElement('style');
-    styleTag.textContent = zoneTransitionStyles;
-    document.head.appendChild(styleTag);
 
     // Draw the main boundary
     const boundaryLayer = L.geoJSON(boundaries, {
@@ -234,6 +320,8 @@ export function MapView({
           }
         });
       }
+      //Add legend
+      map.addControl(new ZoneLegend({position: 'topright'}));
     }
 
     return () => {
