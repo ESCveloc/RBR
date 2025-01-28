@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, jsonb, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, jsonb, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -43,6 +43,10 @@ export type EventBoundaries = {
     coordinates: number[][][];
   };
   properties: Record<string, any>;
+  center?: {
+    lat: number;
+    lng: number;
+  };
 };
 
 export const events = pgTable("games", {
@@ -132,7 +136,11 @@ export const eventBoundariesSchema = z.object({
     type: z.literal("Polygon"),
     coordinates: z.array(z.array(z.array(z.number())))
   }),
-  properties: z.record(z.any())
+  properties: z.record(z.any()),
+  center: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional()
 });
 
 // Base schemas
@@ -150,8 +158,14 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
 export type Event = typeof events.$inferSelect & {
-  participants?: (typeof eventParticipants.$inferSelect)[];
+  participants?: EventParticipant[];
+  boundaries: EventBoundaries;
 };
-export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type EventParticipant = typeof eventParticipants.$inferSelect & {
+  team?: Team;
+};
 export type StartingPosition = typeof startingPositions.$inferSelect;
 export type InsertStartingPosition = typeof startingPositions.$inferInsert;
+
+//This type is referenced in the original code but not defined.  Adding a placeholder
+type GeolocationCoordinates = { lat: number; lng: number };

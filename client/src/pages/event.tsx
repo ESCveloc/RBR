@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import type { Event, EventParticipant } from "@db/schema";
 
 export default function Event() {
   const [, params] = useRoute<{ id: string }>("/event/:id");
@@ -18,19 +19,27 @@ export default function Event() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!event?.boundaries?.center) return;
+    if (!event?.boundaries) return;
+
+    const center = event.boundaries.center ?? {
+      lat: event.boundaries.geometry.coordinates[0][0][1],
+      lng: event.boundaries.geometry.coordinates[0][0][0],
+    };
 
     // Update location based on event boundaries center
-    updateLocation.mutate({
-      latitude: event.boundaries.center.lat,
-      longitude: event.boundaries.center.lng,
+    const location: GeolocationCoordinates = {
+      latitude: center.lat,
+      longitude: center.lng,
       accuracy: 0,
       altitude: null,
       altitudeAccuracy: null,
       heading: null,
-      speed: null
-    });
-  }, [event?.boundaries]);
+      speed: null,
+      toJSON() { return this; }
+    };
+
+    updateLocation.mutate(location);
+  }, [event?.boundaries, updateLocation]);
 
   if (isLoading || !event) {
     return (
@@ -62,7 +71,7 @@ export default function Event() {
 
       <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
         <div className="order-2 md:order-1">
-          <MapView event={event} />
+          <MapView event={event as Event} />
         </div>
 
         <div className="order-1 md:order-2 space-y-4">
@@ -70,11 +79,11 @@ export default function Event() {
             <CardContent className="p-4">
               <h2 className="text-lg font-semibold mb-4">Remaining Teams</h2>
               <div className="space-y-4">
-                {event.participants?.map((participant) => (
+                {event.participants?.map((participant: EventParticipant) => (
                   <TeamCard
-                    key={participant.teamId}
-                    team={participant}
-                    status={participant.status}
+                    key={participant.id}
+                    team={participant.team}
+                    status={participant.status === "active" ? "alive" : "eliminated"}
                   />
                 ))}
               </div>
