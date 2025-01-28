@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Game } from "@db/schema";
+import type { Event } from "@db/schema";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -7,8 +7,8 @@ import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
 import "leaflet-geometryutil";
 
-// Default game settings
-const DEFAULT_GAME_SETTINGS = {
+// Default event settings
+const DEFAULT_EVENT_SETTINGS = {
   defaultCenter: { lat: 35.8462, lng: -86.3928 },
   defaultRadiusMiles: 1,
   zoneConfigs: [
@@ -128,7 +128,7 @@ class ZoneLegend extends L.Control {
 }
 
 interface MapViewProps {
-  game?: Game;
+  event?: Event;
   mode?: "view" | "draw";
   onAreaSelect?: (area: Feature<Polygon>) => void;
   selectedArea?: Feature<Polygon> | null;
@@ -137,12 +137,12 @@ interface MapViewProps {
 }
 
 export function MapView({
-  game,
+  event,
   mode = "view",
   onAreaSelect,
   selectedArea,
-  defaultCenter = DEFAULT_GAME_SETTINGS.defaultCenter,
-  defaultRadiusMiles = DEFAULT_GAME_SETTINGS.defaultRadiusMiles,
+  defaultCenter = DEFAULT_EVENT_SETTINGS.defaultCenter,
+  defaultRadiusMiles = DEFAULT_EVENT_SETTINGS.defaultRadiusMiles,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const drawLayerRef = useRef<L.FeatureGroup | null>(null);
@@ -168,14 +168,14 @@ export function MapView({
       map.addLayer(drawnItems);
       drawLayerRef.current = drawnItems;
 
-      // Add default circle if no game boundaries
-      if (!game?.boundaries) {
+      // Add default circle if no event boundaries
+      if (!event?.boundaries) {
         // Create initial zone circle
         const initialRadius = defaultRadiusMiles * 1609.34; // Convert miles to meters
         const initialCircle = L.circle(
           [defaultCenter.lat, defaultCenter.lng],
-          initialRadius,
           {
+            radius: initialRadius,
             color: ZONE_COLORS[0].color,
             fillColor: ZONE_COLORS[0].color,
             fillOpacity: ZONE_STYLES.fillOpacity,
@@ -187,12 +187,12 @@ export function MapView({
 
         // Create shrinking zone circles
         let currentRadius = initialRadius;
-        DEFAULT_GAME_SETTINGS.zoneConfigs.forEach((config, index) => {
+        DEFAULT_EVENT_SETTINGS.zoneConfigs.forEach((config, index) => {
           const nextRadius = currentRadius * config.radiusMultiplier;
           L.circle(
             [defaultCenter.lat, defaultCenter.lng],
-            nextRadius,
             {
+              radius: nextRadius,
               color: ZONE_COLORS[index + 1].color,
               fillColor: ZONE_COLORS[index + 1].color,
               fillOpacity: ZONE_STYLES.fillOpacity,
@@ -264,10 +264,10 @@ export function MapView({
     };
   }, []);
 
-  // Update map when game boundaries and zones change
+  // Update map when event boundaries and zones change
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !game?.boundaries) return;
+    if (!map || !event?.boundaries) return;
 
     // Remove default circle if it exists
     if (defaultCircleRef.current) {
@@ -285,7 +285,7 @@ export function MapView({
     zonesLayerRef.current = L.layerGroup().addTo(map);
 
     // Draw the main boundary
-    const boundaryLayer = L.geoJSON(game.boundaries, {
+    const boundaryLayer = L.geoJSON(event.boundaries, {
       style: {
         color: ZONE_COLORS[0].color,
         fillColor: ZONE_COLORS[0].color,
@@ -300,8 +300,8 @@ export function MapView({
 
     // Draw each shrinking zone
     let currentRadius = initialRadius;
-    if (Array.isArray(game.zoneConfigs)) {
-      game.zoneConfigs.forEach((zone, index) => {
+    if (Array.isArray(event.zoneConfigs)) {
+      event.zoneConfigs.forEach((zone: any, index: number) => {
         if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
         // Calculate next radius based on current radius and multiplier
@@ -311,8 +311,8 @@ export function MapView({
         // Create zone circle
         L.circle(
           [center.lat, center.lng],
-          nextRadius,
           {
+            radius: nextRadius,
             color: zoneColor.color,
             fillColor: zoneColor.color,
             ...ZONE_STYLES,
@@ -326,7 +326,7 @@ export function MapView({
 
     // Fit map to show all zones with padding
     map.fitBounds(boundaryLayer.getBounds(), { padding: [50, 50] });
-  }, [game?.boundaries, game?.zoneConfigs]);
+  }, [event?.boundaries, event?.zoneConfigs]);
 
   return (
     <div

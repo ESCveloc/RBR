@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useEvent } from "@/hooks/use-event";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { MapView } from "@/components/game/map-view";
@@ -13,13 +13,15 @@ import type { Event, EventParticipant } from "@db/schema";
 
 export default function Event() {
   const [, params] = useRoute<{ id: string }>("/event/:id");
+  const [location] = useLocation();
   const eventId = parseInt(params?.id || "0");
-  const { event, isLoading, updateLocation } = useEvent(eventId);
-  const { sendMessage } = useWebSocket(eventId);
+  const isParticipant = !location.includes("/admin"); // Check if we're not in admin context
+  const { event, isLoading, updateLocation } = useEvent(eventId, isParticipant);
+  const { sendMessage } = useWebSocket(eventId, isParticipant);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!event?.boundaries) return;
+    if (!event?.boundaries || !isParticipant) return; // Only update location for participants
 
     const center = event.boundaries.center ?? {
       lat: event.boundaries.geometry.coordinates[0][0][1],
@@ -35,11 +37,10 @@ export default function Event() {
       altitudeAccuracy: null,
       heading: null,
       speed: null,
-      toJSON() { return this; }
     };
 
     updateLocation.mutate(location);
-  }, [event?.boundaries, updateLocation]);
+  }, [event?.boundaries, updateLocation, isParticipant]);
 
   if (isLoading || !event) {
     return (
@@ -54,7 +55,7 @@ export default function Event() {
       <header className="p-4 border-b">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/">
+            <Link href={isParticipant ? "/" : "/admin"}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -71,7 +72,7 @@ export default function Event() {
 
       <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
         <div className="order-2 md:order-1">
-          <MapView event={event as Event} />
+          <MapView event={event} />
         </div>
 
         <div className="order-1 md:order-2 space-y-4">
@@ -80,11 +81,13 @@ export default function Event() {
               <h2 className="text-lg font-semibold mb-4">Remaining Teams</h2>
               <div className="space-y-4">
                 {event.participants?.map((participant: EventParticipant) => (
-                  <TeamCard
-                    key={participant.id}
-                    team={participant.team}
-                    status={participant.status === "active" ? "alive" : "eliminated"}
-                  />
+                  participant.team && (
+                    <TeamCard
+                      key={participant.id}
+                      team={participant.team}
+                      status={participant.status === "active" ? "alive" : "eliminated"}
+                    />
+                  )
                 ))}
               </div>
             </CardContent>
