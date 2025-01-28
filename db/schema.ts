@@ -29,14 +29,14 @@ export const teamMembers = pgTable("team_members", {
   joinedAt: timestamp("joined_at").defaultNow().notNull()
 });
 
-// Game related types
+// Event related types
 export type ZoneConfig = {
   durationMinutes: number;
   radiusMultiplier: number;
   intervalMinutes: number;
 };
 
-export type GameBoundaries = {
+export type EventBoundaries = {
   type: "Feature";
   geometry: {
     type: "Polygon";
@@ -45,26 +45,26 @@ export type GameBoundaries = {
   properties: Record<string, any>;
 };
 
-export const games = pgTable("games", {
+export const events = pgTable("games", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   status: text("status", { enum: ["pending", "active", "completed"] }).default("pending").notNull(),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
-  gameLengthMinutes: integer("game_length_minutes").notNull().default(60),
+  eventLengthMinutes: integer("game_length_minutes").notNull().default(60),
   maxTeams: integer("max_teams").notNull().default(10),
   playersPerTeam: integer("players_per_team").notNull().default(4),
-  boundaries: jsonb("boundaries").$type<GameBoundaries>().notNull(),
+  boundaries: jsonb("boundaries").$type<EventBoundaries>().notNull(),
   zoneConfigs: jsonb("zone_configs").$type<ZoneConfig[]>().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: serial("created_by").references(() => users.id).notNull()
 });
 
-export const gameParticipants = pgTable("game_participants", {
+export const eventParticipants = pgTable("game_participants", {
   id: serial("id").primaryKey(),
-  gameId: serial("game_id").references(() => games.id).notNull(),
+  eventId: serial("game_id").references(() => events.id).notNull(),
   teamId: serial("team_id").references(() => teams.id).notNull(),
-  status: text("status", { enum: ["alive", "eliminated"] }).default("alive").notNull(),
+  status: text("status", { enum: ["active", "eliminated"] }).default("active").notNull(),
   eliminatedAt: timestamp("eliminated_at"),
   location: jsonb("location").$type<GeolocationCoordinates>()
 });
@@ -72,7 +72,7 @@ export const gameParticipants = pgTable("game_participants", {
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   teams: many(teamMembers),
-  createdGames: many(games)
+  createdEvents: many(events)
 }));
 
 export const teamRelations = relations(teams, ({ many, one }) => ({
@@ -81,13 +81,13 @@ export const teamRelations = relations(teams, ({ many, one }) => ({
     fields: [teams.captainId],
     references: [users.id]
   }),
-  games: many(gameParticipants)
+  events: many(eventParticipants)
 }));
 
-export const gameRelations = relations(games, ({ many, one }) => ({
-  participants: many(gameParticipants),
+export const eventRelations = relations(events, ({ many, one }) => ({
+  participants: many(eventParticipants),
   creator: one(users, {
-    fields: [games.createdBy],
+    fields: [events.createdBy],
     references: [users.id]
   })
 }));
@@ -99,7 +99,7 @@ export const zoneConfigSchema = z.object({
   intervalMinutes: z.number().min(5).max(60),
 });
 
-export const gameBoundariesSchema = z.object({
+export const eventBoundariesSchema = z.object({
   type: z.literal("Feature"),
   geometry: z.object({
     type: z.literal("Polygon"),
@@ -113,14 +113,14 @@ export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
-export const insertGameSchema = createInsertSchema(games);
-export const selectGameSchema = createSelectSchema(games);
+export const insertEventSchema = createInsertSchema(events);
+export const selectEventSchema = createSelectSchema(events);
 
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
-export type Game = typeof games.$inferSelect & {
-  participants?: (typeof gameParticipants.$inferSelect)[];
+export type Event = typeof events.$inferSelect & {
+  participants?: (typeof eventParticipants.$inferSelect)[];
 };
-export type GameParticipant = typeof gameParticipants.$inferSelect;
+export type EventParticipant = typeof eventParticipants.$inferSelect;

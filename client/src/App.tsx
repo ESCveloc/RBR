@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import Home from "@/pages/home";
-import Game from "@/pages/game";
+import Event from "@/pages/event";
 import Admin from "@/pages/admin";
 import Profile from "@/pages/profile";
 import { useUser } from "@/hooks/use-user";
@@ -49,7 +49,6 @@ function Router() {
   const searchParams = new URLSearchParams(window.location.search);
   const viewAs = searchParams.get('view');
 
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -58,7 +57,6 @@ function Router() {
     );
   }
 
-  // If user is authenticated and tries to access auth page, redirect to appropriate page
   if (user && location === "/auth") {
     if (user.role === "admin") {
       setLocation("/admin");
@@ -68,7 +66,6 @@ function Router() {
     return null;
   }
 
-  // If admin user is at root and not explicitly viewing as player, redirect to admin page
   if (user?.role === "admin" && location === "/" && viewAs !== "player") {
     setLocation("/admin");
     return null;
@@ -80,8 +77,8 @@ function Router() {
       <Route path="/">
         <ProtectedRoute component={Home} />
       </Route>
-      <Route path="/game/:id">
-        <ProtectedRoute component={Game} />
+      <Route path="/event/:id">
+        <ProtectedRoute component={Event} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />

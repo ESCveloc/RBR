@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, games, teams, teamMembers } from "@db/schema";
+import { users, events, teams, teamMembers } from "@db/schema";
 import { eq, ilike, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -11,10 +11,10 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
-// Update game schema to match frontend
-const gameSchema = z.object({
-  name: z.string().min(1, "Game name is required"),
-  gameLengthMinutes: z.number().min(10).max(180),
+// Update event schema to match frontend
+const eventSchema = z.object({
+  name: z.string().min(1, "Event name is required"),
+  eventLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
   boundaries: z.any().optional(),
@@ -46,7 +46,6 @@ const settingsSchema = z.object({
   })).min(1),
 });
 
-
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
   setupAuth(app);
@@ -72,7 +71,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Store settings in memory for now
-      global.gameSettings = result.data;
+      global.eventSettings = result.data;
 
       res.json({ message: "Settings updated successfully" });
     } catch (error) {
@@ -81,14 +80,13 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the get settings endpoint to use Murfreesboro, TN coordinates
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
     }
 
     // Return default settings if none are set
-    const settings = global.gameSettings || {
+    const settings = global.eventSettings || {
       defaultCenter: {
         lat: 35.8462, // Murfreesboro, TN coordinates
         lng: -86.3928,
@@ -481,19 +479,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Games API endpoints
-  app.post("/api/games", async (req, res) => {
+  // Event API endpoints
+  app.post("/api/events", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     try {
-      console.log("Received game creation request:", req.body);
-      const result = gameSchema.safeParse(req.body);
+      const result = eventSchema.safeParse(req.body);
       if (!result.success) {
-        console.error("Game validation failed:", result.error);
         return res.status(400).json({
-          message: "Invalid game data",
+          message: "Invalid event data",
           errors: result.error.issues,
         });
       }
@@ -501,14 +497,14 @@ export function registerRoutes(app: Express): Server {
       const {
         name,
         boundaries,
-        gameLengthMinutes,
+        eventLengthMinutes,
         maxTeams,
         playersPerTeam,
         zoneConfigs
       } = result.data;
 
       // Use default boundaries if none provided
-      const settings = global.gameSettings || {
+      const settings = global.eventSettings || {
         defaultCenter: {
           lat: 35.8462,
           lng: -86.3928,
@@ -521,82 +517,80 @@ export function registerRoutes(app: Express): Server {
         ],
       };
 
-      const gameBoundaries = boundaries || {
+      const eventBoundaries = boundaries || {
         center: settings.defaultCenter,
         radiusMiles: settings.defaultRadiusMiles,
       };
 
-      const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
-      console.log("Creating game with boundaries:", gameBoundaries);
+      const eventZoneConfigs = zoneConfigs || settings.zoneConfigs;
 
-      const [game] = await db
-        .insert(games)
+      const [event] = await db
+        .insert(events)
         .values({
           name,
-          boundaries: gameBoundaries,
-          gameLengthMinutes,
+          boundaries: eventBoundaries,
+          eventLengthMinutes,
           maxTeams,
           playersPerTeam,
-          zoneConfigs: gameZoneConfigs,
+          zoneConfigs: eventZoneConfigs,
           createdBy: (req.user as any).id,
           status: "pending",
         })
         .returning();
 
-      console.log("Game created successfully:", game);
-      res.json(game);
+      res.json(event);
     } catch (error: any) {
-      console.error("Game creation error:", error);
-      res.status(500).json({ message: "Failed to create game" });
+      console.error("Event creation error:", error);
+      res.status(500).json({ message: "Failed to create event" });
     }
   });
 
-  // Get all games with status
-  app.get("/api/games", async (req, res) => {
+  // Get all events with status
+  app.get("/api/events", async (req, res) => {
     try {
-      const allGames = await db
+      const allEvents = await db
         .select()
-        .from(games)
-        .orderBy(games.createdAt);
+        .from(events)
+        .orderBy(events.createdAt);
 
-      res.json(allGames);
+      res.json(allEvents);
     } catch (error) {
-      console.error("Fetch games error:", error);
-      res.status(500).json({ message: "Failed to fetch games" });
+      console.error("Fetch events error:", error);
+      res.status(500).json({ message: "Failed to fetch events" });
     }
   });
 
-  // Update game status
-  app.patch("/api/games/:gameId/status", async (req, res) => {
+  // Update event status
+  app.patch("/api/events/:eventId/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
     }
 
     try {
-      const gameId = parseInt(req.params.gameId);
+      const eventId = parseInt(req.params.eventId);
       const { status } = req.body;
 
       if (!["pending", "active", "completed"].includes(status)) {
         return res.status(400).send("Invalid status");
       }
 
-      const [game] = await db
+      const [event] = await db
         .select()
-        .from(games)
-        .where(eq(games.id, gameId))
+        .from(events)
+        .where(eq(events.id, eventId))
         .limit(1);
 
-      if (!game) {
-        return res.status(404).send("Game not found");
+      if (!event) {
+        return res.status(404).send("Event not found");
       }
 
       // Validate state transition
-      if (status === "active" && game.status !== "pending") {
-        return res.status(400).send("Can only activate pending games");
+      if (status === "active" && event.status !== "pending") {
+        return res.status(400).send("Can only activate pending events");
       }
 
-      if (status === "completed" && game.status !== "active") {
-        return res.status(400).send("Can only complete active games");
+      if (status === "completed" && event.status !== "active") {
+        return res.status(400).send("Can only complete active events");
       }
 
       const updateData: any = { status };
@@ -606,16 +600,16 @@ export function registerRoutes(app: Express): Server {
         updateData.endTime = new Date();
       }
 
-      const [updatedGame] = await db
-        .update(games)
+      const [updatedEvent] = await db
+        .update(events)
         .set(updateData)
-        .where(eq(games.id, gameId))
+        .where(eq(events.id, eventId))
         .returning();
 
-      res.json(updatedGame);
+      res.json(updatedEvent);
     } catch (error) {
-      console.error("Update game status error:", error);
-      res.status(500).send("Failed to update game status");
+      console.error("Update event status error:", error);
+      res.status(500).send("Failed to update event status");
     }
   });
 
@@ -623,7 +617,7 @@ export function registerRoutes(app: Express): Server {
 }
 
 declare global {
-  var gameSettings: any;
+  var eventSettings: any;
   namespace Express {
     interface User {
       id: number;
