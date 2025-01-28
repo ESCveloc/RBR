@@ -6,7 +6,7 @@ type WebSocketMessage = {
   payload: any;
 };
 
-export function useWebSocket(gameId: number) {
+export function useWebSocket(gameId: number, isParticipant = false) {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
@@ -21,7 +21,7 @@ export function useWebSocket(gameId: number) {
   }, []);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN || isConnectingRef.current) return;
+    if (!isParticipant || wsRef.current?.readyState === WebSocket.OPEN || isConnectingRef.current) return;
 
     isConnectingRef.current = true;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -71,8 +71,8 @@ export function useWebSocket(gameId: number) {
       console.log('WebSocket disconnected');
       isConnectingRef.current = false;
 
-      // Attempt to reconnect if not at max attempts
-      if (reconnectAttemptRef.current < maxReconnectAttempts) {
+      // Attempt to reconnect if not at max attempts and still a participant
+      if (isParticipant && reconnectAttemptRef.current < maxReconnectAttempts) {
         reconnectAttemptRef.current++;
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
 
@@ -84,7 +84,7 @@ export function useWebSocket(gameId: number) {
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, delay);
-      } else {
+      } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
         toast({
           title: "Connection Error",
           description: "Failed to connect to game server after multiple attempts",
@@ -92,10 +92,12 @@ export function useWebSocket(gameId: number) {
         });
       }
     };
-  }, [gameId, toast, sendMessage]);
+  }, [gameId, toast, sendMessage, isParticipant]);
 
   useEffect(() => {
-    connect();
+    if (isParticipant) {
+      connect();
+    }
 
     return () => {
       if (reconnectTimeoutRef.current) {
@@ -105,7 +107,7 @@ export function useWebSocket(gameId: number) {
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [connect, isParticipant]);
 
   return { sendMessage };
 }
