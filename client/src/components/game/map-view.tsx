@@ -50,37 +50,50 @@ class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
     const div = L.DomUtil.create('div', 'zone-legend');
     div.style.cssText = `
-      background: white;
-      padding: 10px;
+      background: rgb(255, 255, 255);
+      padding: 8px 12px;
       border-radius: 6px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       font-family: system-ui, sans-serif;
       font-size: 12px;
-      max-width: 200px;
+      max-width: none;
       color: #1f2937;
       margin: 10px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid rgba(0,0,0,0.1);
     `;
 
     const title = document.createElement('h4');
     title.textContent = 'Zone Legend';
     title.style.cssText = `
-      margin: 0 0 8px 0;
+      margin: 0;
       font-weight: 600;
       color: #111827;
       font-size: 14px;
+      white-space: nowrap;
     `;
     div.appendChild(title);
+
+    const itemsContainer = document.createElement('div');
+    itemsContainer.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    `;
 
     ZONE_COLORS.forEach(({ color, name, description }) => {
       const item = document.createElement('div');
       item.style.cssText = `
         display: flex;
         align-items: center;
-        margin-bottom: 6px;
-        padding: 4px;
+        gap: 6px;
+        padding: 2px 4px;
         border-radius: 4px;
         transition: background-color 0.2s ease;
         cursor: help;
+        white-space: nowrap;
       `;
 
       const colorBox = document.createElement('span');
@@ -89,15 +102,8 @@ class ZoneLegend extends L.Control {
         height: 12px;
         background: ${color};
         display: inline-block;
-        margin-right: 8px;
         border-radius: 3px;
         border: 1px solid rgba(0,0,0,0.1);
-      `;
-
-      const textContainer = document.createElement('div');
-      textContainer.style.cssText = `
-        display: flex;
-        flex-direction: column;
       `;
 
       const nameText = document.createElement('span');
@@ -108,21 +114,15 @@ class ZoneLegend extends L.Control {
         font-size: 12px;
       `;
 
-      const descText = document.createElement('span');
-      descText.textContent = description;
-      descText.style.cssText = `
-        font-size: 10px;
-        color: #6b7280;
-        margin-top: 2px;
-      `;
+      // Create tooltip for description
+      item.title = description;
 
-      textContainer.appendChild(nameText);
-      textContainer.appendChild(descText);
       item.appendChild(colorBox);
-      item.appendChild(textContainer);
-      div.appendChild(item);
+      item.appendChild(nameText);
+      itemsContainer.appendChild(item);
     });
 
+    div.appendChild(itemsContainer);
     return div;
   }
 }
@@ -250,7 +250,7 @@ export function MapView({
       }
 
       // Add legend
-      map.addControl(new ZoneLegend({ position: 'topright' }));
+      map.addControl(new ZoneLegend({ position: 'topleft' }));
     }
 
     return () => {
