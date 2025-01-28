@@ -46,6 +46,8 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
 function Router() {
   const { user, isLoading } = useUser();
   const [location, setLocation] = useLocation();
+  const searchParams = new URLSearchParams(window.location.search);
+  const viewAs = searchParams.get('view');
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -66,8 +68,8 @@ function Router() {
     return null;
   }
 
-  // If admin user is at root, redirect to admin page
-  if (user?.role === "admin" && location === "/") {
+  // If admin user is at root and not explicitly viewing as player, redirect to admin page
+  if (user?.role === "admin" && location === "/" && viewAs !== "player") {
     setLocation("/admin");
     return null;
   }

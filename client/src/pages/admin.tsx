@@ -305,7 +305,7 @@ export default function Admin() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <Link href="/">
+        <Link href="/?view=player">
           <Button variant="outline" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Player Dashboard
