@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -303,7 +303,15 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <Link href="/">
+          <Button variant="outline" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Player Dashboard
+          </Button>
+        </Link>
+      </div>
 
       <Tabs defaultValue="games" className="space-y-4">
         <TabsList>

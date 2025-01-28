@@ -45,7 +45,7 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -56,9 +56,20 @@ function Router() {
     );
   }
 
-  // If user is authenticated and tries to access auth page, redirect to home
+  // If user is authenticated and tries to access auth page, redirect to appropriate page
   if (user && location === "/auth") {
-    return <Home />;
+    if (user.role === "admin") {
+      setLocation("/admin");
+    } else {
+      setLocation("/");
+    }
+    return null;
+  }
+
+  // If admin user is at root, redirect to admin page
+  if (user?.role === "admin" && location === "/") {
+    setLocation("/admin");
+    return null;
   }
 
   return (

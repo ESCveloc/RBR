@@ -61,11 +61,19 @@ export function ProfileCard() {
             </div>
           </div>
 
-          <Link href="/profile">
-            <Button variant="outline" className="w-full">
-              Edit Profile
-            </Button>
-          </Link>
+          <div className="space-y-2">
+            <Link href="/profile">
+              <Button variant="outline" className="w-full">
+                Edit Profile
+              </Button>
+            </Link>
+
+            {user?.role === "admin" && (
+              <Link href="/admin">
+                <Button className="w-full">Admin Dashboard</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
