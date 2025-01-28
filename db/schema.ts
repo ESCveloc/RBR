@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, jsonb, integer, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -69,6 +69,16 @@ export const eventParticipants = pgTable("game_participants", {
   location: jsonb("location").$type<GeolocationCoordinates>()
 });
 
+export const startingPositions = pgTable("starting_positions", {
+  id: serial("id").primaryKey(),
+  eventId: serial("event_id").references(() => events.id).notNull(),
+  positionNumber: integer("position_number").notNull(),
+  coordinates: jsonb("coordinates").$type<{lat: number, lng: number}>().notNull(),
+  assignedTeamId: serial("assigned_team_id").references(() => teams.id),
+  staffAssignedId: serial("staff_assigned_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   teams: many(teamMembers),
@@ -89,8 +99,25 @@ export const eventRelations = relations(events, ({ many, one }) => ({
   creator: one(users, {
     fields: [events.createdBy],
     references: [users.id]
+  }),
+  startingPositions: many(startingPositions)
+}));
+
+export const startingPositionRelations = relations(startingPositions, ({ one }) => ({
+  event: one(events, {
+    fields: [startingPositions.eventId],
+    references: [events.id]
+  }),
+  assignedTeam: one(teams, {
+    fields: [startingPositions.assignedTeamId],
+    references: [teams.id]
+  }),
+  staffAssigned: one(users, {
+    fields: [startingPositions.staffAssignedId],
+    references: [users.id]
   })
 }));
+
 
 // Validation schemas
 export const zoneConfigSchema = z.object({
@@ -115,6 +142,8 @@ export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
 export const insertEventSchema = createInsertSchema(events);
 export const selectEventSchema = createSelectSchema(events);
+export const insertStartingPositionSchema = createInsertSchema(startingPositions);
+export const selectStartingPositionSchema = createSelectSchema(startingPositions);
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -124,3 +153,5 @@ export type Event = typeof events.$inferSelect & {
   participants?: (typeof eventParticipants.$inferSelect)[];
 };
 export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type StartingPosition = typeof startingPositions.$inferSelect;
+export type InsertStartingPosition = typeof startingPositions.$inferInsert;
