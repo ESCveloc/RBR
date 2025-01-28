@@ -11,13 +11,13 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
-// Update event schema to match frontend
+// Update the event schema to match frontend and fix validation
 const eventSchema = z.object({
   name: z.string().min(1, "Event name is required"),
-  eventLengthMinutes: z.number().min(10).max(180),
+  gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
-  boundaries: z.any().optional(),
+  boundaries: z.any(),
   zoneConfigs: z.array(z.object({
     durationMinutes: z.number().min(5).max(60),
     radiusMultiplier: z.number().min(0.1).max(1),
@@ -62,11 +62,29 @@ function generateStartingPositions(boundaries: any, maxTeams: number) {
 }
 
 function generateDefaultBoundaries(center: { lat: number; lng: number; }, radiusMiles: number) {
-  // This is a placeholder; a real implementation would generate boundaries
-  // based on the center and radius.  This simply returns a default structure.
+  const radiusMeters = radiusMiles * 1609.34; // Convert miles to meters
+
+  // Generate a circular boundary with 32 points
+  const points = [];
+  for (let i = 0; i < 32; i++) {
+    const angle = (i / 32) * 2 * Math.PI;
+    const dx = Math.cos(angle) * radiusMeters;
+    const dy = Math.sin(angle) * radiusMeters;
+
+    const latChange = dy / 111111; // 1 degree of latitude is approximately 111111 meters
+    const lngChange = dx / (111111 * Math.cos(center.lat * Math.PI / 180));
+
+    points.push([center.lng + lngChange, center.lat + latChange]);
+  }
+  points.push(points[0]); // Close the polygon
+
   return {
-    center: center,
-    radiusMiles: radiusMiles,
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [points]
+    },
+    properties: {}
   };
 }
 
@@ -145,7 +163,7 @@ export function registerRoutes(app: Express): Server {
       const {
         name,
         boundaries,
-        eventLengthMinutes,
+        gameLengthMinutes,
         maxTeams,
         playersPerTeam,
         zoneConfigs
@@ -177,7 +195,7 @@ export function registerRoutes(app: Express): Server {
         .values({
           name,
           boundaries: eventBoundaries,
-          eventLengthMinutes,
+          eventLengthMinutes: gameLengthMinutes,
           maxTeams,
           playersPerTeam,
           zoneConfigs: eventZoneConfigs,
@@ -952,7 +970,7 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedPositions);
     } catch (error) {
       console.error("Randomize positions error:", error);
-      res.status(500).send("Failed to randomize positions");
+      res.status(500).send("Failedto randomize positions");
     }
   });
 
