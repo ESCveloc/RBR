@@ -7,26 +7,22 @@ export function useEvent(eventId: number, isParticipant = false) {
   const { data: event, isLoading } = useQuery<Event>({
     queryKey: ['/api/events', eventId],
     enabled: !!eventId,
-    staleTime: isParticipant ? 1000 : Infinity, // Never stale for admin, 1s for participants
+    staleTime: Infinity, // Never stale for now
     gcTime: 60000, // 1 minute
-    refetchInterval: isParticipant ? 5000 : false, // Only poll for participants
-    refetchOnWindowFocus: isParticipant,
+    refetchInterval: false, // Disable polling for now
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
   });
 
+  // Location updates temporarily disabled
   const updateLocation = useMutation({
     mutationFn: async (location: GeolocationCoordinates) => {
       const response = await fetch(`/api/events/${eventId}/update-location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          location: {
-            ...location,
-            timestamp: Date.now()
-          }
-        }),
+        body: JSON.stringify({ location }),
         credentials: 'include'
       });
 
@@ -37,15 +33,16 @@ export function useEvent(eventId: number, isParticipant = false) {
       return response.json();
     },
     onSuccess: (data: EventParticipant) => {
-      queryClient.setQueryData(['/api/events', eventId], (oldData: Event | undefined) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          participants: oldData.participants?.map(p =>
-            p.id === data.id ? { ...p, ...data } : p
-          )
-        };
-      });
+      // Disabled real-time updates
+      // queryClient.setQueryData(['/api/events', eventId], (oldData: Event | undefined) => {
+      //   if (!oldData) return oldData;
+      //   return {
+      //     ...oldData,
+      //     participants: oldData.participants?.map(p =>
+      //       p.id === data.id ? { ...p, ...data } : p
+      //     )
+      //   };
+      // });
     }
   });
 

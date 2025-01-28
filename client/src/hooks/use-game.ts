@@ -7,11 +7,11 @@ export function useGame(gameId: number, isParticipant = false) {
   const { data: game, isLoading } = useQuery<Event>({
     queryKey: ['/api/games', gameId],
     enabled: !!gameId,
-    staleTime: isParticipant ? 1000 : 30000, // 1 second for participants, 30 seconds for admin
+    staleTime: Infinity, // Never stale for now
     gcTime: 60000, // 1 minute
-    refetchInterval: isParticipant ? 5000 : 0, // Only poll for participants
-    refetchOnWindowFocus: isParticipant,
-    refetchOnMount: isParticipant,
+    refetchInterval: false, // Disable polling for now
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
   });
 
   const updateLocation = useMutation({
@@ -30,7 +30,8 @@ export function useGame(gameId: number, isParticipant = false) {
       return response.json();
     },
     onSuccess: (data: EventParticipant) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
+      // Disabled real-time updates
+      // queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
     }
   });
 

@@ -1,64 +1,40 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useEvent } from "@/hooks/use-event";
-import { useWebSocket } from "@/hooks/use-websocket";
 import { MapView } from "@/components/game/map-view";
 import { TeamCard } from "@/components/game/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import type { Event, EventParticipant, GeolocationCoordinates } from "@db/schema";
+import type { Event, EventParticipant } from "@db/schema";
 
 export default function Event() {
   const [, params] = useRoute<{ id: string }>("/event/:id");
   const [location] = useLocation();
   const eventId = parseInt(params?.id || "0");
   const isParticipant = !location.includes("/admin");
-  const { event, isLoading, updateLocation } = useEvent(eventId, isParticipant);
-  const { sendMessage } = useWebSocket(eventId, isParticipant);
-  const { toast } = useToast();
-  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const { event, isLoading } = useEvent(eventId, isParticipant);
 
-  const updatePlayerLocation = useCallback((coordinates: GeolocationCoordinates) => {
-    if (!isParticipant) return;
-
-    updateLocation.mutate({
-      ...coordinates,
-      timestamp: Date.now()
-    });
-  }, [isParticipant, updateLocation]);
-
-  useEffect(() => {
-    if (!event?.boundaries || !isParticipant) return;
-
-    // Initial location update
-    const center = event.boundaries.center ?? {
-      lat: event.boundaries.geometry.coordinates[0][0][1],
-      lng: event.boundaries.geometry.coordinates[0][0][0],
-    };
-
-    const coordinates: GeolocationCoordinates = {
-      latitude: center.lat,
-      longitude: center.lng,
-      accuracy: 0,
-      altitude: null,
-      altitudeAccuracy: null,
-      heading: null,
-      speed: null,
-      timestamp: Date.now()
-    };
-
-    updatePlayerLocation(coordinates);
-
-    // Cleanup
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, [event?.boundaries, updatePlayerLocation, isParticipant]);
+  // Real-time updates temporarily disabled
+  // useEffect(() => {
+  //   if (!event?.boundaries || !isParticipant) return;
+  //   const center = event.boundaries.center ?? {
+  //     lat: event.boundaries.geometry.coordinates[0][0][1],
+  //     lng: event.boundaries.geometry.coordinates[0][0][0],
+  //   };
+  //   const coordinates = {
+  //     latitude: center.lat,
+  //     longitude: center.lng,
+  //     accuracy: 0,
+  //     altitude: null,
+  //     altitudeAccuracy: null,
+  //     heading: null,
+  //     speed: null,
+  //     timestamp: Date.now()
+  //   };
+  //   updatePlayerLocation(coordinates);
+  // }, [event?.boundaries, isParticipant]);
 
   if (isLoading || !event) {
     return (
