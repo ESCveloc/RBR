@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useEvent } from "@/hooks/use-event";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -9,27 +9,37 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import type { Event, EventParticipant } from "@db/schema";
+import type { Event, EventParticipant, GeolocationCoordinates } from "@db/schema";
 
 export default function Event() {
   const [, params] = useRoute<{ id: string }>("/event/:id");
   const [location] = useLocation();
   const eventId = parseInt(params?.id || "0");
-  const isParticipant = !location.includes("/admin"); // Check if we're not in admin context
+  const isParticipant = !location.includes("/admin");
   const { event, isLoading, updateLocation } = useEvent(eventId, isParticipant);
   const { sendMessage } = useWebSocket(eventId, isParticipant);
   const { toast } = useToast();
+  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+
+  const updatePlayerLocation = useCallback((coordinates: GeolocationCoordinates) => {
+    if (!isParticipant) return;
+
+    updateLocation.mutate({
+      ...coordinates,
+      timestamp: Date.now()
+    });
+  }, [isParticipant, updateLocation]);
 
   useEffect(() => {
-    if (!event?.boundaries || !isParticipant) return; // Only update location for participants
+    if (!event?.boundaries || !isParticipant) return;
 
+    // Initial location update
     const center = event.boundaries.center ?? {
       lat: event.boundaries.geometry.coordinates[0][0][1],
       lng: event.boundaries.geometry.coordinates[0][0][0],
     };
 
-    // Update location based on event boundaries center
-    const location: GeolocationCoordinates = {
+    const coordinates: GeolocationCoordinates = {
       latitude: center.lat,
       longitude: center.lng,
       accuracy: 0,
@@ -37,10 +47,18 @@ export default function Event() {
       altitudeAccuracy: null,
       heading: null,
       speed: null,
+      timestamp: Date.now()
     };
 
-    updateLocation.mutate(location);
-  }, [event?.boundaries, updateLocation, isParticipant]);
+    updatePlayerLocation(coordinates);
+
+    // Cleanup
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [event?.boundaries, updatePlayerLocation, isParticipant]);
 
   if (isLoading || !event) {
     return (

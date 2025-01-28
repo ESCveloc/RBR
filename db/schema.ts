@@ -167,5 +167,14 @@ export type EventParticipant = typeof eventParticipants.$inferSelect & {
 export type StartingPosition = typeof startingPositions.$inferSelect;
 export type InsertStartingPosition = typeof startingPositions.$inferInsert;
 
-//This type is referenced in the original code but not defined.  Adding a placeholder
-type GeolocationCoordinates = { lat: number; lng: number };
+//This type is updated with more comprehensive geolocation data.
+export type GeolocationCoordinates = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  altitude: number | null;
+  altitudeAccuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  timestamp?: number;
+};
