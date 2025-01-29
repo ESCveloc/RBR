@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGame } from "@/hooks/use-game";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -7,7 +7,7 @@ import { TeamCard } from "@/components/game/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
+import { Loader2, ArrowLeft, Play, X, Users, Timer } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
@@ -20,6 +20,9 @@ export default function Game() {
   const { toast } = useToast();
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [currentZone, setCurrentZone] = useState<number>(0);
+  const [zoneTimeRemaining, setZoneTimeRemaining] = useState<number | null>(null);
 
   // Mutations for game actions
   const updateGameStatus = useMutation({
@@ -51,6 +54,82 @@ export default function Game() {
       });
     },
   });
+
+  // Game timer effect
+  useEffect(() => {
+    if (!game || game.status !== 'active') {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const startTime = new Date(game.startTime).getTime();
+    const duration = game.gameLengthMinutes * 60 * 1000;
+    const endTime = startTime + duration;
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const remaining = endTime - now;
+
+      if (remaining <= 0) {
+        setTimeRemaining(0);
+        updateGameStatus.mutate({ status: 'completed' });
+        clearInterval(timer);
+      } else {
+        setTimeRemaining(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [game?.status, game?.startTime, game?.gameLengthMinutes]);
+
+  // Zone timer effect
+  useEffect(() => {
+    if (!game || game.status !== 'active' || !game.zoneConfigs) {
+      setZoneTimeRemaining(null);
+      setCurrentZone(0);
+      return;
+    }
+
+    const startTime = new Date(game.startTime).getTime();
+    let totalTime = 0;
+    let currentZoneIndex = 0;
+
+    // Calculate which zone we should be in
+    for (let i = 0; i < game.zoneConfigs.length; i++) {
+      const zoneConfig = game.zoneConfigs[i];
+      totalTime += zoneConfig.intervalMinutes * 60 * 1000;
+
+      const now = new Date().getTime();
+      if (now < startTime + totalTime) {
+        currentZoneIndex = i;
+        const zoneStartTime = startTime + totalTime - (zoneConfig.intervalMinutes * 60 * 1000);
+        const zoneEndTime = startTime + totalTime;
+        const remaining = zoneEndTime - now;
+
+        setCurrentZone(i);
+        setZoneTimeRemaining(remaining > 0 ? remaining : 0);
+        break;
+      }
+    }
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      if (currentZoneIndex < game.zoneConfigs.length) {
+        const zoneConfig = game.zoneConfigs[currentZoneIndex];
+        const zoneEndTime = startTime + totalTime;
+        const remaining = zoneEndTime - now;
+
+        if (remaining <= 0) {
+          setZoneTimeRemaining(0);
+          setCurrentZone(currentZoneIndex + 1);
+        } else {
+          setZoneTimeRemaining(remaining);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [game?.status, game?.startTime, game?.zoneConfigs]);
 
   useEffect(() => {
     if (!game?.boundaries?.geometry?.coordinates) return;
@@ -84,6 +163,13 @@ export default function Game() {
   const isGameCreator = game?.createdBy === user?.id;
   const canManageGame = isAdmin || isGameCreator;
 
+  // Format time remaining for display
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   if (isLoading || !game) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -107,6 +193,22 @@ export default function Game() {
             <h1 className="text-xl font-bold">{game.name}</h1>
           </div>
           <div className="flex items-center gap-4">
+            {/* Game Timer */}
+            {gameStatus === 'active' && timeRemaining !== null && (
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Timer className="h-4 w-4" />
+                {formatTime(timeRemaining)}
+              </div>
+            )}
+
+            {/* Zone Timer */}
+            {gameStatus === 'active' && zoneTimeRemaining !== null && game.zoneConfigs && (
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <span className="text-primary">Zone {currentZone + 1}</span>
+                {formatTime(zoneTimeRemaining)}
+              </div>
+            )}
+
             <span className={`text-sm px-2 py-1 rounded-full ${
               gameStatus === 'active' ? 'bg-green-100 text-green-800' :
               gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
@@ -127,6 +229,17 @@ export default function Game() {
               >
                 <Play className="h-4 w-4 mr-2" />
                 Start Game
+              </Button>
+            )}
+
+            {canManageGame && gameStatus === 'active' && (
+              <Button
+                variant="destructive"
+                onClick={() => updateGameStatus.mutate({ status: 'completed' })}
+                disabled={updateGameStatus.isPending}
+              >
+                <X className="h-4 w-4 mr-2" />
+                End Game
               </Button>
             )}
 
