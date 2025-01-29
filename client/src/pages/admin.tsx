@@ -25,7 +25,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Trophy, Users, Settings, Plus } from "lucide-react";
-import type { Game, User } from "@db/schema";
+import type { Game } from "@db/schema";
 import type { Feature, Polygon } from "geojson";
 import {
   Tabs,
@@ -131,8 +131,6 @@ export default function Admin() {
         throw new Error("You must be logged in to create a game");
       }
 
-      console.log("Attempting to create game with values:", values);
-
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,7 +148,7 @@ export default function Admin() {
     },
     onSuccess: (game) => {
       console.log("Game created successfully:", game);
-      form.reset();
+      gameForm.reset();
       setSelectedArea(null);
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
 
@@ -189,11 +187,11 @@ export default function Admin() {
     refetchInterval: 5000,
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery<User[]>({
+  const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
   });
 
-  const { control, handleSubmit, reset, formState } = useForm<z.infer<typeof formSchema>>({
+  const gameForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -204,53 +202,7 @@ export default function Admin() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      console.log("Form submitted with values:", values);
-
-      // Validate data before submission
-      const result = formSchema.safeParse(values);
-      if (!result.success) {
-        console.error("Form validation failed:", result.error);
-        toast({
-          title: "Validation Error",
-          description: "Please check all required fields",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Always use these default zone configs for new games
-      const defaultZoneConfigs = [
-        { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 15 },
-        { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
-        { durationMinutes: 10, radiusMultiplier: 0.25, intervalMinutes: 10 }
-      ];
-
-      const boundaries = selectedArea || generateDefaultBoundaries(
-        settings?.defaultCenter || { lat: 35.8462, lng: -86.3928 },
-        settings?.defaultRadiusMiles || 1
-      );
-
-      const gameData = {
-        ...values,
-        boundaries,
-        zoneConfigs: defaultZoneConfigs
-      };
-
-      console.log("Submitting game data:", gameData);
-      await createGame.mutateAsync(gameData);
-    } catch (error) {
-      console.error("Error in form submission:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create game. Please try again.",
-        variant: "destructive",
-      });
-    }
-  }
-
-  const { control: settingsControl, handleSubmit: settingsHandleSubmit, formState: settingsFormState } = useForm<z.infer<typeof settingsSchema>>({
+  const settingsForm = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: settings || {
       defaultCenter: { lat: 0, lng: 0 },
@@ -258,6 +210,19 @@ export default function Admin() {
       zoneConfigs: [{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }],
     },
   });
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await createGame.mutateAsync(values);
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create game",
+        variant: "destructive",
+      });
+    }
+  }
 
   const updateSettings = async (values: z.infer<typeof settingsSchema>) => {
     try {
@@ -360,10 +325,10 @@ export default function Admin() {
                 <CardDescription>Set up a new battle royale game</CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...{ control, handleSubmit }}>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <Form {...gameForm}>
+                  <form onSubmit={gameForm.handleSubmit(onSubmit)} className="space-y-6">
                     <FormField
-                      control={control}
+                      control={gameForm.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
@@ -377,7 +342,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={control}
+                      control={gameForm.control}
                       name="gameLengthMinutes"
                       render={({ field }) => (
                         <FormItem>
@@ -403,7 +368,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={control}
+                      control={gameForm.control}
                       name="maxTeams"
                       render={({ field }) => (
                         <FormItem>
@@ -429,7 +394,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={control}
+                      control={gameForm.control}
                       name="playersPerTeam"
                       render={({ field }) => (
                         <FormItem>
@@ -612,11 +577,11 @@ export default function Admin() {
               <CardDescription>Configure default game settings</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...{ control: settingsControl, handleSubmit: settingsHandleSubmit }}>
-                <form onSubmit={settingsHandleSubmit(updateSettings)} className="space-y-6">
+              <Form {...settingsForm}>
+                <form onSubmit={settingsForm.handleSubmit(updateSettings)} className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
-                      control={settingsControl}
+                      control={settingsForm.control}
                       name="defaultCenter.lat"
                       render={({ field }) => (
                         <FormItem>
@@ -630,7 +595,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={settingsControl}
+                      control={settingsForm.control}
                       name="defaultCenter.lng"
                       render={({ field }) => (
                         <FormItem>
@@ -645,7 +610,7 @@ export default function Admin() {
                   </div>
 
                   <FormField
-                    control={settingsControl}
+                    control={settingsForm.control}
                     name="defaultRadiusMiles"
                     render={({ field }) => (
                       <FormItem>
@@ -671,7 +636,7 @@ export default function Admin() {
                   />
 
                   <FormField
-                    control={settingsControl}
+                    control={settingsForm.control}
                     name="zoneConfigs"
                     render={({ field }) => (
                       <FormItem className="space-y-4">
@@ -760,9 +725,9 @@ export default function Admin() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={settingsFormState.isSubmitting}
+                    disabled={settingsForm.formState.isSubmitting}
                   >
-                    {settingsFormState.isSubmitting && (
+                    {settingsForm.formState.isSubmitting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Save Settings
