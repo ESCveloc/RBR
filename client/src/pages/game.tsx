@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGame } from "@/hooks/use-game";
-import { useWebSocket } from "@/hooks/use-websocket";
 import { MapView } from "@/components/game/map-view";
-import { TeamCard } from "@/components/game/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +18,7 @@ export default function Game() {
 
   // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
-  const { game, isLoading } = useGame(gameId);
+  const { game, isLoading, error } = useGame(gameId!);
 
   // Simple admin check
   const isAdmin = user?.role === 'admin';
@@ -32,9 +30,10 @@ export default function Game() {
       isAdmin,
       gameStatus: game?.status,
       gameId,
-      game
+      game,
+      error
     });
-  }, [user, isAdmin, game, gameId]);
+  }, [user, isAdmin, game, gameId, error]);
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -89,10 +88,24 @@ export default function Game() {
     );
   }
 
-  if (isLoading || !game) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !game) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error Loading Game</h1>
+          <p className="text-muted-foreground mb-4">{error?.message || "Failed to load game data"}</p>
+          <Link href="/">
+            <Button>Return to Home</Button>
+          </Link>
+        </div>
       </div>
     );
   }

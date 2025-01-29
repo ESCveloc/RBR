@@ -4,8 +4,19 @@ import type { Game, GameParticipant } from '@db/schema';
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
 
-  const { data: game, isLoading } = useQuery<Game>({
-    queryKey: ['/api/games', gameId],
+  const { data: game, isLoading, error } = useQuery<Game>({
+    queryKey: [`/api/games/${gameId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/games/${gameId}`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch game');
+      }
+
+      return response.json();
+    },
     enabled: !!gameId,
     retry: 3,
     staleTime: 1000,
@@ -28,7 +39,7 @@ export function useGame(gameId: number) {
       return response.json();
     },
     onSuccess: (data: GameParticipant) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
     }
   });
 
@@ -48,13 +59,14 @@ export function useGame(gameId: number) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
     }
   });
 
   return {
     game,
     isLoading,
+    error,
     updateLocation,
     joinGame
   };
