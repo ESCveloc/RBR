@@ -18,16 +18,19 @@ interface SelectTeamProps {
 
 export function SelectTeam({ gameId }: SelectTeamProps) {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const { teams, isLoading: isLoadingTeams } = useTeams();
+  const { teams = [], isLoading: isLoadingTeams } = useTeams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const assignTeam = useMutation({
     mutationFn: async () => {
+      if (!selectedTeamId) return;
+
       const response = await fetch(`/api/games/${gameId}/teams`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -69,11 +72,20 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
             <SelectValue placeholder="Select a team" />
           </SelectTrigger>
           <SelectContent>
-            {teams?.map((team) => (
-              <SelectItem key={team.id} value={team.id.toString()}>
-                {team.name}
+            {teams && teams.length > 0 ? (
+              teams.map((team) => (
+                <SelectItem 
+                  key={team.teams?.id || team.id} 
+                  value={String(team.teams?.id || team.id)}
+                >
+                  {team.teams?.name || team.name}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem value="" disabled>
+                No teams available
               </SelectItem>
-            ))}
+            )}
           </SelectContent>
         </Select>
         <Button
