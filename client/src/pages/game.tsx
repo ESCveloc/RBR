@@ -222,7 +222,6 @@ export default function Game() {
                       onClick={() => updateGameStatus.mutate({ status: 'active' })}
                       disabled={updateGameStatus.isPending}
                       size="sm"
-                      className="bg-green-500 hover:bg-green-600 text-white"
                     >
                       {updateGameStatus.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -243,24 +242,6 @@ export default function Game() {
                       Cancel
                     </Button>
                   </>
-                )}
-
-                {gameStatus === 'active' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => updateGameStatus.mutate({ status: 'completed' })}
-                    disabled={updateGameStatus.isPending}
-                  >
-                    {updateGameStatus.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <X className="h-4 w-4 mr-2" />
-                        End Game
-                      </>
-                    )}
-                  </Button>
                 )}
               </div>
             )}
