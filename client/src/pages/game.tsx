@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft, Play, X, Users, Timer } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
+import type { Game as GameType } from "@db/schema";
 
 export default function Game() {
   const [, params] = useRoute<{ id: string }>("/game/:id");
@@ -27,6 +28,7 @@ export default function Game() {
   // Mutations for game actions
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
+      console.log("Updating game status to:", status); // Debug log
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -35,12 +37,15 @@ export default function Game() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        console.error("Game update failed:", errorText); // Debug log
+        throw new Error(errorText);
       }
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedGame) => {
+      console.log("Game updated successfully:", updatedGame); // Debug log
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
       toast({
         title: "Success",
@@ -48,6 +53,7 @@ export default function Game() {
       });
     },
     onError: (error: Error) => {
+      console.error("Game update error:", error); // Debug log
       toast({
         title: "Error",
         description: error.message,
@@ -55,6 +61,16 @@ export default function Game() {
       });
     },
   });
+
+  const isAdmin = user?.role === 'admin';
+  const isGameCreator = game?.createdBy === user?.id;
+  const canManageGame = isAdmin || isGameCreator;
+
+  // Debug logs
+  console.log('Current user:', user);
+  console.log('Game creator:', game?.createdBy);
+  console.log('Can manage game:', canManageGame);
+  console.log('Game status:', game?.status);
 
   // Game timer effect
   useEffect(() => {
@@ -160,16 +176,6 @@ export default function Game() {
     updateLocation.mutate(locationUpdate);
   }, [game?.boundaries]);
 
-  const isAdmin = user?.role === 'admin';
-  const isGameCreator = game?.createdBy === user?.id;
-  const canManageGame = isAdmin || isGameCreator;
-
-  // Format time remaining for display
-  const formatTime = (ms: number) => {
-    const minutes = Math.floor(ms / (1000 * 60));
-    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   if (isLoading || !game) {
     return (
@@ -212,14 +218,14 @@ export default function Game() {
 
             <span className={`text-sm px-2 py-1 rounded-full ${
               gameStatus === 'active' ? 'bg-green-100 text-green-800' :
-              gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
-              gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-              'bg-yellow-100 text-yellow-800'
+                gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
+                  gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
+                    'bg-yellow-100 text-yellow-800'
             }`}>
               {gameStatus === 'active' ? 'In Progress' :
-               gameStatus === 'completed' ? 'Completed' :
-               gameStatus === 'cancelled' ? 'Cancelled' :
-               'Starting Soon'}
+                gameStatus === 'completed' ? 'Completed' :
+                  gameStatus === 'cancelled' ? 'Cancelled' :
+                    'Starting Soon'}
             </span>
           </div>
         </div>
@@ -244,6 +250,13 @@ export default function Game() {
                 {game.startTime && (
                   <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
                 )}
+              </div>
+
+              {/* Game Controls - Debug wrapper */}
+              <div className="border p-2 rounded-lg bg-muted/10">
+                <p className="text-sm text-muted-foreground mb-2">Debug Info:</p>
+                <p className="text-sm">Can Manage: {canManageGame ? 'Yes' : 'No'}</p>
+                <p className="text-sm">Status: {gameStatus}</p>
               </div>
 
               {/* Game Controls */}
@@ -346,3 +359,9 @@ export default function Game() {
     </div>
   );
 }
+
+const formatTime = (ms: number) => {
+  const minutes = Math.floor(ms / (1000 * 60));
+  const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};

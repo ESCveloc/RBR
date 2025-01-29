@@ -6,7 +6,10 @@ export function useGame(gameId: number) {
 
   const { data: game, isLoading } = useQuery<Game>({
     queryKey: ['/api/games', gameId],
-    enabled: !!gameId
+    enabled: !!gameId,
+    retry: 3,
+    staleTime: 1000,
+    refetchInterval: 5000
   });
 
   const updateLocation = useMutation({
