@@ -470,47 +470,48 @@ export default function Admin() {
                       No games available. Create a new game to get started.
                     </div>
                   ) : (
-                    games?.map((game) => (
-                      <Card key={game.id}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-center">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold">{game.name}</h3>
-                                <Badge
-                                  variant="secondary"
-                                  className={cn(
-                                    "capitalize",
-                                    getStatusColor(game.status)
-                                  )}
-                                >
-                                  {getStatusText(game.status)}
-                                </Badge>
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-sm text-muted-foreground">
-                                  Length: {game.gameLengthMinutes} minutes
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
-                                </p>
-                                {game.startTime && (
+                    games?.filter(game => game.status === "pending" || game.status === "active")
+                      .map((game) => (
+                        <Card key={game.id}>
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-center">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{game.name}</h3>
+                                  <Badge
+                                    variant="secondary"
+                                    className={cn(
+                                      "capitalize",
+                                      getStatusColor(game.status)
+                                    )}
+                                  >
+                                    {getStatusText(game.status)}
+                                  </Badge>
+                                </div>
+                                <div className="space-y-1">
                                   <p className="text-sm text-muted-foreground">
-                                    Starts: {new Date(game.startTime).toLocaleString()}
+                                    Length: {game.gameLengthMinutes} minutes
                                   </p>
-                                )}
+                                  <p className="text-sm text-muted-foreground">
+                                    Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
+                                  </p>
+                                  {game.startTime && (
+                                    <p className="text-sm text-muted-foreground">
+                                      Starts: {new Date(game.startTime).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => setLocation(`/game/${game.id}`)}
+                              >
+                                View
+                              </Button>
                             </div>
-                            <Button
-                              variant="outline"
-                              onClick={() => setLocation(`/game/${game.id}`)}
-                            >
-                              View
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
+                          </CardContent>
+                        </Card>
+                      ))
                   )}
                 </div>
               </CardContent>
