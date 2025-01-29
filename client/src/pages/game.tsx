@@ -27,6 +27,18 @@ export default function Game() {
   const isGameCreator = user && game && game.createdBy === user.id;
   const canManageGame = Boolean(isAdmin || isGameCreator);
 
+  // Debug logs for permission verification
+  useEffect(() => {
+    console.log('Permission Debug:', {
+      user,
+      gameCreator: game?.createdBy,
+      isAdmin,
+      isGameCreator,
+      canManageGame,
+      gameStatus: game?.status
+    });
+  }, [user, game, isAdmin, isGameCreator, canManageGame]);
+
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
       if (!gameId) {
@@ -86,6 +98,12 @@ export default function Game() {
 
   // Show admin controls
   const renderAdminControls = () => {
+    console.log('Rendering admin controls:', {
+      canManageGame,
+      gameStatus: game.status,
+      shouldShow: canManageGame && game.status === 'pending'
+    });
+
     if (!canManageGame || game.status !== 'pending') {
       return null;
     }
