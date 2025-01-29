@@ -588,6 +588,37 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get game by ID
+  app.get("/api/games/:gameId", async (req, res) => {
+    try {
+      const gameId = parseInt(req.params.gameId);
+      if (isNaN(gameId)) {
+        return res.status(400).json({ message: "Invalid game ID" });
+      }
+
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      // Get game participants
+      const participants = await db
+        .select()
+        .from(gameParticipants)
+        .where(eq(gameParticipants.gameId, gameId));
+
+      res.json({ ...game, participants });
+    } catch (error) {
+      console.error("Fetch game error:", error);
+      res.status(500).json({ message: "Failed to fetch game" });
+    }
+  });
+
   // Update game status
   app.patch("/api/games/:gameId/status", async (req, res) => {
     if (!req.isAuthenticated()) {
