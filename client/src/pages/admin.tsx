@@ -45,6 +45,19 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
 
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60),
+  })).min(1),
+});
+
 const formSchema = z.object({
   name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
@@ -52,7 +65,6 @@ const formSchema = z.object({
   playersPerTeam: z.number().min(1).max(10),
   boundaries: z.any().optional(),
 });
-
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -196,6 +208,18 @@ export default function Admin() {
     try {
       console.log("Form submitted with values:", values);
 
+      // Validate data before submission
+      const result = formSchema.safeParse(values);
+      if (!result.success) {
+        console.error("Form validation failed:", result.error);
+        toast({
+          title: "Validation Error",
+          description: "Please check all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Always use these default zone configs for new games
       const defaultZoneConfigs = [
         { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 15 },
@@ -211,7 +235,7 @@ export default function Admin() {
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: defaultZoneConfigs  // Always use default configs
+        zoneConfigs: defaultZoneConfigs
       };
 
       console.log("Submitting game data:", gameData);
@@ -220,7 +244,7 @@ export default function Admin() {
       console.error("Error in form submission:", error);
       toast({
         title: "Error",
-        description: "Failed to create game. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create game. Please try again.",
         variant: "destructive",
       });
     }
@@ -231,7 +255,6 @@ export default function Admin() {
     defaultValues: settings || {
       defaultCenter: { lat: 0, lng: 0 },
       defaultRadiusMiles: 1,
-      numberOfZones: 2,
       zoneConfigs: [{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }],
     },
   });
@@ -753,17 +776,3 @@ export default function Admin() {
     </div>
   );
 }
-
-const settingsSchema = z.object({
-  defaultCenter: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-  }),
-  defaultRadiusMiles: z.number().min(0.1).max(10),
-  numberOfZones: z.number().min(2).max(10),
-  zoneConfigs: z.array(z.object({
-    durationMinutes: z.number().min(5).max(60),
-    radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60),
-  })).min(1),
-});

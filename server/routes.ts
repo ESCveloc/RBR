@@ -25,28 +25,6 @@ const gameSchema = z.object({
   })).optional()
 });
 
-// Update zone configuration schema
-const zoneConfigSchema = z.object({
-  durationMinutes: z.number().min(5).max(60),
-  radiusMultiplier: z.number().min(0.1).max(1),
-  intervalMinutes: z.number().min(5).max(60),
-});
-
-// Update settings schema to include zone configurations
-const settingsSchema = z.object({
-  defaultCenter: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-  }),
-  defaultRadiusMiles: z.number().min(0.1).max(10),
-  zoneConfigs: z.array(z.object({
-    durationMinutes: z.number().min(5).max(60),
-    radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60),
-  })).min(1),
-});
-
-
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
   setupAuth(app);
@@ -527,7 +505,6 @@ export function registerRoutes(app: Express): Server {
       };
 
       const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
-      console.log("Creating game with boundaries:", gameBoundaries);
 
       const [game] = await db
         .insert(games)
@@ -547,6 +524,9 @@ export function registerRoutes(app: Express): Server {
       res.json(game);
     } catch (error: any) {
       console.error("Game creation error:", error);
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "A game with this name already exists" });
+      }
       res.status(500).json({ message: "Failed to create game" });
     }
   });
@@ -632,3 +612,15 @@ declare global {
     }
   }
 }
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60),
+  })).min(1),
+});
