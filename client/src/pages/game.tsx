@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
+import { PermissionDebugger } from "@/components/debug/permission-debugger";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -22,22 +23,11 @@ export default function Game() {
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
   const { game, isLoading } = useGame(gameId);
 
-  // Compute derived state with null checks
+  // Permission checks
   const isAdmin = user && user.role === 'admin';
   const isGameCreator = user && game && game.createdBy === user.id;
   const canManageGame = Boolean(isAdmin || isGameCreator);
 
-  // Debug logs for permission verification
-  useEffect(() => {
-    console.log('Permission Debug:', {
-      user,
-      gameCreator: game?.createdBy,
-      isAdmin,
-      isGameCreator,
-      canManageGame,
-      gameStatus: game?.status
-    });
-  }, [user, game, isAdmin, isGameCreator, canManageGame]);
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -45,6 +35,7 @@ export default function Game() {
         throw new Error('No game ID provided');
       }
 
+      // The backend will also verify these permissions
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -98,12 +89,6 @@ export default function Game() {
 
   // Show admin controls
   const renderAdminControls = () => {
-    console.log('Rendering admin controls:', {
-      canManageGame,
-      gameStatus: game.status,
-      shouldShow: canManageGame && game.status === 'pending'
-    });
-
     if (!canManageGame || game.status !== 'pending') {
       return null;
     }
@@ -154,9 +139,9 @@ export default function Game() {
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
               {game.status === 'active' ? 'In Progress' :
-               game.status === 'completed' ? 'Completed' :
-               game.status === 'cancelled' ? 'Cancelled' :
-               'Pending'}
+                game.status === 'completed' ? 'Completed' :
+                  game.status === 'cancelled' ? 'Cancelled' :
+                    'Pending'}
             </div>
 
             {renderAdminControls()}
@@ -224,6 +209,11 @@ export default function Game() {
           </Card>
         </div>
       </main>
+      <PermissionDebugger 
+        gameId={game.id}
+        createdBy={game.createdBy}
+        gameStatus={game.status}
+      />
     </div>
   );
 }
