@@ -82,7 +82,7 @@ function getStatusColor(status: string) {
 function getStatusText(status: string) {
   switch (status) {
     case "pending":
-      return "Waiting";
+      return "Pending";
     case "active":
       return "In Progress";
     case "completed":
@@ -193,7 +193,7 @@ export default function Admin() {
     queryKey: ["/api/admin/users"],
   });
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const { control, handleSubmit, reset, formState } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -250,7 +250,7 @@ export default function Admin() {
     }
   }
 
-  const settingsForm = useForm<z.infer<typeof settingsSchema>>({
+  const { control: settingsControl, handleSubmit: settingsHandleSubmit, formState: settingsFormState } = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: settings || {
       defaultCenter: { lat: 0, lng: 0 },
@@ -360,10 +360,10 @@ export default function Admin() {
                 <CardDescription>Set up a new battle royale game</CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <Form {...{ control, handleSubmit }}>
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <FormField
-                      control={form.control}
+                      control={control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
@@ -377,7 +377,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={form.control}
+                      control={control}
                       name="gameLengthMinutes"
                       render={({ field }) => (
                         <FormItem>
@@ -403,7 +403,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={form.control}
+                      control={control}
                       name="maxTeams"
                       render={({ field }) => (
                         <FormItem>
@@ -429,7 +429,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={form.control}
+                      control={control}
                       name="playersPerTeam"
                       render={({ field }) => (
                         <FormItem>
@@ -612,11 +612,11 @@ export default function Admin() {
               <CardDescription>Configure default game settings</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...settingsForm}>
-                <form onSubmit={settingsForm.handleSubmit(updateSettings)} className="space-y-6">
+              <Form {...{ control: settingsControl, handleSubmit: settingsHandleSubmit }}>
+                <form onSubmit={settingsHandleSubmit(updateSettings)} className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
-                      control={settingsForm.control}
+                      control={settingsControl}
                       name="defaultCenter.lat"
                       render={({ field }) => (
                         <FormItem>
@@ -630,7 +630,7 @@ export default function Admin() {
                     />
 
                     <FormField
-                      control={settingsForm.control}
+                      control={settingsControl}
                       name="defaultCenter.lng"
                       render={({ field }) => (
                         <FormItem>
@@ -645,7 +645,7 @@ export default function Admin() {
                   </div>
 
                   <FormField
-                    control={settingsForm.control}
+                    control={settingsControl}
                     name="defaultRadiusMiles"
                     render={({ field }) => (
                       <FormItem>
@@ -671,7 +671,7 @@ export default function Admin() {
                   />
 
                   <FormField
-                    control={settingsForm.control}
+                    control={settingsControl}
                     name="zoneConfigs"
                     render={({ field }) => (
                       <FormItem className="space-y-4">
@@ -760,9 +760,9 @@ export default function Admin() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={settingsForm.formState.isSubmitting}
+                    disabled={settingsFormState.isSubmitting}
                   >
-                    {settingsForm.formState.isSubmitting && (
+                    {settingsFormState.isSubmitting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Save Settings

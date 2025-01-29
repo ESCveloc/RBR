@@ -20,7 +20,7 @@ export default function Game() {
   // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
 
-  // Debug logs for route matching
+  // Debug logs for route matching and game status
   console.log('Route match:', match);
   console.log('Route params:', params);
   console.log('Computed game ID:', gameId);
@@ -32,12 +32,36 @@ export default function Game() {
   const isAdmin = user?.role === 'admin';
   const isGameCreator = game?.createdBy === user?.id;
   const canManageGame = isAdmin || isGameCreator;
+  const gameStatus = game?.status;
 
   // Debug logs for auth and game state
   console.log('User:', user);
   console.log('Game:', game);
   console.log('Can manage game:', canManageGame);
-  console.log('Game status:', game?.status);
+  console.log('Game status:', gameStatus);
+  console.log('Should show buttons:', canManageGame && gameStatus === 'pending');
+
+  // Make sure we have explicit checks
+  if (!match || !gameId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
+          <Link href="/">
+            <Button>Return to Home</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !game) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -71,31 +95,10 @@ export default function Game() {
     }
   });
 
-  // Handle invalid route match
-  if (!match) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
-          <Link href="/">
-            <Button>Return to Home</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  //Handle invalid route match and loading state (moved up)
 
-  // Handle loading state
-  if (isLoading || !game) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
-  const gameStatus = game.status as 'pending' | 'active' | 'completed' | 'cancelled';
-
+  // Rest of the component remains unchanged, but with explicit status check
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
