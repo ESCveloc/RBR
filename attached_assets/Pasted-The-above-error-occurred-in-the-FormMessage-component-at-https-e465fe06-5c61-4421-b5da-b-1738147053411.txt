@@ -1,0 +1,102 @@
+The above error occurred in the <FormMessage> component:
+
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:192:6
+    at div
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:71:6
+    at Controller (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YABUFNLM.js?v=b29efe20:313:35)
+    at FormField (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:32:6)
+    at form
+    at FormProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YABUFNLM.js?v=b29efe20:102:11)
+    at div
+    at _c9 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:106:12)
+    at div
+    at _c (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+    at Presence (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5KJT6J3C.js?v=b29efe20:24:11)
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:448:13
+    at _c5 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/tabs.tsx:68:12)
+    at div
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+    at Provider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LSQNWB54.js?v=b29efe20:38:15)
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:326:7
+    at div
+    at Admin (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/pages/admin.tsx:128:43)
+    at ProtectedRoute (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:31:38)
+    at Route (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:323:16)
+    at Switch (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:379:17)
+    at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:71:31)
+    at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:192:6
+at div
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:71:6
+at Controller (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YABUFNLM.js?v=b29efe20:313:35)
+at FormField (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:32:6)
+at form
+at FormProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YABUFNLM.js?v=b29efe20:102:11)
+at div
+at _c9 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:106:12)
+at div
+at _c (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:20:11)
+at div
+at div
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+at Presence (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5KJT6J3C.js?v=b29efe20:24:11)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:448:13
+at _c5 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/tabs.tsx:68:12)
+at div
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+at Provider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LSQNWB54.js?v=b29efe20:38:15)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:326:7
+at div
+at Admin (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/pages/admin.tsx:128:43)
+at ProtectedRoute (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:31:38)
+at Route (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:323:16)
+at Switch (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:379:17)
+at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:71:31)
+at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+The above error occurred in the <FormLabel> component:
+
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/form.tsx:95:6
+    at div
+    at form
+    at FormProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YABUFNLM.js?v=b29efe20:102:11)
+    at div
+    at _c9 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:106:12)
+    at div
+    at _c (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+    at Presence (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5KJT6J3C.js?v=b29efe20:24:11)
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:448:13
+    at _c5 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/tabs.tsx:68:12)
+    at div
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J37UDW3T.js?v=b29efe20:41:13
+    at Provider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LSQNWB54.js?v=b29efe20:38:15)
+    at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b29efe20:326:7
+    at div
+    at Admin (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/pages/admin.tsx:128:43)
+    at ProtectedRoute (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:31:38)
+    at Route (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:323:16)
+    at Switch (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:379:17)
+    at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=BPERu1RyQU9Q0S-vD7jYA:71:31)
+    at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
