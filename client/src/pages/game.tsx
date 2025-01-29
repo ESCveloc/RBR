@@ -31,6 +31,7 @@ export default function Game() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -40,9 +41,9 @@ export default function Game() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
       toast({
-        title: "Game Updated",
+        title: "Success",
         description: "The game status has been updated successfully.",
       });
     },
@@ -57,7 +58,7 @@ export default function Game() {
 
   // Game timer effect
   useEffect(() => {
-    if (!game || game.status !== 'active') {
+    if (!game || game.status !== 'active' || !game.startTime) {
       setTimeRemaining(null);
       return;
     }
@@ -84,7 +85,7 @@ export default function Game() {
 
   // Zone timer effect
   useEffect(() => {
-    if (!game || game.status !== 'active' || !game.zoneConfigs) {
+    if (!game || game.status !== 'active' || !game.startTime || !game.zoneConfigs) {
       setZoneTimeRemaining(null);
       setCurrentZone(0);
       return;
@@ -134,7 +135,7 @@ export default function Game() {
   useEffect(() => {
     if (!game?.boundaries?.geometry?.coordinates) return;
 
-    // Calculate center from game boundaries for location update
+    // Calculate center from game boundaries
     const coordinates = game.boundaries.geometry.coordinates[0];
     const center = coordinates.reduce(
       (acc, coord) => ({
@@ -220,39 +221,6 @@ export default function Game() {
                gameStatus === 'cancelled' ? 'Cancelled' :
                'Starting Soon'}
             </span>
-
-            {/* Admin Controls */}
-            {canManageGame && gameStatus === 'pending' && (
-              <Button
-                onClick={() => updateGameStatus.mutate({ status: 'active' })}
-                disabled={updateGameStatus.isPending}
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Start Game
-              </Button>
-            )}
-
-            {canManageGame && gameStatus === 'active' && (
-              <Button
-                variant="destructive"
-                onClick={() => updateGameStatus.mutate({ status: 'completed' })}
-                disabled={updateGameStatus.isPending}
-              >
-                <X className="h-4 w-4 mr-2" />
-                End Game
-              </Button>
-            )}
-
-            {canManageGame && gameStatus === 'pending' && (
-              <Button
-                variant="destructive"
-                onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-                disabled={updateGameStatus.isPending}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel Game
-              </Button>
-            )}
           </div>
         </div>
       </header>
@@ -268,12 +236,72 @@ export default function Game() {
             <CardHeader>
               <CardTitle className="text-lg">Game Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
-              <p><strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}</p>
-              <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
-              {game.startTime && (
-                <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
+                <p><strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}</p>
+                <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
+                {game.startTime && (
+                  <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
+                )}
+              </div>
+
+              {/* Game Controls */}
+              {canManageGame && (
+                <div className="flex flex-col gap-2 pt-4">
+                  {gameStatus === 'pending' && (
+                    <Button
+                      className="w-full"
+                      onClick={() => updateGameStatus.mutate({ status: 'active' })}
+                      disabled={updateGameStatus.isPending}
+                    >
+                      {updateGameStatus.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Starting...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Start Game
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {gameStatus === 'active' && (
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => updateGameStatus.mutate({ status: 'completed' })}
+                      disabled={updateGameStatus.isPending}
+                    >
+                      {updateGameStatus.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Ending...
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-4 w-4 mr-2" />
+                          End Game
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {gameStatus === 'pending' && (
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                      disabled={updateGameStatus.isPending}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel Game
+                    </Button>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -299,10 +327,10 @@ export default function Game() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {game.participants?.length === 0 ? (
+              {!game.participants || game.participants.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
               ) : (
-                game.participants?.map((participant) => (
+                game.participants.map((participant) => (
                   <TeamCard
                     key={participant.id}
                     gameId={game.id}
