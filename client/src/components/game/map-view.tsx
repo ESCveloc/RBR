@@ -287,7 +287,7 @@ export function MapView({
 
       // Add tooltip
       marker.bindTooltip(
-        assignedTeam 
+        assignedTeam
           ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
           : `Position ${i + 1}: Unassigned`,
         {
@@ -299,7 +299,7 @@ export function MapView({
     }
   }, [game?.boundaries, game?.maxTeams, game?.participants]);
 
-  // Update map when game boundaries and zones change
+  // Update map bounds and zones calculation
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !game?.boundaries) return;
@@ -328,10 +328,24 @@ export function MapView({
       },
     }).addTo(zonesLayerRef.current);
 
-    // Calculate center and initial radius
-    const bounds = boundaryLayer.getBounds();
-    const center = bounds.getCenter();
-    const initialRadius = bounds.getNorthEast().distanceTo(center);
+    // Calculate center from the boundary coordinates
+    const coordinates = game.boundaries.geometry.coordinates[0];
+    const center = coordinates.reduce(
+      (acc, coord) => ({
+        lat: acc.lat + coord[1] / coordinates.length,
+        lng: acc.lng + coord[0] / coordinates.length
+      }),
+      { lat: 0, lng: 0 }
+    );
+
+    // Calculate initial radius based on the furthest point
+    const initialRadius = Math.max(...coordinates.map((coord) => {
+      const lat = coord[1];
+      const lng = coord[0];
+      const latDiff = center.lat - lat;
+      const lngDiff = center.lng - lng;
+      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    })) * 111111; // Convert to meters (roughly)
 
     // Draw each shrinking zone
     let currentRadius = initialRadius;
@@ -339,7 +353,7 @@ export function MapView({
       game.zoneConfigs.forEach((zone, index) => {
         if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
-        const nextRadius = currentRadius * zone.radiusMultiplier;
+        const nextRadius = initialRadius * zone.radiusMultiplier;
         const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
         L.circle(

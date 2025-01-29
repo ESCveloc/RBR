@@ -27,10 +27,9 @@ const gameSchema = z.object({
 
 // Update zone calculation logic
 function calculateStartingLocations(boundaries: any, numPoints: number) {
-  // For a polygon boundary, we'll use its vertices to calculate the center
   const coordinates = boundaries.geometry.coordinates[0];
 
-  // Calculate center point
+  // Calculate center point (this should remain constant for all zones)
   const center = coordinates.reduce(
     (acc: { lat: number; lng: number }, coord: number[]) => {
       return {
@@ -41,27 +40,28 @@ function calculateStartingLocations(boundaries: any, numPoints: number) {
     { lat: 0, lng: 0 }
   );
 
-  // Calculate radius (distance from center to furthest point)
-  const radius = Math.max(...coordinates.map((coord: number[]) => {
+  // Calculate initial radius based on the furthest point
+  const baseRadius = Math.max(...coordinates.map((coord: number[]) => {
     const lat = coord[1];
     const lng = coord[0];
     const latDiff = center.lat - lat;
     const lngDiff = center.lng - lng;
     return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-  })) * 0.95; // Slightly reduce radius to ensure points are inside boundary
+  }));
 
-  // Generate equidistant points around the circle
+  // Generate equidistant points around the circle with safe radius
   const startingLocations = [];
+  const safeRadius = baseRadius * 0.9; // Keep points well within the boundary
+
   for (let i = 0; i < numPoints; i++) {
     const angle = (i * 2 * Math.PI) / numPoints;
-    // Calculate points within the safe radius
-    const lat = center.lat + (radius * Math.sin(angle));
-    const lng = center.lng + (radius * Math.cos(angle));
+    const lat = center.lat + (safeRadius * Math.sin(angle));
+    const lng = center.lng + (safeRadius * Math.cos(angle));
     startingLocations.push({
       position: i + 1,
       coordinates: { lat, lng },
-      center: center, // Include center for reference
-      radius: radius // Include radius for reference
+      center, // Store center for reference
+      baseRadius // Store initial radius for reference
     });
   }
 
@@ -102,23 +102,22 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the get settings endpoint to include proper zone configurations
+  // Update zone settings with more conservative shrinking
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
     }
 
-    // Return default settings with adjusted zone configs
     const settings = global.gameSettings || {
       defaultCenter: {
-        lat: 35.8462, // Murfreesboro, TN coordinates
+        lat: 35.8462,
         lng: -86.3928,
       },
       defaultRadiusMiles: 1,
       zoneConfigs: [
-        { durationMinutes: 15, radiusMultiplier: 0.8, intervalMinutes: 20 }, // First shrink more conservative
-        { durationMinutes: 10, radiusMultiplier: 0.6, intervalMinutes: 15 },
-        { durationMinutes: 5, radiusMultiplier: 0.4, intervalMinutes: 10 },
+        { durationMinutes: 15, radiusMultiplier: 0.85, intervalMinutes: 20 }, // More gradual first shrink
+        { durationMinutes: 10, radiusMultiplier: 0.70, intervalMinutes: 15 }, // Second shrink
+        { durationMinutes: 5, radiusMultiplier: 0.50, intervalMinutes: 10 },  // Final shrink
       ],
     };
 
@@ -761,6 +760,8 @@ declare global {
     }
   }
 }
+
+// Settings schema and game zone configs
 const settingsSchema = z.object({
   defaultCenter: z.object({
     lat: z.number().min(-90).max(90),
