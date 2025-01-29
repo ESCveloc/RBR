@@ -608,7 +608,16 @@ export function registerRoutes(app: Express): Server {
 
       // Get game participants
       const participants = await db
-        .select()
+        .select({
+          id: gameParticipants.id,
+          gameId: gameParticipants.gameId,
+          teamId: gameParticipants.teamId,
+          status: gameParticipants.status,
+          eliminatedAt: gameParticipants.eliminatedAt,
+          location: gameParticipants.location,
+          startingLocation: gameParticipants.startingLocation,
+          startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt
+        })
         .from(gameParticipants)
         .where(eq(gameParticipants.gameId, gameId));
 
