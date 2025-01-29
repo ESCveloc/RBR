@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useGame } from "@/hooks/use-game";
 import { MapView } from "@/components/game/map-view";
+import { TeamCard } from "@/components/game/team-card"; // Added import
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -45,7 +46,10 @@ export default function Game() {
 
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' // Added Accept header
+        },
         body: JSON.stringify({ status }),
         credentials: 'include'
       });
