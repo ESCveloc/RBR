@@ -12,6 +12,7 @@ export function useGame(gameId: number) {
           credentials: 'include',
           headers: {
             'Accept': 'application/json',
+            'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
@@ -26,18 +27,8 @@ export function useGame(gameId: number) {
         const responseText = await response.text();
         console.log('Response Text:', responseText);
 
-        if (!response.ok) {
-          try {
-            // Try to parse error as JSON
-            const error = JSON.parse(responseText);
-            throw new Error(error.message || 'Failed to fetch game');
-          } catch {
-            // If not JSON, use text directly
-            throw new Error(responseText || 'Failed to fetch game');
-          }
-        }
-
         try {
+          // Try to parse as JSON first
           const data = JSON.parse(responseText);
           console.log('Parsed game data:', data);
           return data;
