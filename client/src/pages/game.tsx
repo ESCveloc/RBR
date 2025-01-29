@@ -22,10 +22,18 @@ export default function Game() {
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
   const { game, isLoading } = useGame(gameId);
 
-  const isAdmin = user?.role === 'admin';
-  const isGameCreator = game?.createdBy === user?.id;
-  const canManageGame = isAdmin || isGameCreator;
-  const gameStatus = game?.status;
+  // Compute derived state with null checks
+  const isAdmin = user && user.role === 'admin';
+  const isGameCreator = user && game && game.createdBy === user.id;
+  const canManageGame = Boolean(isAdmin || isGameCreator);
+
+  // Debug logs
+  console.log('User Object:', user);
+  console.log('Game Object:', game);
+  console.log('Is Admin:', isAdmin);
+  console.log('Is Game Creator:', isGameCreator);
+  console.log('Can Manage Game:', canManageGame);
+  console.log('Game Status:', game?.status);
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -80,6 +88,41 @@ export default function Game() {
     );
   }
 
+  // Show admin controls
+  const renderAdminControls = () => {
+    if (!canManageGame || game.status !== 'pending') {
+      return null;
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Button
+          onClick={() => updateGameStatus.mutate({ status: 'active' })}
+          disabled={updateGameStatus.isPending}
+          size="sm"
+        >
+          {updateGameStatus.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Play className="h-4 w-4 mr-2" />
+              Start Game
+            </>
+          )}
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+          disabled={updateGameStatus.isPending}
+        >
+          <X className="h-4 w-4 mr-2" />
+          Cancel
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -96,39 +139,13 @@ export default function Game() {
           {/* Right side - Status and controls */}
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
-              {gameStatus === 'active' ? 'In Progress' :
-               gameStatus === 'completed' ? 'Completed' :
-               gameStatus === 'cancelled' ? 'Cancelled' :
+              {game.status === 'active' ? 'In Progress' :
+               game.status === 'completed' ? 'Completed' :
+               game.status === 'cancelled' ? 'Cancelled' :
                'Pending'}
             </div>
 
-            {canManageGame && gameStatus === 'pending' && (
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => updateGameStatus.mutate({ status: 'active' })}
-                  disabled={updateGameStatus.isPending}
-                  size="sm"
-                >
-                  {updateGameStatus.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Game
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-                  disabled={updateGameStatus.isPending}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-              </div>
-            )}
+            {renderAdminControls()}
           </div>
         </div>
       </header>
@@ -157,7 +174,7 @@ export default function Game() {
           </Card>
 
           {/* Team Assignment Section */}
-          {canManageGame && gameStatus === 'pending' && (
+          {canManageGame && game.status === 'pending' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Assign Teams</CardTitle>
@@ -185,7 +202,7 @@ export default function Game() {
                     key={participant.id}
                     gameId={game.id}
                     participant={participant}
-                    canAssignPosition={canManageGame && gameStatus === 'pending'}
+                    canAssignPosition={canManageGame && game.status === 'pending'}
                   />
                 ))
               )}
