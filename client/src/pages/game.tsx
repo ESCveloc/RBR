@@ -59,7 +59,8 @@ export default function Game() {
         throw new Error(errorText || "Failed to update game status");
       }
 
-      return response.json();
+      const data = await response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
