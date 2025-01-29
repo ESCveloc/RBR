@@ -235,14 +235,14 @@ export function MapView({
       { lat: 0, lng: 0 }
     );
 
-    // Calculate radius (distance from center to furthest point)
-    const radius = Math.max(...coordinates.map(coord => {
+    // Calculate radius as 90% of the distance to the furthest point
+    const radius = Math.max(...coordinates.map((coord) => {
       const lat = coord[1];
       const lng = coord[0];
       const latDiff = center.lat - lat;
       const lngDiff = center.lng - lng;
       return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    })) * 0.95; // Slightly reduce radius to keep markers inside boundary
+    })) * 0.9; // Use 90% of max radius to keep inside boundary
 
     // Create markers for each starting position
     for (let i = 0; i < game.maxTeams; i++) {
@@ -250,48 +250,69 @@ export function MapView({
       const lat = center.lat + radius * Math.sin(angle);
       const lng = center.lng + radius * Math.cos(angle);
 
-      // Create marker with custom icon
-      const markerIcon = L.divIcon({
-        className: 'starting-location-marker',
-        html: `<div style="
-          background-color: white;
-          border: 2px solid #3b82f6;
-          color: #1f2937;
-          width: 24px;
-          height: 24px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 600;
-          font-size: 12px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">${i + 1}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+      // Create white background circle
+      const bgCircle = L.circle([lat, lng], {
+        radius: 35,
+        color: '#ffffff',
+        fillColor: '#ffffff',
+        fillOpacity: 1,
+        weight: 3,
+        opacity: 1,
+        className: 'starting-position-bg'
+      }).addTo(markersLayer);
+
+      // Create border circle
+      const borderCircle = L.circle([lat, lng], {
+        radius: 35,
+        color: '#3b82f6',
+        fillColor: 'transparent',
+        fillOpacity: 0,
+        weight: 3,
+        opacity: 1,
+        className: 'starting-position-border'
+      }).addTo(markersLayer);
+
+      // Add number label
+      const numberDiv = L.divIcon({
+        className: 'starting-position-number',
+        html: `
+          <div style="
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: #1f2937;
+            background-color: transparent;
+          ">${i + 1}</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
       });
 
-      // Find assigned team for this position
+      L.marker([lat, lng], { 
+        icon: numberDiv,
+        interactive: true,
+        zIndexOffset: 1000
+      }).addTo(markersLayer);
+
+      // Add tooltip for team assignment
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === i + 1
       );
 
-      // Create marker with tooltip showing team assignment
-      const marker = L.marker([lat, lng], { icon: markerIcon });
+      const tooltipContent = assignedTeam 
+        ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
+        : `Position ${i + 1}: Unassigned`;
 
-      if (assignedTeam) {
-        marker.bindTooltip(`Position ${i + 1}: Team ${assignedTeam.teamId}`, {
-          permanent: false,
-          direction: 'top'
-        });
-      } else {
-        marker.bindTooltip(`Position ${i + 1}: Unassigned`, {
-          permanent: false,
-          direction: 'top'
-        });
-      }
-
-      marker.addTo(markersLayer);
+      bgCircle.bindTooltip(tooltipContent, {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -20],
+        opacity: 0.9,
+        className: 'starting-position-tooltip'
+      });
     }
   }, [game?.boundaries, game?.maxTeams, game?.participants]);
 
