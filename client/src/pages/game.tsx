@@ -31,7 +31,8 @@ export default function Game() {
       user,
       isAdmin,
       gameStatus: game?.status,
-      gameId
+      gameId,
+      game
     });
   }, [user, isAdmin, game, gameId]);
 
@@ -41,6 +42,8 @@ export default function Game() {
         throw new Error('No game ID provided');
       }
 
+      console.log('Updating game status:', { gameId, status });
+
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +52,8 @@ export default function Game() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update game status");
       }
 
       return response.json();
@@ -62,6 +66,7 @@ export default function Game() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating game status:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -92,6 +97,11 @@ export default function Game() {
     );
   }
 
+  const handleStatusUpdate = (newStatus: 'active' | 'completed' | 'cancelled') => {
+    console.log('Attempting to update status:', { newStatus, currentStatus: game.status });
+    updateGameStatus.mutate({ status: newStatus });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -114,11 +124,11 @@ export default function Game() {
                'Pending'}
             </div>
 
-            {/* Always render admin controls, let the function handle visibility */}
+            {/* Admin controls */}
             {isAdmin && (
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => updateGameStatus.mutate({ status: 'active' })}
+                  onClick={() => handleStatusUpdate('active')}
                   disabled={updateGameStatus.isPending || game.status !== 'pending'}
                   size="sm"
                 >
@@ -134,7 +144,7 @@ export default function Game() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                  onClick={() => handleStatusUpdate('cancelled')}
                   disabled={updateGameStatus.isPending || game.status !== 'pending'}
                 >
                   <X className="h-4 w-4 mr-2" />
