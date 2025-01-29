@@ -192,8 +192,9 @@ export default function Game() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="p-4 border-b">
-        <div className="container mx-auto flex items-center justify-between">
+      <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex items-center justify-between gap-4">
+          {/* Left side - Title and back button */}
           <div className="flex items-center gap-4">
             <Link href="/">
               <Button variant="ghost" size="icon">
@@ -203,10 +204,11 @@ export default function Game() {
             <h1 className="text-xl font-bold">{game.name}</h1>
           </div>
 
+          {/* Right side - Game controls and status */}
           <div className="flex items-center gap-4">
             {/* Game Timer */}
             {gameStatus === 'active' && timeRemaining !== null && (
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="hidden md:flex items-center gap-2 text-sm font-medium">
                 <Timer className="h-4 w-4" />
                 {formatTime(timeRemaining)}
               </div>
@@ -214,28 +216,31 @@ export default function Game() {
 
             {/* Zone Timer */}
             {gameStatus === 'active' && zoneTimeRemaining !== null && game.zoneConfigs && (
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="hidden md:flex items-center gap-2 text-sm font-medium">
                 <span className="text-primary">Zone {currentZone + 1}</span>
                 {formatTime(zoneTimeRemaining)}
               </div>
             )}
 
-            {/* Game Status and Controls Container */}
-            <div className="flex items-center gap-4">
-              {/* Status Badge */}
-              <Badge variant="secondary" className={cn(
-                gameStatus === 'active' ? 'bg-green-100 text-green-800' :
-                gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
-                gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-                'bg-yellow-100 text-yellow-800'
-              )}>
+            {/* Status Badge and Game Controls */}
+            <div className="flex items-center gap-3">
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  "text-sm font-medium",
+                  gameStatus === 'active' && "bg-green-100 text-green-800",
+                  gameStatus === 'completed' && "bg-gray-100 text-gray-800",
+                  gameStatus === 'cancelled' && "bg-red-100 text-red-800",
+                  gameStatus === 'pending' && "bg-yellow-100 text-yellow-800"
+                )}
+              >
                 {gameStatus === 'active' ? 'In Progress' :
                  gameStatus === 'completed' ? 'Completed' :
                  gameStatus === 'cancelled' ? 'Cancelled' :
                  'Starting Soon'}
               </Badge>
 
-              {/* Game Control Buttons - Always show if user can manage */}
+              {/* Game Control Buttons */}
               {canManageGame && (
                 <div className="flex items-center gap-2">
                   {gameStatus === 'pending' && (
@@ -244,14 +249,14 @@ export default function Game() {
                         onClick={() => updateGameStatus.mutate({ status: 'active' })}
                         disabled={updateGameStatus.isPending}
                         size="sm"
-                        className="bg-green-500 hover:bg-green-600"
+                        className="bg-green-500 hover:bg-green-600 text-white"
                       >
                         {updateGameStatus.isPending ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <>
                             <Play className="h-4 w-4 mr-2" />
-                            Start
+                            Start Game
                           </>
                         )}
                       </Button>
@@ -279,7 +284,7 @@ export default function Game() {
                       ) : (
                         <>
                           <X className="h-4 w-4 mr-2" />
-                          End
+                          End Game
                         </>
                       )}
                     </Button>
