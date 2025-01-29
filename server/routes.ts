@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, events, teams, teamMembers, startingPositions, eventParticipants } from "@db/schema";
+import { users, games, teams, teamMembers } from "@db/schema";
 import { eq, ilike, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -11,13 +11,13 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
-// Update the event schema to match frontend and fix validation
-const eventSchema = z.object({
-  name: z.string().min(1, "Event name is required"),
+// Update game schema to match frontend
+const gameSchema = z.object({
+  name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
-  boundaries: z.any(),
+  boundaries: z.any().optional(),
   zoneConfigs: z.array(z.object({
     durationMinutes: z.number().min(5).max(60),
     radiusMultiplier: z.number().min(0.1).max(1),
@@ -25,68 +25,26 @@ const eventSchema = z.object({
   })).optional()
 });
 
-// Helper function to generate starting positions around a boundary
-function generateStartingPositions(boundaries: any, maxTeams: number) {
-  try {
-    if (!boundaries?.geometry?.coordinates?.[0]) {
-      throw new Error("Invalid boundary format");
-    }
+// Update zone configuration schema
+const zoneConfigSchema = z.object({
+  durationMinutes: z.number().min(5).max(60),
+  radiusMultiplier: z.number().min(0.1).max(1),
+  intervalMinutes: z.number().min(5).max(60),
+});
 
-    const coordinates = boundaries.geometry.coordinates[0];
-    const positions = [];
-
-    // Calculate positions evenly spaced around the boundary
-    for (let i = 0; i < maxTeams; i++) {
-      const index = Math.floor((i / maxTeams) * coordinates.length);
-      const boundaryPoint = coordinates[index];
-
-      if (!boundaryPoint || boundaryPoint.length < 2) {
-        console.error("Invalid boundary point at index:", index);
-        continue;
-      }
-
-      positions.push({
-        positionNumber: i + 1,
-        coordinates: {
-          lat: boundaryPoint[1],
-          lng: boundaryPoint[0]
-        }
-      });
-    }
-
-    return positions;
-  } catch (error) {
-    console.error("Error generating starting positions:", error);
-    return [];
-  }
-}
-
-function generateDefaultBoundaries(center: { lat: number; lng: number; }, radiusMiles: number) {
-  const radiusMeters = radiusMiles * 1609.34; // Convert miles to meters
-
-  // Generate a circular boundary with 32 points
-  const points = [];
-  for (let i = 0; i < 32; i++) {
-    const angle = (i / 32) * 2 * Math.PI;
-    const dx = Math.cos(angle) * radiusMeters;
-    const dy = Math.sin(angle) * radiusMeters;
-
-    const latChange = dy / 111111; // 1 degree of latitude is approximately 111111 meters
-    const lngChange = dx / (111111 * Math.cos(center.lat * Math.PI / 180));
-
-    points.push([center.lng + lngChange, center.lat + latChange]);
-  }
-  points.push(points[0]); // Close the polygon
-
-  return {
-    type: "Feature",
-    geometry: {
-      type: "Polygon",
-      coordinates: [points]
-    },
-    properties: {}
-  };
-}
+// Update settings schema to include zone configurations
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  zoneConfigs: z.array(z.object({
+    durationMinutes: z.number().min(5).max(60),
+    radiusMultiplier: z.number().min(0.1).max(1),
+    intervalMinutes: z.number().min(5).max(60),
+  })).min(1),
+});
 
 
 export function registerRoutes(app: Express): Server {
@@ -114,7 +72,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Store settings in memory for now
-      global.eventSettings = result.data;
+      global.gameSettings = result.data;
 
       res.json({ message: "Settings updated successfully" });
     } catch (error) {
@@ -123,13 +81,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the get settings endpoint to use Murfreesboro, TN coordinates
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
     }
 
     // Return default settings if none are set
-    const settings = global.eventSettings || {
+    const settings = global.gameSettings || {
       defaultCenter: {
         lat: 35.8462, // Murfreesboro, TN coordinates
         lng: -86.3928,
@@ -144,254 +103,6 @@ export function registerRoutes(app: Express): Server {
 
     res.json(settings);
   });
-
-  // Events API endpoints
-  app.post("/api/events", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const result = eventSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({
-          message: "Invalid event data",
-          errors: result.error.issues,
-        });
-      }
-
-      const {
-        name,
-        boundaries,
-        gameLengthMinutes,
-        maxTeams,
-        playersPerTeam,
-        zoneConfigs
-      } = result.data;
-
-      // Use default boundaries if none provided
-      const settings = global.eventSettings || {
-        defaultCenter: {
-          lat: 35.8462,
-          lng: -86.3928,
-        },
-        defaultRadiusMiles: 1,
-        zoneConfigs: [
-          { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-          { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-          { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-        ],
-      };
-
-      const eventBoundaries = boundaries || generateDefaultBoundaries(
-        settings.defaultCenter,
-        settings.defaultRadiusMiles
-      );
-
-      const eventZoneConfigs = zoneConfigs || settings.zoneConfigs;
-
-      const [event] = await db
-        .insert(events)
-        .values({
-          name,
-          boundaries: eventBoundaries,
-          eventLengthMinutes: gameLengthMinutes,
-          maxTeams,
-          playersPerTeam,
-          zoneConfigs: eventZoneConfigs,
-          createdBy: (req.user as any).id,
-          status: "pending",
-        })
-        .returning();
-
-      // Generate and insert starting positions
-      const positions = generateStartingPositions(eventBoundaries, maxTeams);
-      await Promise.all(
-        positions.map((pos) =>
-          db.insert(startingPositions).values({
-            eventId: event.id,
-            positionNumber: pos.positionNumber,
-            coordinates: pos.coordinates,
-          })
-        )
-      );
-
-      // Fetch the event with its starting positions
-      const [eventWithPositions] = await db
-        .select()
-        .from(events)
-        .where(eq(events.id, event.id))
-        .limit(1);
-
-      const eventStartingPositions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, event.id));
-
-      res.json({ ...eventWithPositions, startingPositions: eventStartingPositions });
-    } catch (error: any) {
-      console.error("Event creation error:", error);
-      res.status(500).json({ message: "Failed to create event" });
-    }
-  });
-
-  // Get starting positions for an event
-  app.get("/api/events/:eventId/starting-positions", async (req, res) => {
-    try {
-      const eventId = parseInt(req.params.eventId);
-      if (isNaN(eventId)) {
-        return res.status(400).send("Invalid event ID");
-      }
-
-      const positions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, eventId))
-        .orderBy(startingPositions.positionNumber);
-
-      res.json(positions);
-    } catch (error) {
-      console.error("Fetch starting positions error:", error);
-      res.status(500).send("Failed to fetch starting positions");
-    }
-  });
-
-  // Assign team to starting position (admin only)
-  app.patch("/api/events/:eventId/starting-positions/:positionId/team", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const { teamId } = req.body;
-      const positionId = parseInt(req.params.positionId);
-      const eventId = parseInt(req.params.eventId);
-
-      if (isNaN(positionId) || isNaN(eventId)) {
-        return res.status(400).send("Invalid position or event ID");
-      }
-
-      // Check if team is already assigned to another position
-      const existingAssignment = await db
-        .select()
-        .from(startingPositions)
-        .where(
-          and(
-            eq(startingPositions.eventId, eventId),
-            eq(startingPositions.assignedTeamId, teamId)
-          )
-        )
-        .limit(1);
-
-      if (existingAssignment.length > 0) {
-        return res.status(400).send("Team is already assigned to a position");
-      }
-
-      const [updatedPosition] = await db
-        .update(startingPositions)
-        .set({ assignedTeamId: teamId })
-        .where(
-          and(
-            eq(startingPositions.id, positionId),
-            eq(startingPositions.eventId, eventId)
-          )
-        )
-        .returning();
-
-      res.json(updatedPosition);
-    } catch (error) {
-      console.error("Update starting position error:", error);
-      res.status(500).send("Failed to update starting position");
-    }
-  });
-
-  // Assign staff to starting position (admin only)
-  app.patch("/api/events/:eventId/starting-positions/:positionId/staff", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const { staffId } = req.body;
-      const positionId = parseInt(req.params.positionId);
-      const eventId = parseInt(req.params.eventId);
-
-      if (isNaN(positionId) || isNaN(eventId)) {
-        return res.status(400).send("Invalid position or event ID");
-      }
-
-      const [updatedPosition] = await db
-        .update(startingPositions)
-        .set({ staffAssignedId: staffId })
-        .where(
-          and(
-            eq(startingPositions.id, positionId),
-            eq(startingPositions.eventId, eventId)
-          )
-        )
-        .returning();
-
-      res.json(updatedPosition);
-    } catch (error) {
-      console.error("Update staff assignment error:", error);
-      res.status(500).send("Failed to update staff assignment");
-    }
-  });
-
-  // Randomly assign teams to starting positions
-  app.post("/api/events/:eventId/randomize-positions", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const eventId = parseInt(req.params.eventId);
-      if (isNaN(eventId)) {
-        return res.status(400).send("Invalid event ID");
-      }
-
-      // Get all positions for this event
-      const positions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, eventId));
-
-      // Filter unassigned positions in memory instead of using eq with null
-      const unassignedPositions = positions.filter(pos => pos.assignedTeamId === null);
-
-      const eventParticipantsResult = await db
-        .select()
-        .from(eventParticipants)
-        .where(eq(eventParticipants.eventId, eventId));
-
-      const teams = eventParticipantsResult.map(p => p.teamId);
-      const shuffledTeams = teams.sort(() => Math.random() - 0.5);
-
-      // Assign teams to positions
-      await Promise.all(
-        unassignedPositions.map(async (pos, index) => {
-          if (index < shuffledTeams.length) {
-            await db
-              .update(startingPositions)
-              .set({ assignedTeamId: shuffledTeams[index] })
-              .where(eq(startingPositions.id, pos.id));
-          }
-        })
-      );
-
-      const updatedPositions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, eventId))
-        .orderBy(startingPositions.positionNumber);
-
-      res.json(updatedPositions);
-    } catch (error) {
-      console.error("Randomize positions error:", error);
-      res.status(500).send("Failed to randomize positions");
-    }
-  });
-
 
   // Minimal API route for verification - check database connection
   app.get("/api/health", async (req, res) => {
@@ -770,52 +481,122 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get all events with status
-  app.get("/api/events", async (req, res) => {
-    try {
-      const allEvents = await db
-        .select()
-        .from(events)
-        .orderBy(events.createdAt);
+  // Games API endpoints
+  app.post("/api/games", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
 
-      res.json(allEvents);
-    } catch (error) {
-      console.error("Fetch events error:", error);
-      res.status(500).json({ message: "Failed to fetch events" });
+    try {
+      console.log("Received game creation request:", req.body);
+      const result = gameSchema.safeParse(req.body);
+      if (!result.success) {
+        console.error("Game validation failed:", result.error);
+        return res.status(400).json({
+          message: "Invalid game data",
+          errors: result.error.issues,
+        });
+      }
+
+      const {
+        name,
+        boundaries,
+        gameLengthMinutes,
+        maxTeams,
+        playersPerTeam,
+        zoneConfigs
+      } = result.data;
+
+      // Use default boundaries if none provided
+      const settings = global.gameSettings || {
+        defaultCenter: {
+          lat: 35.8462,
+          lng: -86.3928,
+        },
+        defaultRadiusMiles: 1,
+        zoneConfigs: [
+          { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
+          { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
+          { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
+        ],
+      };
+
+      const gameBoundaries = boundaries || {
+        center: settings.defaultCenter,
+        radiusMiles: settings.defaultRadiusMiles,
+      };
+
+      const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
+      console.log("Creating game with boundaries:", gameBoundaries);
+
+      const [game] = await db
+        .insert(games)
+        .values({
+          name,
+          boundaries: gameBoundaries,
+          gameLengthMinutes,
+          maxTeams,
+          playersPerTeam,
+          zoneConfigs: gameZoneConfigs,
+          createdBy: (req.user as any).id,
+          status: "pending",
+        })
+        .returning();
+
+      console.log("Game created successfully:", game);
+      res.json(game);
+    } catch (error: any) {
+      console.error("Game creation error:", error);
+      res.status(500).json({ message: "Failed to create game" });
     }
   });
 
-  // Update event status
-  app.patch("/api/events/:eventId/status", async (req, res) => {
+  // Get all games with status
+  app.get("/api/games", async (req, res) => {
+    try {
+      const allGames = await db
+        .select()
+        .from(games)
+        .orderBy(games.createdAt);
+
+      res.json(allGames);
+    } catch (error) {
+      console.error("Fetch games error:", error);
+      res.status(500).json({ message: "Failed to fetch games" });
+    }
+  });
+
+  // Update game status
+  app.patch("/api/games/:gameId/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
     }
 
     try {
-      const eventId = parseInt(req.params.eventId);
+      const gameId = parseInt(req.params.gameId);
       const { status } = req.body;
 
       if (!["pending", "active", "completed"].includes(status)) {
         return res.status(400).send("Invalid status");
       }
 
-      const [event] = await db
+      const [game] = await db
         .select()
-        .from(events)
-        .where(eq(events.id, eventId))
+        .from(games)
+        .where(eq(games.id, gameId))
         .limit(1);
 
-      if (!event) {
-        return res.status(404).send("Event not found");
+      if (!game) {
+        return res.status(404).send("Game not found");
       }
 
       // Validate state transition
-      if (status === "active" && event.status !== "pending") {
-        return res.status(400).send("Can only activate pending events");
+      if (status === "active" && game.status !== "pending") {
+        return res.status(400).send("Can only activate pending games");
       }
 
-      if (status === "completed" && event.status !== "active") {
-        return res.status(400).send("Can only complete active events");
+      if (status === "completed" && game.status !== "active") {
+        return res.status(400).send("Can only complete active games");
       }
 
       const updateData: any = { status };
@@ -825,152 +606,16 @@ export function registerRoutes(app: Express): Server {
         updateData.endTime = new Date();
       }
 
-      const [updatedEvent] = await db
-        .update(events)
+      const [updatedGame] = await db
+        .update(games)
         .set(updateData)
-        .where(eq(events.id, eventId))
+        .where(eq(games.id, gameId))
         .returning();
 
-      res.json(updatedEvent);
+      res.json(updatedGame);
     } catch (error) {
-      console.error("Update event status error:", error);
-      res.status(500).send("Failed to update event status");
-    }
-  });
-
-  // Assign team to starting position (admin only)
-  app.patch("/api/events/:eventId/starting-positions/:positionId/team", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const { teamId } = req.body;
-      const positionId = parseInt(req.params.positionId);
-      const eventId = parseInt(req.params.eventId);
-
-      if (isNaN(positionId) || isNaN(eventId)) {
-        return res.status(400).send("Invalid position or event ID");
-      }
-
-      // Check if team is already assigned to another position
-      const existingAssignment = await db
-        .select()
-        .from(startingPositions)
-        .where(
-          and(
-            eq(startingPositions.eventId, eventId),
-            eq(startingPositions.assignedTeamId, teamId)
-          )
-        )
-        .limit(1);
-
-      if (existingAssignment.length > 0) {
-        return res.status(400).send("Team is already assigned to a position");
-      }
-
-      const [updatedPosition] = await db
-        .update(startingPositions)
-        .set({ assignedTeamId: teamId })
-        .where(
-          and(
-            eq(startingPositions.id, positionId),
-            eq(startingPositions.eventId, eventId)
-          )
-        )
-        .returning();
-
-      res.json(updatedPosition);
-    } catch (error) {
-      console.error("Update starting position error:", error);
-      res.status(500).send("Failed to update starting position");
-    }
-  });
-
-  // Assign staff to starting position (admin only)
-  app.patch("/api/events/:eventId/starting-positions/:positionId/staff", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const { staffId } = req.body;
-      const positionId = parseInt(req.params.positionId);
-      const eventId = parseInt(req.params.eventId);
-
-      if (isNaN(positionId) || isNaN(eventId)) {
-        return res.status(400).send("Invalid position or event ID");
-      }
-
-      const [updatedPosition] = await db
-        .update(startingPositions)
-        .set({ staffAssignedId: staffId })
-        .where(
-          and(
-            eq(startingPositions.id, positionId),
-            eq(startingPositions.eventId, eventId)
-          )
-        )
-        .returning();
-
-      res.json(updatedPosition);
-    } catch (error) {
-      console.error("Update staff assignment error:", error);
-      res.status(500).send("Failed to update staff assignment");
-    }
-  });
-
-  // Randomly assign teams to starting positions
-  app.post("/api/events/:eventId/randomize-positions", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).send("Forbidden");
-    }
-
-    try {
-      const eventId = parseInt(req.params.eventId);
-      if (isNaN(eventId)) {
-        return res.status(400).send("Invalid event ID");
-      }
-
-      // Get all positions for this event
-      const positions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, eventId));
-
-      // Filter unassigned positions in memory instead of using eq with null
-      const unassignedPositions = positions.filter(pos => pos.assignedTeamId === null);
-
-      const eventParticipantsResult = await db
-        .select()
-        .from(eventParticipants)
-        .where(eq(eventParticipants.eventId, eventId));
-
-      const teams = eventParticipantsResult.map(p => p.teamId);
-      const shuffledTeams = teams.sort(() => Math.random() - 0.5);
-
-      // Assign teams to positions
-      await Promise.all(
-        unassignedPositions.map(async (pos, index) => {
-          if (index < shuffledTeams.length) {
-            await db
-              .update(startingPositions)
-              .set({ assignedTeamId: shuffledTeams[index] })
-              .where(eq(startingPositions.id, pos.id));
-          }
-        })
-      );
-
-      const updatedPositions = await db
-        .select()
-        .from(startingPositions)
-        .where(eq(startingPositions.eventId, eventId))
-        .orderBy(startingPositions.positionNumber);
-
-      res.json(updatedPositions);
-    } catch (error) {
-      console.error("Randomize positions error:", error);
-      res.status(500).send("Failedto randomize positions");
+      console.error("Update game status error:", error);
+      res.status(500).send("Failed to update game status");
     }
   });
 
@@ -978,7 +623,7 @@ export function registerRoutes(app: Express): Server {
 }
 
 declare global {
-  var eventSettings: any;
+  var gameSettings: any;
   namespace Express {
     interface User {
       id: number;
@@ -987,16 +632,3 @@ declare global {
     }
   }
 }
-
-const settingsSchema = z.object({
-  defaultCenter: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-  }),
-  defaultRadiusMiles: z.number().min(0.1).max(10),
-  zoneConfigs: z.array(z.object({
-    durationMinutes: z.number().min(5).max(60),
-    radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60),
-  })).min(1),
-});

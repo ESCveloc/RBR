@@ -116,10 +116,10 @@ export default function Admin() {
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!user) {
-        throw new Error("You must be logged in to create an event");
+        throw new Error("You must be logged in to create a game");
       }
 
-      console.log("Attempting to create event with values:", values);
+      console.log("Attempting to create game with values:", values);
 
       const response = await fetch("/api/games", {
         method: "POST",
@@ -130,21 +130,21 @@ export default function Admin() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Event creation failed:", errorText);
-        throw new Error(errorText || "Failed to create event");
+        console.error("Game creation failed:", errorText);
+        throw new Error(errorText || "Failed to create game");
       }
 
       return response.json();
     },
     onSuccess: (game) => {
-      console.log("Event created successfully:", game);
+      console.log("Game created successfully:", game);
       form.reset();
       setSelectedArea(null);
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
 
       toast({
         title: "Success",
-        description: "Event created successfully",
+        description: "Game created successfully",
       });
 
       setTimeout(() => {
@@ -152,7 +152,7 @@ export default function Admin() {
       }, 1500);
     },
     onError: (error: Error) => {
-      console.error("Event creation error:", error);
+      console.error("Game creation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -304,11 +304,11 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Event Management</h1>
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <Link href="/?view=player">
           <Button variant="outline" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Participant View
+            Player Dashboard
           </Button>
         </Link>
       </div>
@@ -317,7 +317,7 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="games" className="flex items-center gap-2">
             <Trophy className="h-4 w-4" />
-            Events
+            Games
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -333,8 +333,8 @@ export default function Admin() {
           <div className="grid gap-8 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Create New Event</CardTitle>
-                <CardDescription>Set up a new battle royale sports event</CardDescription>
+                <CardTitle>Create New Game</CardTitle>
+                <CardDescription>Set up a new battle royale game</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -344,20 +344,21 @@ export default function Admin() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Event Name</FormLabel>
+                          <FormLabel>Game Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter event name" {...field} />
+                            <Input placeholder="Enter game name" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={form.control}
                       name="gameLengthMinutes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Event Length (minutes)</FormLabel>
+                          <FormLabel>Game Length (minutes)</FormLabel>
                           <FormControl>
                             <div className="space-y-2">
                               <Slider
@@ -377,6 +378,7 @@ export default function Admin() {
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={form.control}
                       name="maxTeams"
@@ -402,6 +404,7 @@ export default function Admin() {
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={form.control}
                       name="playersPerTeam"
@@ -427,8 +430,10 @@ export default function Admin() {
                         </FormItem>
                       )}
                     />
+
+
                     <div>
-                      <FormLabel>Event Area</FormLabel>
+                      <FormLabel>Game Area</FormLabel>
                       <div className="h-[300px] rounded-lg overflow-hidden border mt-2">
                         <MapView
                           mode="draw"
@@ -440,10 +445,11 @@ export default function Admin() {
                       </div>
                       {!selectedArea && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          Draw a polygon on the map to set the event boundaries
+                          Draw a polygon or rectangle on the map to set the game boundaries
                         </p>
                       )}
                     </div>
+
                     <Button
                       type="submit"
                       className="w-full"
@@ -457,7 +463,7 @@ export default function Admin() {
                       ) : (
                         <>
                           <Plus className="h-4 w-4 mr-2" />
-                          Create Event
+                          Create Game
                         </>
                       )}
                     </Button>
@@ -465,16 +471,17 @@ export default function Admin() {
                 </Form>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Active Events</CardTitle>
-                <CardDescription>Manage ongoing events</CardDescription>
+                <CardTitle>Active Games</CardTitle>
+                <CardDescription>Manage ongoing games</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {games?.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      No events available. Create a new event to get started.
+                      No games available. Create a new game to get started.
                     </div>
                   ) : (
                     games?.map((game) => (
@@ -524,6 +531,7 @@ export default function Admin() {
             </Card>
           </div>
         </TabsContent>
+
         <TabsContent value="users">
           <Card>
             <CardHeader>
@@ -573,11 +581,12 @@ export default function Admin() {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle>Event Settings</CardTitle>
-              <CardDescription>Configure default event settings</CardDescription>
+              <CardTitle>Game Settings</CardTitle>
+              <CardDescription>Configure default game settings</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...settingsForm}>
@@ -596,6 +605,7 @@ export default function Admin() {
                         </FormItem>
                       )}
                     />
+
                     <FormField
                       control={settingsForm.control}
                       name="defaultCenter.lng"
@@ -610,6 +620,7 @@ export default function Admin() {
                       )}
                     />
                   </div>
+
                   <FormField
                     control={settingsForm.control}
                     name="defaultRadiusMiles"
@@ -635,6 +646,7 @@ export default function Admin() {
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={settingsForm.control}
                     name="zoneConfigs"
@@ -721,6 +733,7 @@ export default function Admin() {
                       </FormItem>
                     )}
                   />
+
                   <Button
                     type="submit"
                     className="w-full"

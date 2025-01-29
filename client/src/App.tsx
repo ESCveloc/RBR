@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import Home from "@/pages/home";
-import Event from "@/pages/event";
+import Game from "@/pages/game";
 import Admin from "@/pages/admin";
 import Profile from "@/pages/profile";
 import { useUser } from "@/hooks/use-user";
@@ -19,8 +19,10 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
   useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/auth");
+    } else if (!isLoading && admin && user?.role !== "admin") {
+      setLocation("/");
     }
-  }, [user, isLoading, setLocation]);
+  }, [user, isLoading, admin, setLocation]);
 
   if (isLoading) {
     return (
@@ -30,38 +32,46 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
     );
   }
 
-  if (!user) return null;
-  if (admin && user.role !== "admin") return null;
+  if (!user) {
+    return null;
+  }
+
+  if (admin && user.role !== "admin") {
+    return null;
+  }
 
   return <Component {...rest} />;
 }
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const viewAs = searchParams.get('view');
 
-  // Simplified routing logic - only redirect if needed
-  useEffect(() => {
-    if (isLoading) return;
-
-    const shouldRedirect = 
-      (user && location === "/auth") || 
-      (user?.role === "admin" && location === "/" && !viewAs);
-
-    if (!shouldRedirect) return;
-
-    const targetRoute = user?.role === "admin" && !viewAs ? "/admin" : "/";
-    window.history.replaceState(null, '', targetRoute);
-  }, [user, isLoading, location, viewAs]);
-
+  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // If user is authenticated and tries to access auth page, redirect to appropriate page
+  if (user && location === "/auth") {
+    if (user.role === "admin") {
+      setLocation("/admin");
+    } else {
+      setLocation("/");
+    }
+    return null;
+  }
+
+  // If admin user is at root and not explicitly viewing as player, redirect to admin page
+  if (user?.role === "admin" && location === "/" && viewAs !== "player") {
+    setLocation("/admin");
+    return null;
   }
 
   return (
@@ -70,8 +80,8 @@ function Router() {
       <Route path="/">
         <ProtectedRoute component={Home} />
       </Route>
-      <Route path="/event/:id">
-        <ProtectedRoute component={Event} />
+      <Route path="/game/:id">
+        <ProtectedRoute component={Game} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />

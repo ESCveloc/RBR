@@ -1,17 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Event, EventParticipant } from '@db/schema';
+import type { Game, GameParticipant } from '@db/schema';
 
-export function useGame(gameId: number, isParticipant = false) {
+export function useGame(gameId: number) {
   const queryClient = useQueryClient();
 
-  const { data: game, isLoading } = useQuery<Event>({
+  const { data: game, isLoading } = useQuery<Game>({
     queryKey: ['/api/games', gameId],
-    enabled: !!gameId,
-    staleTime: Infinity, // Never stale for now
-    gcTime: 60000, // 1 minute
-    refetchInterval: false, // Disable polling for now
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
+    enabled: !!gameId
   });
 
   const updateLocation = useMutation({
@@ -29,9 +24,8 @@ export function useGame(gameId: number, isParticipant = false) {
 
       return response.json();
     },
-    onSuccess: (data: EventParticipant) => {
-      // Disabled real-time updates
-      // queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
+    onSuccess: (data: GameParticipant) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
     }
   });
 
