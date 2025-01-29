@@ -204,94 +204,66 @@ export default function Game() {
             <h1 className="text-xl font-bold">{game.name}</h1>
           </div>
 
-          {/* Right side - Game controls and status */}
-          <div className="flex items-center gap-4">
-            {/* Game Timer */}
-            {gameStatus === 'active' && timeRemaining !== null && (
-              <div className="hidden md:flex items-center gap-2 text-sm font-medium">
-                <Timer className="h-4 w-4" />
-                {formatTime(timeRemaining)}
-              </div>
-            )}
+          {/* Right side - Status and controls */}
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
+              {gameStatus === 'active' ? 'In Progress' :
+               gameStatus === 'completed' ? 'Completed' :
+               gameStatus === 'cancelled' ? 'Cancelled' :
+               'Starting Soon'}
+            </div>
 
-            {/* Zone Timer */}
-            {gameStatus === 'active' && zoneTimeRemaining !== null && game.zoneConfigs && (
-              <div className="hidden md:flex items-center gap-2 text-sm font-medium">
-                <span className="text-primary">Zone {currentZone + 1}</span>
-                {formatTime(zoneTimeRemaining)}
-              </div>
-            )}
-
-            {/* Status Badge and Game Controls */}
-            <div className="flex items-center gap-3">
-              <Badge 
-                variant="secondary" 
-                className={cn(
-                  "text-sm font-medium",
-                  gameStatus === 'active' && "bg-green-100 text-green-800",
-                  gameStatus === 'completed' && "bg-gray-100 text-gray-800",
-                  gameStatus === 'cancelled' && "bg-red-100 text-red-800",
-                  gameStatus === 'pending' && "bg-yellow-100 text-yellow-800"
-                )}
-              >
-                {gameStatus === 'active' ? 'In Progress' :
-                 gameStatus === 'completed' ? 'Completed' :
-                 gameStatus === 'cancelled' ? 'Cancelled' :
-                 'Starting Soon'}
-              </Badge>
-
-              {/* Game Control Buttons */}
-              {canManageGame && (
-                <div className="flex items-center gap-2">
-                  {gameStatus === 'pending' && (
-                    <>
-                      <Button
-                        onClick={() => updateGameStatus.mutate({ status: 'active' })}
-                        disabled={updateGameStatus.isPending}
-                        size="sm"
-                        className="bg-green-500 hover:bg-green-600 text-white"
-                      >
-                        {updateGameStatus.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Play className="h-4 w-4 mr-2" />
-                            Start Game
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-                        disabled={updateGameStatus.isPending}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-
-                  {gameStatus === 'active' && (
+            {/* Game Control Buttons */}
+            {canManageGame && (
+              <div className="flex items-center gap-2">
+                {gameStatus === 'pending' && (
+                  <>
                     <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => updateGameStatus.mutate({ status: 'completed' })}
+                      onClick={() => updateGameStatus.mutate({ status: 'active' })}
                       disabled={updateGameStatus.isPending}
+                      size="sm"
+                      className="bg-green-500 hover:bg-green-600 text-white"
                     >
                       {updateGameStatus.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <>
-                          <X className="h-4 w-4 mr-2" />
-                          End Game
+                          <Play className="h-4 w-4 mr-2" />
+                          Start Game
                         </>
                       )}
                     </Button>
-                  )}
-                </div>
-              )}
-            </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                      disabled={updateGameStatus.isPending}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </>
+                )}
+
+                {gameStatus === 'active' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => updateGameStatus.mutate({ status: 'completed' })}
+                    disabled={updateGameStatus.isPending}
+                  >
+                    {updateGameStatus.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        End Game
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>
