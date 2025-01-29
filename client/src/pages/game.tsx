@@ -115,7 +115,7 @@ export default function Game() {
               {gameStatus === 'active' ? 'In Progress' :
                gameStatus === 'completed' ? 'Completed' :
                gameStatus === 'cancelled' ? 'Cancelled' :
-               'Starting Soon'}
+               'Pending'}
             </div>
 
             {canManageGame && gameStatus === 'pending' && (
