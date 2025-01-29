@@ -66,7 +66,12 @@ export const gameParticipants = pgTable("game_participants", {
   teamId: serial("team_id").references(() => teams.id).notNull(),
   status: text("status", { enum: ["alive", "eliminated"] }).default("alive").notNull(),
   eliminatedAt: timestamp("eliminated_at"),
-  location: jsonb("location").$type<GeolocationCoordinates>()
+  location: jsonb("location").$type<GeolocationCoordinates>(),
+  startingLocation: jsonb("starting_location").$type<{
+    position: number;
+    coordinates: { lat: number; lng: number };
+  }>(),
+  startingLocationAssignedAt: timestamp("starting_location_assigned_at")
 });
 
 // Relations

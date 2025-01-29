@@ -18,12 +18,22 @@ export default function Game() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!game?.boundaries?.center) return;
+    if (!game?.boundaries?.geometry?.coordinates) return;
+
+    // Calculate center from game boundaries for location update
+    const coordinates = game.boundaries.geometry.coordinates[0];
+    const center = coordinates.reduce(
+      (acc, coord) => ({
+        lat: acc.lat + coord[1] / coordinates.length,
+        lng: acc.lng + coord[0] / coordinates.length
+      }),
+      { lat: 0, lng: 0 }
+    );
 
     // Update location based on game boundaries center
     updateLocation.mutate({
-      latitude: game.boundaries.center.lat,
-      longitude: game.boundaries.center.lng,
+      latitude: center.lat,
+      longitude: center.lng,
       accuracy: 0,
       altitude: null,
       altitudeAccuracy: null,
@@ -68,13 +78,13 @@ export default function Game() {
         <div className="order-1 md:order-2 space-y-4">
           <Card>
             <CardContent className="p-4">
-              <h2 className="text-lg font-semibold mb-4">Remaining Teams</h2>
+              <h2 className="text-lg font-semibold mb-4">Teams</h2>
               <div className="space-y-4">
                 {game.participants?.map((participant) => (
                   <TeamCard
-                    key={participant.teamId}
-                    team={participant}
-                    status={participant.status}
+                    key={participant.id}
+                    participant={participant}
+                    startingLocation={participant.startingLocation}
                   />
                 ))}
               </div>

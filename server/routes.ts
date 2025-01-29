@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, games, teams, teamMembers } from "@db/schema";
+import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
 import { eq, ilike, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -24,6 +24,45 @@ const gameSchema = z.object({
     intervalMinutes: z.number().min(5).max(60)
   })).optional()
 });
+
+function calculateStartingLocations(boundaries: any, numPoints: number) {
+  // For a polygon boundary, we'll use its vertices to calculate the center
+  const coordinates = boundaries.geometry.coordinates[0];
+
+  // Calculate center point
+  const center = coordinates.reduce(
+    (acc: { lat: number; lng: number }, coord: number[]) => {
+      return {
+        lat: acc.lat + coord[1] / coordinates.length,
+        lng: acc.lng + coord[0] / coordinates.length
+      };
+    },
+    { lat: 0, lng: 0 }
+  );
+
+  // Calculate radius (distance from center to furthest point)
+  const radius = Math.max(...coordinates.map((coord: number[]) => {
+    const lat = coord[1];
+    const lng = coord[0];
+    const latDiff = center.lat - lat;
+    const lngDiff = center.lng - lng;
+    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+  }));
+
+  // Generate equidistant points around the circle
+  const startingLocations = [];
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i * 2 * Math.PI) / numPoints;
+    const lat = center.lat + radius * Math.sin(angle);
+    const lng = center.lng + radius * Math.cos(angle);
+    startingLocations.push({
+      position: i + 1,
+      coordinates: { lat, lng }
+    });
+  }
+
+  return startingLocations;
+}
 
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
@@ -506,6 +545,9 @@ export function registerRoutes(app: Express): Server {
 
       const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
 
+      // Calculate starting locations based on maxTeams
+      const startingLocations = calculateStartingLocations(gameBoundaries, maxTeams);
+
       const [game] = await db
         .insert(games)
         .values({
@@ -521,7 +563,7 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       console.log("Game created successfully:", game);
-      res.json(game);
+      res.json({ ...game, startingLocations });
     } catch (error: any) {
       console.error("Game creation error:", error);
       if (error.code === '23505') {
@@ -596,6 +638,65 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Update game status error:", error);
       res.status(500).send("Failed to update game status");
+    }
+  });
+
+  // Add new endpoint for managing team starting locations
+  app.post("/api/games/:gameId/assign-starting-location", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId, position } = req.body;
+
+      if (!teamId || !position) {
+        return res.status(400).send("Team ID and position are required");
+      }
+
+      // Verify the game exists and user is admin or game creator
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      // Only allow admins or game creator to manually assign positions
+      if (req.user.role !== "admin" && game.createdBy !== req.user.id) {
+        return res.status(403).send("Unauthorized to assign starting locations");
+      }
+
+      // Update the team's starting location
+      const startingLocations = calculateStartingLocations(game.boundaries, game.maxTeams);
+      const selectedLocation = startingLocations[position - 1];
+
+      if (!selectedLocation) {
+        return res.status(400).send("Invalid position number");
+      }
+
+      const [updatedParticipant] = await db
+        .update(gameParticipants)
+        .set({
+          startingLocation: selectedLocation,
+          startingLocationAssignedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .returning();
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error("Assign starting location error:", error);
+      res.status(500).send("Failed to assign starting location");
     }
   });
 
