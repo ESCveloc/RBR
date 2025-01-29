@@ -82,6 +82,19 @@ interface MapViewProps {
   defaultRadiusMiles?: number;
 }
 
+// Add CSS styles for the starting position markers
+const markerStyles = `
+  .starting-position-number {
+    z-index: 1000 !important;
+  }
+  .starting-position-bg {
+    z-index: 400;
+  }
+  .starting-position-border {
+    z-index: 450;
+  }
+`;
+
 export function MapView({
   game,
   mode = "view",
@@ -99,6 +112,11 @@ export function MapView({
   // Initialize map
   useEffect(() => {
     if (!mapRef.current) {
+      // Add marker styles to document
+      const style = document.createElement('style');
+      style.textContent = markerStyles;
+      document.head.appendChild(style);
+
       const map = L.map("map", {
         zoomControl: true,
         doubleClickZoom: false,
@@ -225,7 +243,7 @@ export function MapView({
     // Clear existing markers
     markersLayer.clearLayers();
 
-    // Generate starting locations for the game
+    // Calculate center and radius from game boundaries
     const coordinates = game.boundaries.geometry.coordinates[0];
     const center = coordinates.reduce(
       (acc, coord) => ({
@@ -250,7 +268,7 @@ export function MapView({
       const lat = center.lat + radius * Math.sin(angle);
       const lng = center.lng + radius * Math.cos(angle);
 
-      // Create white background circle
+      // White background circle (bottom layer)
       const bgCircle = L.circle([lat, lng], {
         radius: 35,
         color: '#ffffff',
@@ -258,10 +276,11 @@ export function MapView({
         fillOpacity: 1,
         weight: 3,
         opacity: 1,
-        className: 'starting-position-bg'
+        className: 'starting-position-bg',
+        pane: 'markerPane'
       }).addTo(markersLayer);
 
-      // Create border circle
+      // Blue border circle (middle layer)
       const borderCircle = L.circle([lat, lng], {
         radius: 35,
         color: '#3b82f6',
@@ -269,10 +288,11 @@ export function MapView({
         fillOpacity: 0,
         weight: 3,
         opacity: 1,
-        className: 'starting-position-border'
+        className: 'starting-position-border',
+        pane: 'markerPane'
       }).addTo(markersLayer);
 
-      // Add number label
+      // Number marker (top layer)
       const numberDiv = L.divIcon({
         className: 'starting-position-number',
         html: `
@@ -286,22 +306,27 @@ export function MapView({
             font-size: 16px;
             color: #1f2937;
             background-color: transparent;
+            z-index: 1000;
+            position: relative;
           ">${i + 1}</div>`,
         iconSize: [40, 40],
         iconAnchor: [20, 20]
       });
 
-      L.marker([lat, lng], { 
+      // Create marker with high z-index
+      const numberMarker = L.marker([lat, lng], { 
         icon: numberDiv,
         interactive: true,
-        zIndexOffset: 1000
+        zIndexOffset: 1000,
+        pane: 'markerPane'
       }).addTo(markersLayer);
 
-      // Add tooltip for team assignment
+      // Find assigned team for this position
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === i + 1
       );
 
+      // Add tooltip
       const tooltipContent = assignedTeam 
         ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
         : `Position ${i + 1}: Unassigned`;
