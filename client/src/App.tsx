@@ -10,19 +10,32 @@ import Admin from "@/pages/admin";
 import Profile from "@/pages/profile";
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
   const { user, isLoading } = useUser();
   const [, setLocation] = useLocation();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation("/auth");
-    } else if (!isLoading && admin && user?.role !== "admin") {
-      setLocation("/");
+    if (!isLoading) {
+      if (!user) {
+        setShouldRedirect(true);
+      } else if (admin && user.role !== "admin") {
+        setShouldRedirect(true);
+      }
     }
-  }, [user, isLoading, admin, setLocation]);
+  }, [user, isLoading, admin]);
+
+  useEffect(() => {
+    if (shouldRedirect) {
+      if (!user) {
+        setLocation("/auth");
+      } else if (admin && user.role !== "admin") {
+        setLocation("/");
+      }
+    }
+  }, [shouldRedirect, user, admin, setLocation]);
 
   if (isLoading) {
     return (
@@ -32,11 +45,7 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  if (admin && user.role !== "admin") {
+  if (shouldRedirect) {
     return null;
   }
 
@@ -45,33 +54,33 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
   const searchParams = new URLSearchParams(window.location.search);
   const viewAs = searchParams.get('view');
 
-  // Show loading state while checking authentication
+  useEffect(() => {
+    if (!isLoading) {
+      if (user && location === "/auth") {
+        setRedirectPath(user.role === "admin" ? "/admin" : "/");
+      } else if (user?.role === "admin" && location === "/" && viewAs !== "player") {
+        setRedirectPath("/admin");
+      }
+    }
+  }, [user, isLoading, location, viewAs]);
+
+  useEffect(() => {
+    if (redirectPath) {
+      window.location.href = redirectPath;
+    }
+  }, [redirectPath]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  // If user is authenticated and tries to access auth page, redirect to appropriate page
-  if (user && location === "/auth") {
-    if (user.role === "admin") {
-      setLocation("/admin");
-    } else {
-      setLocation("/");
-    }
-    return null;
-  }
-
-  // If admin user is at root and not explicitly viewing as player, redirect to admin page
-  if (user?.role === "admin" && location === "/" && viewAs !== "player") {
-    setLocation("/admin");
-    return null;
   }
 
   return (

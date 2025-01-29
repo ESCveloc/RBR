@@ -1,0 +1,110 @@
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+Attempting to login...
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Making POST request to /api/login
+[Auth] Request succeeded
+[Auth] Login successful, invalidating user query
+[Auth] Fetching user data
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: false, error: null}
+[Auth] User data received: 
+Object {id: 19, username: "boss", role: "admin", password: "[REDACTED]"}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+Warning: Cannot update a component (&#x60;Router&#x60;) while rendering a different component (&#x60;Router&#x60;). To locate the bad setState() call inside &#x60;Router&#x60;, follow the stack trace as described in https://reactjs.org/link/setstate-in-render
+    at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=3hxpQ5EoQUWmwVmLJ0_IG:71:31)
+    at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+    at App
+at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=3hxpQ5EoQUWmwVmLJ0_IG:71:31)
+at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+at App
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+error: null
+isLoading: false
+user: Object
+[[Prototype]]: Object
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
