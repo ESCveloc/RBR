@@ -1,38 +1,64 @@
 import { useState } from "react";
-import type { Team, User } from "@db/schema";
+import type { GameParticipant } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, ChevronDown, ChevronUp } from "lucide-react";
-import { TeamMembersCard } from "./team-members-card";
-import { useUser } from "@/hooks/use-user";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface TeamCardProps {
-  team: Team;
-  status?: "alive" | "eliminated";
+  gameId: number;
+  participant: GameParticipant;
+  canAssignPosition?: boolean;
 }
 
-export function TeamCard({ team, status }: TeamCardProps) {
-  const [showMembers, setShowMembers] = useState(false);
-  const { user } = useUser();
+export function TeamCard({ gameId, participant, canAssignPosition }: TeamCardProps) {
+  const [isAssigning, setIsAssigning] = useState(false);
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isCaptain = user?.id === team.captainId;
 
-  // Use suspense: false to prevent loading states from causing UI flicker
-  const { data: members = [] } = useQuery<User[]>({
-    queryKey: [`/api/teams/${team.id}/members`],
-    enabled: true,
-    suspense: false,
+  const assignPosition = useMutation({
+    mutationFn: async (position: number) => {
+      const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: participant.teamId, position }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
     onSuccess: () => {
-      // Ensure team data is refreshed when members change
-      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
-    }
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      setIsAssigning(false);
+      toast({
+        title: "Position Assigned",
+        description: "Starting position has been assigned successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   return (
     <Card
       className={`
-        ${status === "eliminated" ? "opacity-50" : ""}
+        ${participant.status === "eliminated" ? "opacity-50" : ""}
         hover:bg-accent/50 transition-colors
       `}
     >
@@ -43,7 +69,7 @@ export function TeamCard({ team, status }: TeamCardProps) {
               className={`
                 w-10 h-10 rounded-full flex items-center justify-center
                 ${
-                  status === "eliminated"
+                  participant.status === "eliminated"
                     ? "bg-destructive"
                     : "bg-primary"
                 }
@@ -52,36 +78,56 @@ export function TeamCard({ team, status }: TeamCardProps) {
               <Users className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold">{team.name}</h3>
+              <h3 className="font-semibold">Team {participant.teamId}</h3>
               <p className="text-sm text-muted-foreground">
-                {status
-                  ? status.charAt(0).toUpperCase() + status.slice(1)
-                  : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+                {participant.status === "eliminated" ? "Eliminated" : "Active"}
+                {participant.startingLocation && 
+                  ` - Position ${participant.startingLocation.position}`}
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowMembers(!showMembers)}
-          >
-            {showMembers ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
 
-        {showMembers && (
-          <div className="mt-4">
-            <TeamMembersCard 
-              teamId={team.id} 
-              captainId={team.captainId}
-              isCaptain={isCaptain}
-            />
-          </div>
-        )}
+          {canAssignPosition && !participant.startingLocation && (
+            <div className="flex items-center gap-2">
+              {isAssigning ? (
+                <>
+                  <Select
+                    onValueChange={(value) => {
+                      assignPosition.mutate(parseInt(value));
+                    }}
+                    disabled={assignPosition.isPending}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
+                        <SelectItem key={position} value={position.toString()}>
+                          Position {position}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAssigning(false)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAssigning(true)}
+                >
+                  Assign Position
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
