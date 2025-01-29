@@ -19,10 +19,8 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
   useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/auth");
-    } else if (!isLoading && admin && user?.role !== "admin") {
-      setLocation("/");
     }
-  }, [user, isLoading, admin, setLocation]);
+  }, [user, isLoading, setLocation]);
 
   if (isLoading) {
     return (
@@ -32,22 +30,31 @@ function ProtectedRoute({ component: Component, admin = false, ...rest }: any) {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  if (admin && user.role !== "admin") {
-    return null;
-  }
+  if (!user) return null;
+  if (admin && user.role !== "admin") return null;
 
   return <Component {...rest} />;
 }
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const viewAs = searchParams.get('view');
+
+  // Simplified routing logic - only redirect if needed
+  useEffect(() => {
+    if (isLoading) return;
+
+    const shouldRedirect = 
+      (user && location === "/auth") || 
+      (user?.role === "admin" && location === "/" && !viewAs);
+
+    if (!shouldRedirect) return;
+
+    const targetRoute = user?.role === "admin" && !viewAs ? "/admin" : "/";
+    window.history.replaceState(null, '', targetRoute);
+  }, [user, isLoading, location, viewAs]);
 
   if (isLoading) {
     return (
@@ -55,20 +62,6 @@ function Router() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  if (user && location === "/auth") {
-    if (user.role === "admin") {
-      setLocation("/admin");
-    } else {
-      setLocation("/");
-    }
-    return null;
-  }
-
-  if (user?.role === "admin" && location === "/" && viewAs !== "player") {
-    setLocation("/admin");
-    return null;
   }
 
   return (
