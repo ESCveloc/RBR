@@ -7,7 +7,7 @@ import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
 import "leaflet-geometryutil";
 
-// Zone colors with semantic meanings
+// Update the zone colors with semantic meanings
 const ZONE_COLORS = [
   { color: '#3b82f6', name: 'Initial Zone' },
   { color: '#10b981', name: 'First Shrink' },
@@ -30,22 +30,7 @@ const DEFAULT_ZONE_CONFIGS = [
   { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
 ];
 
-// Tile layer configuration
-const TILE_LAYER = {
-  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 19,
-};
-
-interface MapViewProps {
-  game?: Game;
-  mode?: "view" | "draw";
-  onAreaSelect?: (area: Feature<Polygon>) => void;
-  selectedArea?: Feature<Polygon> | null;
-  defaultCenter?: { lat: number; lng: number };
-  defaultRadiusMiles?: number;
-}
-
+// Update the zone calculation function
 function calculateZones(coordinates: number[][], center: { lat: number; lng: number }, initialRadius: number, layerGroup: L.LayerGroup) {
   DEFAULT_ZONE_CONFIGS.forEach((zone, index) => {
     const zoneRadius = initialRadius * zone.radiusMultiplier;
@@ -65,6 +50,13 @@ function calculateZones(coordinates: number[][], center: { lat: number; lng: num
     ).addTo(layerGroup);
   });
 }
+
+// Tile layer configuration
+const TILE_LAYER = {
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+};
 
 // Update the ZoneLegend class to be more responsive and avoid overlaps
 class ZoneLegend extends L.Control {
@@ -137,6 +129,15 @@ class ZoneLegend extends L.Control {
   }
 }
 
+interface MapViewProps {
+  game?: Game;
+  mode?: "view" | "draw";
+  onAreaSelect?: (area: Feature<Polygon>) => void;
+  selectedArea?: Feature<Polygon> | null;
+  defaultCenter?: { lat: number; lng: number };
+  defaultRadiusMiles?: number;
+}
+
 export function MapView({
   game,
   mode = "view",
@@ -191,10 +192,8 @@ export function MapView({
 
         defaultCircleRef.current = defaultCircle;
 
-        // Create zones layer group
+        // Create zones layer group and calculate zones
         zonesLayerRef.current = L.layerGroup().addTo(map);
-
-        // Calculate and draw zones for default circle
         calculateZones([[defaultCenter.lng, defaultCenter.lat]], defaultCenter, initialRadius, zonesLayerRef.current);
 
         const bounds = defaultCircle.getBounds();
