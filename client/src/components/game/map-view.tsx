@@ -15,12 +15,18 @@ const ZONE_COLORS = [
   { color: '#ef4444', name: 'Final Zone' }       // Red
 ];
 
+// Base zone style
 const ZONE_STYLE = {
   weight: 2,
   opacity: 0.9,
-  dashArray: '5, 10',
   fillOpacity: 0.1
 };
+
+// Different styles for initial and shrinking zones
+const getZoneStyle = (index: number) => ({
+  ...ZONE_STYLE,
+  dashArray: index === 0 ? undefined : '5, 10', // Solid line for initial zone, dashed for others
+});
 
 const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
@@ -33,7 +39,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number) {
       radius: initialRadius * multiplier,
       color: ZONE_COLORS[index].color,
       fillColor: ZONE_COLORS[index].color,
-      ...ZONE_STYLE
+      ...getZoneStyle(index)
     }).addTo(zonesLayer);
   });
 
@@ -50,9 +56,10 @@ class ZoneLegend extends L.Control {
       border-radius: 4px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
       font-size: 12px;
+      color: black;
     `;
 
-    div.innerHTML = '<div style="font-weight: 600; margin-bottom: 4px;">Zone Phases</div>';
+    div.innerHTML = '<div style="font-weight: 600; margin-bottom: 4px; color: black;">Zone Phases</div>';
 
     ZONE_COLORS.forEach(zone => {
       div.innerHTML += `
@@ -60,7 +67,7 @@ class ZoneLegend extends L.Control {
           <span style="width: 12px; height: 12px; background: ${zone.color}; 
                        display: inline-block; margin-right: 5px; border-radius: 2px;">
           </span>
-          <span>${zone.name}</span>
+          <span style="color: black;">${zone.name}</span>
         </div>
       `;
     });
@@ -116,7 +123,7 @@ export function MapView({
               shapeOptions: {
                 color: ZONE_COLORS[0].color,
                 fillColor: ZONE_COLORS[0].color,
-                ...ZONE_STYLE
+                ...getZoneStyle(0)
               }
             },
             rectangle: false,
