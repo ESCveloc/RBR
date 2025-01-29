@@ -7,62 +7,12 @@ import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
 import "leaflet-geometryutil";
 
-// Add custom control for starting location legend
-class StartingLocationLegend extends L.Control {
-  onAdd(map: L.Map) {
-    const div = L.DomUtil.create('div', 'starting-location-legend');
-    div.style.cssText = `
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      font-family: system-ui, sans-serif;
-      font-size: 12px;
-      max-width: 200px;
-      color: #1f2937;
-      margin: 10px;
-    `;
-
-    const title = document.createElement('h4');
-    title.textContent = 'Starting Locations';
-    title.style.cssText = `
-      margin: 0 0 8px 0;
-      font-weight: 600;
-      color: #111827;
-      font-size: 14px;
-    `;
-    div.appendChild(title);
-
-    const description = document.createElement('p');
-    description.textContent = 'Numbers indicate team starting positions';
-    description.style.cssText = `
-      margin: 0;
-      font-size: 12px;
-      color: #6b7280;
-    `;
-    div.appendChild(description);
-
-    return div;
-  }
-}
-
-// Default game settings
-const DEFAULT_GAME_SETTINGS = {
-  defaultCenter: { lat: 35.8462, lng: -86.3928 },
-  defaultRadiusMiles: 1,
-  zoneConfigs: [
-    { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-    { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-    { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-  ],
-};
-
 // Zone colors with semantic meanings
 const ZONE_COLORS = [
-  { color: '#3b82f6', name: 'Initial Zone', description: 'Starting play area' },
-  { color: '#10b981', name: 'First Shrink', description: 'First zone reduction' },
-  { color: '#f59e0b', name: 'Second Shrink', description: 'Second zone reduction' },
-  { color: '#ef4444', name: 'Final Zone', description: 'Final combat area' },
+  { color: '#3b82f6', name: 'Initial Zone' },
+  { color: '#10b981', name: 'First Shrink' },
+  { color: '#f59e0b', name: 'Second Shrink' },
+  { color: '#ef4444', name: 'Final Zone' },
 ];
 
 // Update the boundary styling with transition properties
@@ -82,13 +32,92 @@ interface MapViewProps {
   defaultRadiusMiles?: number;
 }
 
+// Update the ZoneLegend class to be more responsive and avoid overlaps
+class ZoneLegend extends L.Control {
+  onAdd(map: L.Map) {
+    const div = L.DomUtil.create('div', 'zone-legend');
+    div.style.cssText = `
+      background: white;
+      padding: 8px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      min-width: 120px;
+      max-width: 150px;
+      color: #1f2937;
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 400;
+      opacity: 0.9;
+      transition: opacity 0.2s ease;
+    `;
+
+    div.addEventListener('mouseenter', () => {
+      div.style.opacity = '1';
+    });
+
+    div.addEventListener('mouseleave', () => {
+      div.style.opacity = '0.9';
+    });
+
+    const title = document.createElement('h4');
+    title.textContent = 'Zone Phases';
+    title.style.cssText = `
+      margin: 0 0 6px 0;
+      font-weight: 600;
+      color: #111827;
+      font-size: 12px;
+    `;
+    div.appendChild(title);
+
+    ZONE_COLORS.forEach(({ color, name }) => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        margin-bottom: 4px;
+        padding: 2px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+      `;
+
+      const colorBox = document.createElement('span');
+      colorBox.style.cssText = `
+        width: 10px;
+        height: 10px;
+        background: ${color};
+        display: inline-block;
+        margin-right: 6px;
+        border-radius: 2px;
+        border: 1px solid rgba(0,0,0,0.1);
+      `;
+
+      const nameText = document.createElement('span');
+      nameText.textContent = name;
+      nameText.style.cssText = `
+        font-weight: 500;
+        color: #374151;
+        font-size: 11px;
+      `;
+
+      item.appendChild(colorBox);
+      item.appendChild(nameText);
+      div.appendChild(item);
+    });
+
+    return div;
+  }
+}
+
 export function MapView({
   game,
   mode = "view",
   onAreaSelect,
   selectedArea,
-  defaultCenter = DEFAULT_GAME_SETTINGS.defaultCenter,
-  defaultRadiusMiles = DEFAULT_GAME_SETTINGS.defaultRadiusMiles,
+  defaultCenter = { lat: 35.8462, lng: -86.3928 },
+  defaultRadiusMiles = 1,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -121,7 +150,6 @@ export function MapView({
 
       // Add default circle if no game boundaries
       if (!game?.boundaries) {
-        // Create initial zone circle
         const initialRadius = defaultRadiusMiles * 1609.34; // Convert miles to meters
         const defaultCircle = L.circle(
           [defaultCenter.lat, defaultCenter.lng],
@@ -134,26 +162,6 @@ export function MapView({
             opacity: ZONE_STYLES.opacity,
           }
         ).addTo(map);
-
-        // Create shrinking zone circles
-        let currentRadius = initialRadius;
-        DEFAULT_GAME_SETTINGS.zoneConfigs.forEach((config, index) => {
-          const nextRadius = currentRadius * config.radiusMultiplier;
-          L.circle(
-            [defaultCenter.lat, defaultCenter.lng],
-            {
-              radius: nextRadius,
-              color: ZONE_COLORS[index + 1].color,
-              fillColor: ZONE_COLORS[index + 1].color,
-              fillOpacity: ZONE_STYLES.fillOpacity,
-              weight: ZONE_STYLES.weight,
-              opacity: ZONE_STYLES.opacity,
-              dashArray: '5, 10',
-            }
-          ).addTo(map);
-
-          currentRadius = nextRadius;
-        });
 
         defaultCircleRef.current = defaultCircle;
         const bounds = defaultCircle.getBounds();
@@ -196,11 +204,8 @@ export function MapView({
         });
       }
 
-      // Add legends
-      if (mode === "view") {
-        map.addControl(new StartingLocationLegend({ position: 'bottomright' }));
-      }
-      map.addControl(new ZoneLegend({ position: 'topright' }));
+      // Add zone legend to bottom-right corner
+      map.addControl(new ZoneLegend({ position: 'bottomright' }));
     }
 
     return () => {
@@ -214,90 +219,6 @@ export function MapView({
       }
     };
   }, []);
-
-  // Update starting location markers when game data changes
-  useEffect(() => {
-    const map = mapRef.current;
-    const markersLayer = markersLayerRef.current;
-
-    if (!map || !markersLayer || !game?.boundaries) return;
-
-    // Clear existing markers
-    markersLayer.clearLayers();
-
-    // Calculate center and radius from game boundaries
-    const coordinates = game.boundaries.geometry.coordinates[0];
-    const center = coordinates.reduce(
-      (acc, coord) => ({
-        lat: acc.lat + coord[1] / coordinates.length,
-        lng: acc.lng + coord[0] / coordinates.length
-      }),
-      { lat: 0, lng: 0 }
-    );
-
-    // Calculate radius as 90% of the distance to the furthest point
-    const radius = Math.max(...coordinates.map((coord) => {
-      const lat = coord[1];
-      const lng = coord[0];
-      const latDiff = center.lat - lat;
-      const lngDiff = center.lng - lng;
-      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    })) * 0.9; // Use 90% of max radius to keep inside boundary
-
-    // Simplify the marker creation to focus on visibility and positioning
-    // Create markers for each starting position
-    for (let i = 0; i < game.maxTeams; i++) {
-      const angle = (i * 2 * Math.PI) / game.maxTeams;
-      const lat = center.lat + radius * Math.sin(angle);
-      const lng = center.lng + radius * Math.cos(angle);
-
-      // Create a simple, highly visible marker using divIcon
-      const icon = L.divIcon({
-        html: `
-          <div style="
-            background-color: white;
-            border: 3px solid #3b82f6;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            color: #1f2937;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-          ">${i + 1}</div>`,
-        className: '',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
-      });
-
-      // Create marker in the overlay pane for maximum visibility
-      const marker = L.marker([lat, lng], {
-        icon: icon,
-        pane: 'overlayPane',
-        zIndexOffset: 1000
-      }).addTo(markersLayer);
-
-      // Find assigned team for this position
-      const assignedTeam = game.participants?.find(
-        p => p.startingLocation?.position === i + 1
-      );
-
-      // Add tooltip
-      marker.bindTooltip(
-        assignedTeam
-          ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
-          : `Position ${i + 1}: Unassigned`,
-        {
-          permanent: false,
-          direction: 'top',
-          offset: [0, -15]
-        }
-      );
-    }
-  }, [game?.boundaries, game?.maxTeams, game?.participants]);
 
   // Update map bounds and zones calculation
   useEffect(() => {
@@ -348,18 +269,18 @@ export function MapView({
     })) * 111111; // Convert to meters (roughly)
 
     // Draw each shrinking zone
-    let currentRadius = initialRadius;
     if (Array.isArray(game.zoneConfigs)) {
+      let currentRadius = initialRadius;
       game.zoneConfigs.forEach((zone, index) => {
         if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
-        const nextRadius = initialRadius * zone.radiusMultiplier;
+        currentRadius = initialRadius * zone.radiusMultiplier;
         const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
         L.circle(
           [center.lat, center.lng],
           {
-            radius: nextRadius,
+            radius: currentRadius,
             color: zoneColor.color,
             fillColor: zoneColor.color,
             fillOpacity: ZONE_STYLES.fillOpacity,
@@ -368,8 +289,6 @@ export function MapView({
             dashArray: '5, 10',
           }
         ).addTo(zonesLayerRef.current!);
-
-        currentRadius = nextRadius;
       });
     }
 
@@ -384,86 +303,4 @@ export function MapView({
       style={{ minHeight: "300px" }}
     />
   );
-}
-
-// Custom control for zone legend
-class ZoneLegend extends L.Control {
-  onAdd(map: L.Map) {
-    const div = L.DomUtil.create('div', 'zone-legend');
-    div.style.cssText = `
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      font-family: system-ui, sans-serif;
-      font-size: 12px;
-      max-width: 200px;
-      color: #1f2937;
-      margin: 10px;
-    `;
-
-    const title = document.createElement('h4');
-    title.textContent = 'Zone Legend';
-    title.style.cssText = `
-      margin: 0 0 8px 0;
-      font-weight: 600;
-      color: #111827;
-      font-size: 14px;
-    `;
-    div.appendChild(title);
-
-    ZONE_COLORS.forEach(({ color, name, description }) => {
-      const item = document.createElement('div');
-      item.style.cssText = `
-        display: flex;
-        align-items: center;
-        margin-bottom: 6px;
-        padding: 4px;
-        border-radius: 4px;
-        transition: background-color 0.2s ease;
-        cursor: help;
-      `;
-
-      const colorBox = document.createElement('span');
-      colorBox.style.cssText = `
-        width: 12px;
-        height: 12px;
-        background: ${color};
-        display: inline-block;
-        margin-right: 8px;
-        border-radius: 3px;
-        border: 1px solid rgba(0,0,0,0.1);
-      `;
-
-      const textContainer = document.createElement('div');
-      textContainer.style.cssText = `
-        display: flex;
-        flex-direction: column;
-      `;
-
-      const nameText = document.createElement('span');
-      nameText.textContent = name;
-      nameText.style.cssText = `
-        font-weight: 500;
-        color: #374151;
-        font-size: 12px;
-      `;
-
-      const descText = document.createElement('span');
-      descText.textContent = description;
-      descText.style.cssText = `
-        font-size: 10px;
-        color: #6b7280;
-        margin-top: 2px;
-      `;
-
-      textContainer.appendChild(nameText);
-      textContainer.appendChild(descText);
-      item.appendChild(colorBox);
-      item.appendChild(textContainer);
-      div.appendChild(item);
-    });
-
-    return div;
-  }
 }
