@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useGame } from "@/hooks/use-game";
 import { MapView } from "@/components/game/map-view";
-import { TeamCard } from "@/components/game/team-card"; // Added import
+import { TeamCard } from "@/components/game/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,7 @@ export default function Game() {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json' // Added Accept header
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ status }),
         credentials: 'include'
@@ -142,11 +142,11 @@ export default function Game() {
             </div>
 
             {/* Admin controls */}
-            {isAdmin && (
+            {isAdmin && game.status === 'pending' && (
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => handleStatusUpdate('active')}
-                  disabled={updateGameStatus.isPending || game.status !== 'pending'}
+                  disabled={updateGameStatus.isPending}
                   size="sm"
                 >
                   {updateGameStatus.isPending ? (
@@ -162,7 +162,7 @@ export default function Game() {
                   variant="destructive"
                   size="sm"
                   onClick={() => handleStatusUpdate('cancelled')}
-                  disabled={updateGameStatus.isPending || game.status !== 'pending'}
+                  disabled={updateGameStatus.isPending}
                 >
                   <X className="h-4 w-4 mr-2" />
                   Cancel
