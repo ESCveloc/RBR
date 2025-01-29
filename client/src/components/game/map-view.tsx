@@ -7,122 +7,62 @@ import type { Feature, Polygon } from "geojson";
 import "leaflet-draw";
 import "leaflet-geometryutil";
 
-// Update the zone colors with semantic meanings
+// Zone visualization constants
 const ZONE_COLORS = [
-  { color: '#3b82f6', name: 'Initial Zone' },
-  { color: '#10b981', name: 'First Shrink' },
-  { color: '#f59e0b', name: 'Second Shrink' },
-  { color: '#ef4444', name: 'Final Zone' },
+  { color: '#3b82f6', name: 'Initial Zone' },    // Blue
+  { color: '#10b981', name: 'First Shrink' },    // Green
+  { color: '#f59e0b', name: 'Second Shrink' },   // Orange
+  { color: '#ef4444', name: 'Final Zone' }       // Red
 ];
 
-// Update the boundary styling with transition properties
-const ZONE_STYLES = {
-  fillOpacity: 0.2,
-  weight: 3,
+const ZONE_STYLE = {
+  weight: 2,
   opacity: 0.9,
-  className: 'zone-transition'
+  dashArray: '5, 10',
+  fillOpacity: 0.1
 };
 
-// Default zone configurations
-const DEFAULT_ZONE_CONFIGS = [
-  { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-  { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-  { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-];
+const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
-// Update the zone calculation function
-function calculateZones(coordinates: number[][], center: { lat: number; lng: number }, initialRadius: number, layerGroup: L.LayerGroup) {
-  DEFAULT_ZONE_CONFIGS.forEach((zone, index) => {
-    const zoneRadius = initialRadius * zone.radiusMultiplier;
-    const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
+function createZones(map: L.Map, center: L.LatLng, initialRadius: number) {
+  const zonesLayer = L.layerGroup().addTo(map);
 
-    L.circle(
-      [center.lat, center.lng],
-      {
-        radius: zoneRadius,
-        color: zoneColor.color,
-        fillColor: zoneColor.color,
-        fillOpacity: ZONE_STYLES.fillOpacity,
-        weight: ZONE_STYLES.weight,
-        opacity: ZONE_STYLES.opacity,
-        dashArray: '5, 10',
-      }
-    ).addTo(layerGroup);
+  // Create concentric circles for each zone
+  SHRINK_MULTIPLIERS.forEach((multiplier, index) => {
+    L.circle(center, {
+      radius: initialRadius * multiplier,
+      color: ZONE_COLORS[index].color,
+      fillColor: ZONE_COLORS[index].color,
+      ...ZONE_STYLE
+    }).addTo(zonesLayer);
   });
+
+  return zonesLayer;
 }
 
-// Tile layer configuration
-const TILE_LAYER = {
-  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 19,
-};
-
-// Update the ZoneLegend class to be more responsive and avoid overlaps
+// Zone legend control
 class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
-    const div = L.DomUtil.create('div', 'zone-legend');
+    const div = L.DomUtil.create('div', 'info legend');
     div.style.cssText = `
       background: white;
       padding: 8px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      font-family: system-ui, sans-serif;
-      font-size: 12px;
-      min-width: 120px;
-      max-width: 150px;
-      color: #1f2937;
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      z-index: 400;
-      opacity: 0.9;
-      transition: opacity 0.2s ease;
-    `;
-
-    const title = document.createElement('h4');
-    title.textContent = 'Zone Phases';
-    title.style.cssText = `
-      margin: 0 0 6px 0;
-      font-weight: 600;
-      color: #111827;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
       font-size: 12px;
     `;
-    div.appendChild(title);
 
-    ZONE_COLORS.forEach(({ color, name }) => {
-      const item = document.createElement('div');
-      item.style.cssText = `
-        display: flex;
-        align-items: center;
-        margin-bottom: 4px;
-        padding: 2px;
-        border-radius: 4px;
-        transition: background-color 0.2s ease;
+    div.innerHTML = '<div style="font-weight: 600; margin-bottom: 4px;">Zone Phases</div>';
+
+    ZONE_COLORS.forEach(zone => {
+      div.innerHTML += `
+        <div style="display: flex; align-items: center; margin: 2px 0;">
+          <span style="width: 12px; height: 12px; background: ${zone.color}; 
+                       display: inline-block; margin-right: 5px; border-radius: 2px;">
+          </span>
+          <span>${zone.name}</span>
+        </div>
       `;
-
-      const colorBox = document.createElement('span');
-      colorBox.style.cssText = `
-        width: 10px;
-        height: 10px;
-        background: ${color};
-        display: inline-block;
-        margin-right: 6px;
-        border-radius: 2px;
-        border: 1px solid rgba(0,0,0,0.1);
-      `;
-
-      const nameText = document.createElement('span');
-      nameText.textContent = name;
-      nameText.style.cssText = `
-        font-weight: 500;
-        color: #374151;
-        font-size: 11px;
-      `;
-
-      item.appendChild(colorBox);
-      item.appendChild(nameText);
-      div.appendChild(item);
     });
 
     return div;
@@ -147,12 +87,9 @@ export function MapView({
   defaultRadiusMiles = 1,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
-  const markersLayerRef = useRef<L.LayerGroup | null>(null);
-  const drawLayerRef = useRef<L.FeatureGroup | null>(null);
   const zonesLayerRef = useRef<L.LayerGroup | null>(null);
-  const defaultCircleRef = useRef<L.Circle | null>(null);
+  const drawLayerRef = useRef<L.FeatureGroup | null>(null);
 
-  // Initialize map
   useEffect(() => {
     if (!mapRef.current) {
       const map = L.map("map", {
@@ -160,55 +97,26 @@ export function MapView({
         doubleClickZoom: false,
       }).setView([defaultCenter.lat, defaultCenter.lng], 13);
 
-      mapRef.current = map;
-
-      // Add consistent tile layer
-      L.tileLayer(TILE_LAYER.url, {
-        attribution: TILE_LAYER.attribution,
-        maxZoom: TILE_LAYER.maxZoom,
+      // Add the base tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
       }).addTo(map);
 
-      const drawnItems = new L.FeatureGroup();
-      map.addLayer(drawnItems);
-      drawLayerRef.current = drawnItems;
+      mapRef.current = map;
 
-      const markersLayer = L.layerGroup().addTo(map);
-      markersLayerRef.current = markersLayer;
-
-      // Add default circle if no game boundaries
-      if (!game?.boundaries && !selectedArea) {
-        const initialRadius = defaultRadiusMiles * 1609.34; // Convert miles to meters
-        const defaultCircle = L.circle(
-          [defaultCenter.lat, defaultCenter.lng],
-          {
-            radius: initialRadius,
-            color: ZONE_COLORS[0].color,
-            fillColor: ZONE_COLORS[0].color,
-            fillOpacity: ZONE_STYLES.fillOpacity,
-            weight: ZONE_STYLES.weight,
-            opacity: ZONE_STYLES.opacity,
-          }
-        ).addTo(map);
-
-        defaultCircleRef.current = defaultCircle;
-
-        // Create zones layer group and calculate zones
-        zonesLayerRef.current = L.layerGroup().addTo(map);
-        calculateZones([[defaultCenter.lng, defaultCenter.lat]], defaultCenter, initialRadius, zonesLayerRef.current);
-
-        const bounds = defaultCircle.getBounds();
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-
+      // Add draw controls if in draw mode
       if (mode === "draw") {
+        const drawLayer = new L.FeatureGroup().addTo(map);
+        drawLayerRef.current = drawLayer;
+
         const drawControl = new L.Control.Draw({
           draw: {
             polygon: {
               shapeOptions: {
                 color: ZONE_COLORS[0].color,
                 fillColor: ZONE_COLORS[0].color,
-                fillOpacity: ZONE_STYLES.fillOpacity,
-                weight: ZONE_STYLES.weight,
+                ...ZONE_STYLE
               }
             },
             rectangle: false,
@@ -218,169 +126,86 @@ export function MapView({
             polyline: false,
           },
           edit: {
-            featureGroup: drawnItems,
-          },
+            featureGroup: drawLayer
+          }
         });
 
         map.addControl(drawControl);
 
         map.on(L.Draw.Event.CREATED, (e: any) => {
-          const layer = e.layer as L.Polygon;
-          drawnItems.clearLayers();
-          drawnItems.addLayer(layer);
+          const layer = e.layer;
+          drawLayer.clearLayers();
+          drawLayer.addLayer(layer);
 
           if (onAreaSelect) {
-            const geoJSON = layer.toGeoJSON() as Feature<Polygon>;
-            onAreaSelect(geoJSON);
+            onAreaSelect(layer.toGeoJSON());
           }
         });
       }
 
-      // Add zone legend
-      map.addControl(new ZoneLegend({ position: 'bottomright' }));
+      // Add legend
+      new ZoneLegend({ position: 'bottomright' }).addTo(map);
     }
 
+    // Cleanup on unmount
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
-        markersLayerRef.current = null;
-        drawLayerRef.current = null;
         zonesLayerRef.current = null;
-        defaultCircleRef.current = null;
+        drawLayerRef.current = null;
       }
     };
   }, []);
 
-  // Update map bounds and zones for view mode
+  // Handle game boundaries and zones
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !game?.boundaries || mode !== "view") return;
-
-    // Remove default circle if it exists
-    if (defaultCircleRef.current) {
-      defaultCircleRef.current.removeFrom(map);
-      defaultCircleRef.current = null;
-    }
+    if (!map) return;
 
     // Clear existing zones
     if (zonesLayerRef.current) {
       zonesLayerRef.current.clearLayers();
       zonesLayerRef.current.remove();
+      zonesLayerRef.current = null;
     }
 
-    // Create new layer group for zones
-    zonesLayerRef.current = L.layerGroup().addTo(map);
+    let center: L.LatLng;
+    let radius: number;
 
-    // Draw the main boundary
-    const boundaryLayer = L.geoJSON(game.boundaries, {
-      style: {
-        color: ZONE_COLORS[0].color,
-        fillColor: ZONE_COLORS[0].color,
-        ...ZONE_STYLES,
-      },
-    }).addTo(zonesLayerRef.current);
+    if (game?.boundaries) {
+      // Calculate center from game boundaries
+      const coords = game.boundaries.geometry.coordinates[0];
+      const centerPoint = coords.reduce(
+        (acc, [lng, lat]) => ({
+          lat: acc.lat + lat / coords.length,
+          lng: acc.lng + lng / coords.length
+        }),
+        { lat: 0, lng: 0 }
+      );
 
-    // Calculate center and zones
-    const coordinates = game.boundaries.geometry.coordinates[0];
-    const center = coordinates.reduce(
-      (acc, coord) => ({
-        lat: acc.lat + coord[1] / coordinates.length,
-        lng: acc.lng + coord[0] / coordinates.length
-      }),
-      { lat: 0, lng: 0 }
-    );
+      center = L.latLng(centerPoint.lat, centerPoint.lng);
 
-    // Calculate initial radius
-    const initialRadius = Math.max(...coordinates.map((coord) => {
-      const lat = coord[1];
-      const lng = coord[0];
-      const latDiff = center.lat - lat;
-      const lngDiff = center.lng - lng;
-      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    })) * 111111; // Convert to meters
-
-    // Draw zones using game zone configs if available, otherwise use defaults
-    const zoneConfigs = Array.isArray(game.zoneConfigs) ? game.zoneConfigs : DEFAULT_ZONE_CONFIGS;
-    zoneConfigs.forEach((zone, index) => {
-      if (!zone || typeof zone.radiusMultiplier !== 'number') return;
-
-      const zoneRadius = initialRadius * zone.radiusMultiplier;
-      const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
-
-      L.circle(
-        [center.lat, center.lng],
-        {
-          radius: zoneRadius,
-          color: zoneColor.color,
-          fillColor: zoneColor.color,
-          fillOpacity: ZONE_STYLES.fillOpacity,
-          weight: ZONE_STYLES.weight,
-          opacity: ZONE_STYLES.opacity,
-          dashArray: '5, 10',
-        }
-      ).addTo(zonesLayerRef.current!);
-    });
-
-    // Fit map to show all zones with padding
-    map.fitBounds(boundaryLayer.getBounds(), { padding: [50, 50] });
-  }, [game?.boundaries, game?.zoneConfigs, mode]);
-
-  // Handle area selection in draw mode
-  useEffect(() => {
-    if (!mapRef.current || !selectedArea || mode !== "draw") return;
-
-    const map = mapRef.current;
-
-    // Remove default circle if it exists
-    if (defaultCircleRef.current) {
-      defaultCircleRef.current.removeFrom(map);
-      defaultCircleRef.current = null;
+      // Calculate radius as distance to farthest point
+      radius = Math.max(...coords.map(([lng, lat]) => {
+        return center.distanceTo(L.latLng(lat, lng));
+      }));
+    } else {
+      // Use default center and radius
+      center = L.latLng(defaultCenter.lat, defaultCenter.lng);
+      radius = defaultRadiusMiles * 1609.34; // Convert miles to meters
     }
 
-    // Clear existing zones
-    if (zonesLayerRef.current) {
-      zonesLayerRef.current.clearLayers();
-      zonesLayerRef.current.remove();
-    }
+    // Create zones
+    zonesLayerRef.current = createZones(map, center, radius);
 
-    // Create new layer group for zones
-    zonesLayerRef.current = L.layerGroup().addTo(map);
+    // Fit map to show all zones
+    const bounds = L.latLngBounds([center]);
+    bounds.extend(L.latLng(center.lat + radius * 0.000009, center.lng + radius * 0.000009));
+    bounds.extend(L.latLng(center.lat - radius * 0.000009, center.lng - radius * 0.000009));
+    map.fitBounds(bounds, { padding: [50, 50] });
 
-    // Draw the selected area
-    const boundaryLayer = L.geoJSON(selectedArea, {
-      style: {
-        color: ZONE_COLORS[0].color,
-        fillColor: ZONE_COLORS[0].color,
-        ...ZONE_STYLES,
-      },
-    }).addTo(zonesLayerRef.current);
-
-    // Calculate center and zones
-    const coordinates = selectedArea.geometry.coordinates[0];
-    const center = coordinates.reduce(
-      (acc, coord) => ({
-        lat: acc.lat + coord[1] / coordinates.length,
-        lng: acc.lng + coord[0] / coordinates.length
-      }),
-      { lat: 0, lng: 0 }
-    );
-
-    // Calculate initial radius
-    const initialRadius = Math.max(...coordinates.map((coord) => {
-      const lat = coord[1];
-      const lng = coord[0];
-      const latDiff = center.lat - lat;
-      const lngDiff = center.lng - lng;
-      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    })) * 111111; // Convert to meters
-
-    // Draw shrinking zones
-    calculateZones(coordinates, center, initialRadius, zonesLayerRef.current);
-
-    // Fit map to show all zones with padding
-    map.fitBounds(boundaryLayer.getBounds(), { padding: [50, 50] });
-  }, [selectedArea, mode]);
+  }, [game?.boundaries, defaultCenter, defaultRadiusMiles]);
 
   return (
     <div
