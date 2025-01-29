@@ -24,6 +24,9 @@ export default function Game() {
   // Simple admin check
   const isAdmin = user?.role === 'admin';
 
+  // Get the back link based on user role
+  const backLink = isAdmin ? "/admin" : "/";
+
   // Debug logging
   useEffect(() => {
     console.log('Game Component Debug:', {
@@ -125,12 +128,12 @@ export default function Game() {
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link href="/">
+            <Link href={backLink}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">{game.name}</h1>
+            <h1 className="text-xl font-bold">{game?.name}</h1>
           </div>
 
           {/* Right side - Status and controls */}
