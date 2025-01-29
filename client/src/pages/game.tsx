@@ -25,6 +25,16 @@ export default function Game() {
   // Simple admin check
   const isAdmin = user?.role === 'admin';
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Game Component Debug:', {
+      user,
+      isAdmin,
+      gameStatus: game?.status,
+      gameId
+    });
+  }, [user, isAdmin, game, gameId]);
+
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
       if (!gameId) {
@@ -82,41 +92,6 @@ export default function Game() {
     );
   }
 
-  // Show admin controls
-  const renderAdminControls = () => {
-    if (!isAdmin || game.status !== 'pending') {
-      return null;
-    }
-
-    return (
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => updateGameStatus.mutate({ status: 'active' })}
-          disabled={updateGameStatus.isPending}
-          size="sm"
-        >
-          {updateGameStatus.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <>
-              <Play className="h-4 w-4 mr-2" />
-              Start Game
-            </>
-          )}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-          disabled={updateGameStatus.isPending}
-        >
-          <X className="h-4 w-4 mr-2" />
-          Cancel
-        </Button>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -134,12 +109,39 @@ export default function Game() {
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
               {game.status === 'active' ? 'In Progress' :
-                game.status === 'completed' ? 'Completed' :
-                  game.status === 'cancelled' ? 'Cancelled' :
-                    'Pending'}
+               game.status === 'completed' ? 'Completed' :
+               game.status === 'cancelled' ? 'Cancelled' :
+               'Pending'}
             </div>
 
-            {renderAdminControls()}
+            {/* Always render admin controls, let the function handle visibility */}
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => updateGameStatus.mutate({ status: 'active' })}
+                  disabled={updateGameStatus.isPending || game.status !== 'pending'}
+                  size="sm"
+                >
+                  {updateGameStatus.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Game
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                  disabled={updateGameStatus.isPending || game.status !== 'pending'}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -207,9 +209,3 @@ export default function Game() {
     </div>
   );
 }
-
-const formatTime = (ms: number) => {
-  const minutes = Math.floor(ms / (1000 * 60));
-  const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
