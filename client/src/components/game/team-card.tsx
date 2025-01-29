@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GameParticipant } from "@db/schema";
+import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
@@ -14,18 +14,21 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface TeamCardProps {
-  gameId: number;
-  participant: GameParticipant;
+  gameId?: number;
+  participant?: GameParticipant;
+  team?: Team;
   canAssignPosition?: boolean;
 }
 
-export function TeamCard({ gameId, participant, canAssignPosition }: TeamCardProps) {
+export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamCardProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
+      if (!gameId || !participant) return;
+
       const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -55,80 +58,108 @@ export function TeamCard({ gameId, participant, canAssignPosition }: TeamCardPro
     },
   });
 
-  return (
-    <Card
-      className={`
-        ${participant.status === "eliminated" ? "opacity-50" : ""}
-        hover:bg-accent/50 transition-colors
-      `}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`
-                w-10 h-10 rounded-full flex items-center justify-center
-                ${
-                  participant.status === "eliminated"
-                    ? "bg-destructive"
-                    : "bg-primary"
-                }
-              `}
-            >
-              <Users className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold">Team {participant.teamId}</h3>
-              <p className="text-sm text-muted-foreground">
-                {participant.status === "eliminated" ? "Eliminated" : "Active"}
-                {participant.startingLocation && 
-                  ` - Position ${participant.startingLocation.position}`}
-              </p>
+  // If we're displaying a team outside of a game context
+  if (team) {
+    return (
+      <Card className="hover:bg-accent/50 transition-colors">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                <Users className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{team.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {team.active ? "Active" : "Inactive"}
+                </p>
+              </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-          {canAssignPosition && !participant.startingLocation && (
-            <div className="flex items-center gap-2">
-              {isAssigning ? (
-                <>
-                  <Select
-                    onValueChange={(value) => {
-                      assignPosition.mutate(parseInt(value));
-                    }}
-                    disabled={assignPosition.isPending}
-                  >
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
-                        <SelectItem key={position} value={position.toString()}>
-                          Position {position}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsAssigning(false)}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAssigning(true)}
-                >
-                  Assign Position
-                </Button>
-              )}
+  // If we're displaying a participant in a game
+  if (participant) {
+    return (
+      <Card
+        className={`
+          ${participant.status === "eliminated" ? "opacity-50" : ""}
+          hover:bg-accent/50 transition-colors
+        `}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className={`
+                  w-10 h-10 rounded-full flex items-center justify-center
+                  ${
+                    participant.status === "eliminated"
+                      ? "bg-destructive"
+                      : "bg-primary"
+                  }
+                `}
+              >
+                <Users className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Team {participant.teamId}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {participant.status === "eliminated" ? "Eliminated" : "Active"}
+                  {participant.startingLocation && 
+                    ` - Position ${participant.startingLocation.position}`}
+                </p>
+              </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
+
+            {canAssignPosition && !participant.startingLocation && (
+              <div className="flex items-center gap-2">
+                {isAssigning ? (
+                  <>
+                    <Select
+                      onValueChange={(value) => {
+                        assignPosition.mutate(parseInt(value));
+                      }}
+                      disabled={assignPosition.isPending}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
+                          <SelectItem key={position} value={position.toString()}>
+                            Position {position}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAssigning(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsAssigning(true)}
+                  >
+                    Assign Position
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return null; // Return null if no valid props are provided
 }
