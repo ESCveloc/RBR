@@ -16,7 +16,7 @@ export const users = pgTable("users", {
 
 export const teams = pgTable("teams", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(), 
   captainId: serial("captain_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   active: boolean("active").default(true)
@@ -116,7 +116,9 @@ export const gameBoundariesSchema = z.object({
 // Base schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
-export const insertTeamSchema = createInsertSchema(teams);
+export const insertTeamSchema = createInsertSchema(teams).extend({
+  name: z.string().min(1, "Team name is required").max(50, "Team name must be less than 50 characters"),
+});
 export const selectTeamSchema = createSelectSchema(teams);
 export const insertGameSchema = createInsertSchema(games);
 export const selectGameSchema = createSelectSchema(games);
