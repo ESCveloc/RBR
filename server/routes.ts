@@ -638,7 +638,7 @@ export function registerRoutes(app: Express): Server {
       const gameId = parseInt(req.params.gameId);
       const { status } = req.body;
 
-      if (!["pending", "active", "completed"].includes(status)) {
+      if (!["pending", "active", "completed", "cancelled"].includes(status)) {
         return res.status(400).send("Invalid status");
       }
 
@@ -661,10 +661,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Can only complete active games");
       }
 
+      if (status === "cancelled" && game.status === "completed") {
+        return res.status(400).send("Cannot cancel completed games");
+      }
+
       const updateData: any = { status };
       if (status === "active") {
         updateData.startTime = new Date();
-      } else if (status === "completed") {
+      } else if (status === "completed" || status === "cancelled") {
         updateData.endTime = new Date();
       }
 

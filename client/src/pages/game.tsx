@@ -143,31 +143,49 @@ export default function Game() {
             </div>
 
             {/* Admin controls */}
-            {isAdmin && game.status === 'pending' && (
+            {isAdmin && (
               <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => handleStatusUpdate('active')}
-                  disabled={updateGameStatus.isPending}
-                  size="sm"
-                >
-                  {updateGameStatus.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Game
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleStatusUpdate('cancelled')}
-                  disabled={updateGameStatus.isPending}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
+                {game.status === 'pending' && (
+                  <>
+                    <Button
+                      onClick={() => handleStatusUpdate('active')}
+                      disabled={updateGameStatus.isPending}
+                      size="sm"
+                    >
+                      {updateGameStatus.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Start Game
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleStatusUpdate('cancelled')}
+                      disabled={updateGameStatus.isPending}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                {game.status === 'active' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleStatusUpdate('completed')}
+                    disabled={updateGameStatus.isPending}
+                  >
+                    {updateGameStatus.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>End Game</>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
           </div>
