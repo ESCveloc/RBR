@@ -7,31 +7,35 @@ import { TeamCard } from "@/components/game/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, Play, X, Users, Timer } from "lucide-react";
+import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
 import type { Game as GameType } from "@db/schema";
-import cn from 'classnames';
-import {Badge} from "@/components/ui/badge";
-
 
 export default function Game() {
-  const [, params] = useRoute<{ id: string }>("/game/:id");
-  const gameId = parseInt(params?.id || "0");
-  const { game, isLoading, updateLocation } = useGame(gameId);
-  const { sendMessage } = useWebSocket(gameId);
-  const { toast } = useToast();
+  const [match, params] = useRoute<{ id: string }>("/game/:id");
+  const gameId = params?.id ? parseInt(params.id) : undefined;
+  const { game, isLoading } = useGame(gameId!);
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [currentZone, setCurrentZone] = useState<number>(0);
-  const [zoneTimeRemaining, setZoneTimeRemaining] = useState<number | null>(null);
 
-  // Mutations for game actions
+  // Debug logs
+  console.log('Game ID:', gameId);
+  console.log('Game Status:', game?.status);
+  console.log('User:', user);
+  console.log('isAdmin:', user?.role === 'admin');
+  console.log('isGameCreator:', game?.createdBy === user?.id);
+
+  const isAdmin = user?.role === 'admin';
+  const isGameCreator = game?.createdBy === user?.id;
+  const canManageGame = isAdmin || isGameCreator;
+
+  console.log('Can manage game:', canManageGame);
+
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
-      console.log("Updating game status to:", status); // Debug log
+      console.log("Updating game status to:", status);
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -40,145 +44,15 @@ export default function Game() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Game update failed:", errorText); // Debug log
-        throw new Error(errorText);
+        throw new Error(await response.text());
       }
 
       return response.json();
     },
-    onSuccess: (updatedGame) => {
-      console.log("Game updated successfully:", updatedGame); // Debug log
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
-      toast({
-        title: "Success",
-        description: "The game status has been updated successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      console.error("Game update error:", error); // Debug log
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
-
-  const isAdmin = user?.role === 'admin';
-  const isGameCreator = game?.createdBy === user?.id;
-  const canManageGame = isAdmin || isGameCreator;
-
-  // Debug logs
-  console.log('Current user:', user);
-  console.log('Game creator:', game?.createdBy);
-  console.log('Can manage game:', canManageGame);
-  console.log('Game status:', game?.status);
-
-  // Game timer effect
-  useEffect(() => {
-    if (!game || game.status !== 'active' || !game.startTime) {
-      setTimeRemaining(null);
-      return;
-    }
-
-    const startTime = new Date(game.startTime).getTime();
-    const duration = game.gameLengthMinutes * 60 * 1000;
-    const endTime = startTime + duration;
-
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const remaining = endTime - now;
-
-      if (remaining <= 0) {
-        setTimeRemaining(0);
-        updateGameStatus.mutate({ status: 'completed' });
-        clearInterval(timer);
-      } else {
-        setTimeRemaining(remaining);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [game?.status, game?.startTime, game?.gameLengthMinutes]);
-
-  // Zone timer effect
-  useEffect(() => {
-    if (!game || game.status !== 'active' || !game.startTime || !game.zoneConfigs) {
-      setZoneTimeRemaining(null);
-      setCurrentZone(0);
-      return;
-    }
-
-    const startTime = new Date(game.startTime).getTime();
-    let totalTime = 0;
-    let currentZoneIndex = 0;
-
-    // Calculate which zone we should be in
-    for (let i = 0; i < game.zoneConfigs.length; i++) {
-      const zoneConfig = game.zoneConfigs[i];
-      totalTime += zoneConfig.intervalMinutes * 60 * 1000;
-
-      const now = new Date().getTime();
-      if (now < startTime + totalTime) {
-        currentZoneIndex = i;
-        const zoneStartTime = startTime + totalTime - (zoneConfig.intervalMinutes * 60 * 1000);
-        const zoneEndTime = startTime + totalTime;
-        const remaining = zoneEndTime - now;
-
-        setCurrentZone(i);
-        setZoneTimeRemaining(remaining > 0 ? remaining : 0);
-        break;
-      }
-    }
-
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      if (currentZoneIndex < game.zoneConfigs.length) {
-        const zoneConfig = game.zoneConfigs[currentZoneIndex];
-        const zoneEndTime = startTime + totalTime;
-        const remaining = zoneEndTime - now;
-
-        if (remaining <= 0) {
-          setZoneTimeRemaining(0);
-          setCurrentZone(currentZoneIndex + 1);
-        } else {
-          setZoneTimeRemaining(remaining);
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [game?.status, game?.startTime, game?.zoneConfigs]);
-
-  useEffect(() => {
-    if (!game?.boundaries?.geometry?.coordinates) return;
-
-    // Calculate center from game boundaries
-    const coordinates = game.boundaries.geometry.coordinates[0];
-    const center = coordinates.reduce(
-      (acc, coord) => ({
-        lat: acc.lat + coord[1] / coordinates.length,
-        lng: acc.lng + coord[0] / coordinates.length
-      }),
-      { lat: 0, lng: 0 }
-    );
-
-    // Create a proper GeolocationCoordinates object
-    const locationUpdate: GeolocationCoordinates = {
-      latitude: center.lat,
-      longitude: center.lng,
-      accuracy: 0,
-      altitude: null,
-      altitudeAccuracy: null,
-      heading: null,
-      speed: null,
-      toJSON() { return this; }
-    };
-
-    updateLocation.mutate(locationUpdate);
-  }, [game?.boundaries]);
-
 
   if (isLoading || !game) {
     return (
@@ -193,8 +67,7 @@ export default function Game() {
   return (
     <div className="min-h-screen bg-background">
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex items-center justify-between gap-4">
-          {/* Left side - Title and back button */}
+        <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
             <Link href="/">
               <Button variant="ghost" size="icon">
@@ -213,36 +86,31 @@ export default function Game() {
                'Starting Soon'}
             </div>
 
-            {/* Game Control Buttons */}
-            {canManageGame && (
+            {canManageGame && gameStatus === 'pending' && (
               <div className="flex items-center gap-2">
-                {gameStatus === 'pending' && (
-                  <>
-                    <Button
-                      onClick={() => updateGameStatus.mutate({ status: 'active' })}
-                      disabled={updateGameStatus.isPending}
-                      size="sm"
-                    >
-                      {updateGameStatus.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Game
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-                      disabled={updateGameStatus.isPending}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </>
-                )}
+                <Button
+                  onClick={() => updateGameStatus.mutate({ status: 'active' })}
+                  disabled={updateGameStatus.isPending}
+                  size="sm"
+                >
+                  {updateGameStatus.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Game
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                  disabled={updateGameStatus.isPending}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
               </div>
             )}
           </div>

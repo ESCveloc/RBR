@@ -1,0 +1,43 @@
+It looks like you have a well-structured React component, but some buttons might not be appearing due to the following potential issues:
+
+### Possible Causes of Buttons Not Appearing:
+1. **`canManageGame` is false**
+   - Buttons inside `canManageGame && (...)` conditions won’t render if `canManageGame` is `false`. 
+   - Add `console.log('canManageGame:', canManageGame);` before rendering to check if it’s correctly computed.
+
+2. **Game status might not match the expected conditions**
+   - Your buttons for `Start Game` and `Cancel` are inside `gameStatus === 'pending'`, so if the game status is not `'pending'`, they won’t show.
+   - Add `console.log('Game status:', gameStatus);` before rendering.
+
+3. **Invalid `useRoute` Hook Usage**
+   - `useRoute` returns `[match, params]`. If `match` is `false`, `params` will be `undefined`, causing `gameId = parseInt(params?.id || "0")` to be `0`, possibly preventing game data from loading.
+   - Add `console.log('Game ID:', gameId);` to verify it’s correct.
+
+4. **Permissions not allowing updates**
+   - If `isAdmin` or `isGameCreator` is incorrect, `canManageGame` will be `false`, preventing buttons from rendering.
+   - Add `console.log('isAdmin:', isAdmin, 'isGameCreator:', isGameCreator);` to debug.
+
+5. **React Query Issues (`useMutation`)**
+   - `updateGameStatus.isPending` might keep buttons disabled.
+   - Add `console.log('Mutation pending:', updateGameStatus.isPending);` to check.
+
+---
+
+### Recommended Fixes & Debugging
+- Add these logs before rendering:
+  ```tsx
+  console.log('Game ID:', gameId);
+  console.log('Game Status:', gameStatus);
+  console.log('User:', user);
+  console.log('isAdmin:', isAdmin, 'isGameCreator:', isGameCreator, 'canManageGame:', canManageGame);
+  ```
+- Force `gameId` to be `undefined` if `params` isn’t available:
+  ```tsx
+  const gameId = params?.id ? parseInt(params.id) : undefined;
+  ```
+- Add a fallback UI for missing data:
+  ```tsx
+  if (!game) return <div>Loading game data...</div>;
+  ```
+
+Try these fixes and let me know if the issue persists! 🚀
