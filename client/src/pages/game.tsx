@@ -15,26 +15,36 @@ import type { Game as GameType } from "@db/schema";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
-  const gameId = params?.id ? parseInt(params.id) : undefined;
-  const { game, isLoading } = useGame(gameId!);
+  const { toast } = useToast();
+
+  // Only set gameId if we have a match and valid ID
+  const gameId = match && params?.id ? parseInt(params.id) : undefined;
+
+  // Debug logs for route matching
+  console.log('Route match:', match);
+  console.log('Route params:', params);
+  console.log('Computed game ID:', gameId);
+
+  const { game, isLoading } = useGame(gameId);
   const { user } = useUser();
   const queryClient = useQueryClient();
-
-  // Debug logs
-  console.log('Game ID:', gameId);
-  console.log('Game Status:', game?.status);
-  console.log('User:', user);
-  console.log('isAdmin:', user?.role === 'admin');
-  console.log('isGameCreator:', game?.createdBy === user?.id);
 
   const isAdmin = user?.role === 'admin';
   const isGameCreator = game?.createdBy === user?.id;
   const canManageGame = isAdmin || isGameCreator;
 
+  // Debug logs for auth and game state
+  console.log('User:', user);
+  console.log('Game:', game);
   console.log('Can manage game:', canManageGame);
+  console.log('Game status:', game?.status);
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
+      if (!gameId) {
+        throw new Error('No game ID provided');
+      }
+
       console.log("Updating game status to:", status);
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
@@ -52,8 +62,30 @@ export default function Game() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   });
 
+  // Handle invalid route match
+  if (!match) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
+          <Link href="/">
+            <Button>Return to Home</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle loading state
   if (isLoading || !game) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -123,7 +155,7 @@ export default function Game() {
         </div>
 
         <div className="order-1 md:order-2 space-y-4">
-          {/* Game Details Card - removed control buttons */}
+          {/* Game Details Card */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Game Details</CardTitle>
