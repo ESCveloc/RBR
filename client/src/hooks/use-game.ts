@@ -11,28 +11,40 @@ export function useGame(gameId: number) {
         const response = await fetch(`/api/games/${gameId}`, {
           credentials: 'include',
           headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
         });
 
+        console.log('Game API Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+
+        const responseText = await response.text();
+        console.log('Response Text:', responseText);
+
         if (!response.ok) {
-          const text = await response.text();
           try {
             // Try to parse error as JSON
-            const error = JSON.parse(text);
+            const error = JSON.parse(responseText);
             throw new Error(error.message || 'Failed to fetch game');
           } catch {
             // If not JSON, use text directly
-            throw new Error(text || 'Failed to fetch game');
+            throw new Error(responseText || 'Failed to fetch game');
           }
         }
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Invalid response format from server');
+        try {
+          const data = JSON.parse(responseText);
+          console.log('Parsed game data:', data);
+          return data;
+        } catch (e) {
+          console.error('JSON Parse Error:', e);
+          throw new Error('Failed to parse game data');
         }
-
-        return response.json();
       } catch (err) {
         console.error('Error fetching game:', err);
         throw err;
