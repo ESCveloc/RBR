@@ -197,7 +197,10 @@ export default function Game() {
 
       <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
         <div className="order-2 md:order-1">
-          <MapView game={game} />
+          {/* Increase height of map container */}
+          <div className="h-[600px] w-full rounded-lg overflow-hidden border">
+            <MapView game={game} />
+          </div>
         </div>
 
         <div className="order-1 md:order-2 space-y-4">
