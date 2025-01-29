@@ -11,7 +11,6 @@ import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
-import { PermissionDebugger } from "@/components/debug/permission-debugger";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -23,11 +22,8 @@ export default function Game() {
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
   const { game, isLoading } = useGame(gameId);
 
-  // Permission checks
-  const isAdmin = user && user.role === 'admin';
-  const isGameCreator = user && game && game.createdBy === user.id;
-  const canManageGame = Boolean(isAdmin || isGameCreator);
-
+  // Simple admin check
+  const isAdmin = user?.role === 'admin';
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -35,7 +31,6 @@ export default function Game() {
         throw new Error('No game ID provided');
       }
 
-      // The backend will also verify these permissions
       const response = await fetch(`/api/games/${gameId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -89,7 +84,7 @@ export default function Game() {
 
   // Show admin controls
   const renderAdminControls = () => {
-    if (!canManageGame || game.status !== 'pending') {
+    if (!isAdmin || game.status !== 'pending') {
       return null;
     }
 
@@ -173,7 +168,7 @@ export default function Game() {
           </Card>
 
           {/* Team Assignment Section */}
-          {canManageGame && game.status === 'pending' && (
+          {isAdmin && game.status === 'pending' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Assign Teams</CardTitle>
@@ -201,7 +196,7 @@ export default function Game() {
                     key={participant.id}
                     gameId={game.id}
                     participant={participant}
-                    canAssignPosition={canManageGame && game.status === 'pending'}
+                    canAssignPosition={isAdmin && game.status === 'pending'}
                   />
                 ))
               )}
@@ -209,11 +204,6 @@ export default function Game() {
           </Card>
         </div>
       </main>
-      <PermissionDebugger 
-        gameId={game.id}
-        createdBy={game.createdBy}
-        gameStatus={game.status}
-      />
     </div>
   );
 }
