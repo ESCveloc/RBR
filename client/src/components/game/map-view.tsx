@@ -23,6 +23,13 @@ const ZONE_STYLES = {
   className: 'zone-transition'
 };
 
+// Default zone configurations
+const DEFAULT_ZONE_CONFIGS = [
+  { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
+  { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
+  { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
+];
+
 interface MapViewProps {
   game?: Game;
   mode?: "view" | "draw";
@@ -30,6 +37,26 @@ interface MapViewProps {
   selectedArea?: Feature<Polygon> | null;
   defaultCenter?: { lat: number; lng: number };
   defaultRadiusMiles?: number;
+}
+
+function calculateZones(coordinates: number[][], center: { lat: number; lng: number }, initialRadius: number, layerGroup: L.LayerGroup) {
+  DEFAULT_ZONE_CONFIGS.forEach((zone, index) => {
+    const zoneRadius = initialRadius * zone.radiusMultiplier;
+    const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
+
+    L.circle(
+      [center.lat, center.lng],
+      {
+        radius: zoneRadius,
+        color: zoneColor.color,
+        fillColor: zoneColor.color,
+        fillOpacity: ZONE_STYLES.fillOpacity,
+        weight: ZONE_STYLES.weight,
+        opacity: ZONE_STYLES.opacity,
+        dashArray: '5, 10',
+      }
+    ).addTo(layerGroup);
+  });
 }
 
 // Update the ZoneLegend class to be more responsive and avoid overlaps
@@ -53,14 +80,6 @@ class ZoneLegend extends L.Control {
       opacity: 0.9;
       transition: opacity 0.2s ease;
     `;
-
-    div.addEventListener('mouseenter', () => {
-      div.style.opacity = '1';
-    });
-
-    div.addEventListener('mouseleave', () => {
-      div.style.opacity = '0.9';
-    });
 
     const title = document.createElement('h4');
     title.textContent = 'Zone Phases';
@@ -144,12 +163,11 @@ export function MapView({
       map.addLayer(drawnItems);
       drawLayerRef.current = drawnItems;
 
-      // Create layer for markers
       const markersLayer = L.layerGroup().addTo(map);
       markersLayerRef.current = markersLayer;
 
       // Add default circle if no game boundaries
-      if (!game?.boundaries) {
+      if (!game?.boundaries && !selectedArea) {
         const initialRadius = defaultRadiusMiles * 1609.34; // Convert miles to meters
         const defaultCircle = L.circle(
           [defaultCenter.lat, defaultCenter.lng],
@@ -164,6 +182,13 @@ export function MapView({
         ).addTo(map);
 
         defaultCircleRef.current = defaultCircle;
+
+        // Create zones layer group
+        zonesLayerRef.current = L.layerGroup().addTo(map);
+
+        // Calculate and draw zones for default circle
+        calculateZones([[defaultCenter.lng, defaultCenter.lat]], defaultCenter, initialRadius, zonesLayerRef.current);
+
         const bounds = defaultCircle.getBounds();
         map.fitBounds(bounds, { padding: [50, 50] });
       }
@@ -193,74 +218,18 @@ export function MapView({
         map.addControl(drawControl);
 
         map.on(L.Draw.Event.CREATED, (e: any) => {
-          drawnItems.clearLayers();
           const layer = e.layer as L.Polygon;
+          drawnItems.clearLayers();
           drawnItems.addLayer(layer);
 
           if (onAreaSelect) {
             const geoJSON = layer.toGeoJSON() as Feature<Polygon>;
             onAreaSelect(geoJSON);
-
-            // Clear existing zones
-            if (zonesLayerRef.current) {
-              zonesLayerRef.current.clearLayers();
-              zonesLayerRef.current.remove();
-            }
-
-            // Create new layer group for zones
-            zonesLayerRef.current = L.layerGroup().addTo(map);
-
-            // Calculate center from the polygon coordinates
-            const coordinates = geoJSON.geometry.coordinates[0];
-            const center = coordinates.reduce(
-              (acc, coord) => ({
-                lat: acc.lat + coord[1] / coordinates.length,
-                lng: acc.lng + coord[0] / coordinates.length
-              }),
-              { lat: 0, lng: 0 }
-            );
-
-            // Calculate initial radius based on the furthest point
-            const initialRadius = Math.max(...coordinates.map((coord) => {
-              const lat = coord[1];
-              const lng = coord[0];
-              const latDiff = center.lat - lat;
-              const lngDiff = center.lng - lng;
-              return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-            })) * 111111; // Convert to meters (roughly)
-
-            // Draw each shrinking zone
-            let currentRadius = initialRadius;
-            const settings = global.gameSettings || {
-              zoneConfigs: [
-                { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-                { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-                { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-              ],
-            };
-
-            settings.zoneConfigs.forEach((zone: any, index: number) => {
-              currentRadius = initialRadius * zone.radiusMultiplier;
-              const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
-
-              L.circle(
-                [center.lat, center.lng],
-                {
-                  radius: currentRadius,
-                  color: zoneColor.color,
-                  fillColor: zoneColor.color,
-                  fillOpacity: ZONE_STYLES.fillOpacity,
-                  weight: ZONE_STYLES.weight,
-                  opacity: ZONE_STYLES.opacity,
-                  dashArray: '5, 10',
-                }
-              ).addTo(zonesLayerRef.current!);
-            });
           }
         });
       }
 
-      // Add zone legend to bottom-right corner
+      // Add zone legend
       map.addControl(new ZoneLegend({ position: 'bottomright' }));
     }
 
@@ -276,11 +245,16 @@ export function MapView({
     };
   }, []);
 
-  // Update when selectedArea changes
+  // Update map bounds and zones for view mode
   useEffect(() => {
-    if (!mapRef.current || !selectedArea) return;
-
     const map = mapRef.current;
+    if (!map || !game?.boundaries || mode !== "view") return;
+
+    // Remove default circle if it exists
+    if (defaultCircleRef.current) {
+      defaultCircleRef.current.removeFrom(map);
+      defaultCircleRef.current = null;
+    }
 
     // Clear existing zones
     if (zonesLayerRef.current) {
@@ -291,8 +265,17 @@ export function MapView({
     // Create new layer group for zones
     zonesLayerRef.current = L.layerGroup().addTo(map);
 
-    // Calculate center from the polygon coordinates
-    const coordinates = selectedArea.geometry.coordinates[0];
+    // Draw the main boundary
+    const boundaryLayer = L.geoJSON(game.boundaries, {
+      style: {
+        color: ZONE_COLORS[0].color,
+        fillColor: ZONE_COLORS[0].color,
+        ...ZONE_STYLES,
+      },
+    }).addTo(zonesLayerRef.current);
+
+    // Calculate center and zones
+    const coordinates = game.boundaries.geometry.coordinates[0];
     const center = coordinates.reduce(
       (acc, coord) => ({
         lat: acc.lat + coord[1] / coordinates.length,
@@ -301,31 +284,27 @@ export function MapView({
       { lat: 0, lng: 0 }
     );
 
-    // Calculate initial radius based on the furthest point
+    // Calculate initial radius
     const initialRadius = Math.max(...coordinates.map((coord) => {
       const lat = coord[1];
       const lng = coord[0];
       const latDiff = center.lat - lat;
       const lngDiff = center.lng - lng;
       return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    })) * 111111; // Convert to meters (roughly)
+    })) * 111111; // Convert to meters
 
-    // Draw each shrinking zone
-    let currentRadius = initialRadius;
-    const defaultZoneConfigs = [
-      { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-      { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-      { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-    ];
+    // Draw zones using game zone configs if available, otherwise use defaults
+    const zoneConfigs = Array.isArray(game.zoneConfigs) ? game.zoneConfigs : DEFAULT_ZONE_CONFIGS;
+    zoneConfigs.forEach((zone, index) => {
+      if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
-    defaultZoneConfigs.forEach((zone, index) => {
-      currentRadius = initialRadius * zone.radiusMultiplier;
+      const zoneRadius = initialRadius * zone.radiusMultiplier;
       const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
       L.circle(
         [center.lat, center.lng],
         {
-          radius: currentRadius,
+          radius: zoneRadius,
           color: zoneColor.color,
           fillColor: zoneColor.color,
           fillOpacity: ZONE_STYLES.fillOpacity,
@@ -335,7 +314,66 @@ export function MapView({
         }
       ).addTo(zonesLayerRef.current!);
     });
-  }, [selectedArea]);
+
+    // Fit map to show all zones with padding
+    map.fitBounds(boundaryLayer.getBounds(), { padding: [50, 50] });
+  }, [game?.boundaries, game?.zoneConfigs, mode]);
+
+  // Handle area selection in draw mode
+  useEffect(() => {
+    if (!mapRef.current || !selectedArea || mode !== "draw") return;
+
+    const map = mapRef.current;
+
+    // Remove default circle if it exists
+    if (defaultCircleRef.current) {
+      defaultCircleRef.current.removeFrom(map);
+      defaultCircleRef.current = null;
+    }
+
+    // Clear existing zones
+    if (zonesLayerRef.current) {
+      zonesLayerRef.current.clearLayers();
+      zonesLayerRef.current.remove();
+    }
+
+    // Create new layer group for zones
+    zonesLayerRef.current = L.layerGroup().addTo(map);
+
+    // Draw the selected area
+    const boundaryLayer = L.geoJSON(selectedArea, {
+      style: {
+        color: ZONE_COLORS[0].color,
+        fillColor: ZONE_COLORS[0].color,
+        ...ZONE_STYLES,
+      },
+    }).addTo(zonesLayerRef.current);
+
+    // Calculate center and zones
+    const coordinates = selectedArea.geometry.coordinates[0];
+    const center = coordinates.reduce(
+      (acc, coord) => ({
+        lat: acc.lat + coord[1] / coordinates.length,
+        lng: acc.lng + coord[0] / coordinates.length
+      }),
+      { lat: 0, lng: 0 }
+    );
+
+    // Calculate initial radius
+    const initialRadius = Math.max(...coordinates.map((coord) => {
+      const lat = coord[1];
+      const lng = coord[0];
+      const latDiff = center.lat - lat;
+      const lngDiff = center.lng - lng;
+      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    })) * 111111; // Convert to meters
+
+    // Draw shrinking zones
+    calculateZones(coordinates, center, initialRadius, zonesLayerRef.current);
+
+    // Fit map to show all zones with padding
+    map.fitBounds(boundaryLayer.getBounds(), { padding: [50, 50] });
+  }, [selectedArea, mode]);
 
   return (
     <div
