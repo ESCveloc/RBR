@@ -101,11 +101,6 @@ export default function Home() {
 
           <div className="space-y-4">
             <ProfileCard />
-            {user?.role === "admin" && (
-              <Link href="/admin">
-                <Button className="w-full">Admin Dashboard</Button>
-              </Link>
-            )}
           </div>
         </div>
       </div>
