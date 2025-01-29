@@ -30,6 +30,13 @@ const DEFAULT_ZONE_CONFIGS = [
   { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
 ];
 
+// Tile layer configuration
+const TILE_LAYER = {
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+};
+
 interface MapViewProps {
   game?: Game;
   mode?: "view" | "draw";
@@ -154,9 +161,10 @@ export function MapView({
 
       mapRef.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
+      // Add consistent tile layer
+      L.tileLayer(TILE_LAYER.url, {
+        attribution: TILE_LAYER.attribution,
+        maxZoom: TILE_LAYER.maxZoom,
       }).addTo(map);
 
       const drawnItems = new L.FeatureGroup();
@@ -198,10 +206,10 @@ export function MapView({
           draw: {
             polygon: {
               shapeOptions: {
-                color: '#3b82f6',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.2,
-                weight: 3,
+                color: ZONE_COLORS[0].color,
+                fillColor: ZONE_COLORS[0].color,
+                fillOpacity: ZONE_STYLES.fillOpacity,
+                weight: ZONE_STYLES.weight,
               }
             },
             rectangle: false,
