@@ -25,6 +25,7 @@ const gameSchema = z.object({
   })).optional()
 });
 
+// Update zone calculation logic
 function calculateStartingLocations(boundaries: any, numPoints: number) {
   // For a polygon boundary, we'll use its vertices to calculate the center
   const coordinates = boundaries.geometry.coordinates[0];
@@ -47,17 +48,20 @@ function calculateStartingLocations(boundaries: any, numPoints: number) {
     const latDiff = center.lat - lat;
     const lngDiff = center.lng - lng;
     return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-  }));
+  })) * 0.95; // Slightly reduce radius to ensure points are inside boundary
 
   // Generate equidistant points around the circle
   const startingLocations = [];
   for (let i = 0; i < numPoints; i++) {
     const angle = (i * 2 * Math.PI) / numPoints;
-    const lat = center.lat + radius * Math.sin(angle);
-    const lng = center.lng + radius * Math.cos(angle);
+    // Calculate points within the safe radius
+    const lat = center.lat + (radius * Math.sin(angle));
+    const lng = center.lng + (radius * Math.cos(angle));
     startingLocations.push({
       position: i + 1,
-      coordinates: { lat, lng }
+      coordinates: { lat, lng },
+      center: center, // Include center for reference
+      radius: radius // Include radius for reference
     });
   }
 
@@ -98,13 +102,13 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the get settings endpoint to use Murfreesboro, TN coordinates
+  // Update the get settings endpoint to include proper zone configurations
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
     }
 
-    // Return default settings if none are set
+    // Return default settings with adjusted zone configs
     const settings = global.gameSettings || {
       defaultCenter: {
         lat: 35.8462, // Murfreesboro, TN coordinates
@@ -112,9 +116,9 @@ export function registerRoutes(app: Express): Server {
       },
       defaultRadiusMiles: 1,
       zoneConfigs: [
-        { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-        { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-        { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
+        { durationMinutes: 15, radiusMultiplier: 0.8, intervalMinutes: 20 }, // First shrink more conservative
+        { durationMinutes: 10, radiusMultiplier: 0.6, intervalMinutes: 15 },
+        { durationMinutes: 5, radiusMultiplier: 0.4, intervalMinutes: 10 },
       ],
     };
 
