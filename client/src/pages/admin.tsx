@@ -140,14 +140,12 @@ export default function Admin() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Game creation failed:", errorText);
         throw new Error(errorText || "Failed to create game");
       }
 
       return response.json();
     },
     onSuccess: (game) => {
-      console.log("Game created successfully:", game);
       gameForm.reset();
       setSelectedArea(null);
       queryClient.invalidateQueries({ queryKey: ["/api/games"] });
@@ -157,12 +155,12 @@ export default function Admin() {
         description: "Game created successfully",
       });
 
+      // Use useEffect to handle navigation after state updates
       setTimeout(() => {
         setLocation(`/game/${game.id}`);
-      }, 1500);
+      }, 0);
     },
     onError: (error: Error) => {
-      console.error("Game creation error:", error);
       toast({
         title: "Error",
         description: error.message,

@@ -27,14 +27,6 @@ export default function Game() {
   const isGameCreator = user && game && game.createdBy === user.id;
   const canManageGame = Boolean(isAdmin || isGameCreator);
 
-  // Debug logs
-  console.log('User Object:', user);
-  console.log('Game Object:', game);
-  console.log('Is Admin:', isAdmin);
-  console.log('Is Game Creator:', isGameCreator);
-  console.log('Can Manage Game:', canManageGame);
-  console.log('Game Status:', game?.status);
-
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
       if (!gameId) {
@@ -55,7 +47,11 @@ export default function Game() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Game status updated successfully",
+      });
     },
     onError: (error: Error) => {
       toast({
