@@ -12,6 +12,9 @@ import { useUser } from "@/hooks/use-user";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
 import type { Game as GameType } from "@db/schema";
+import cn from 'classnames';
+import {Badge} from "@/components/ui/badge";
+
 
 export default function Game() {
   const [, params] = useRoute<{ id: string }>("/game/:id");
@@ -199,6 +202,7 @@ export default function Game() {
             </Link>
             <h1 className="text-xl font-bold">{game.name}</h1>
           </div>
+
           <div className="flex items-center gap-4">
             {/* Game Timer */}
             {gameStatus === 'active' && timeRemaining !== null && (
@@ -216,39 +220,38 @@ export default function Game() {
               </div>
             )}
 
-            {/* Game Status and Controls */}
-            <div className="flex items-center gap-2">
-              <span className={`text-sm px-2 py-1 rounded-full ${
+            {/* Game Status and Controls Container */}
+            <div className="flex items-center gap-4">
+              {/* Status Badge */}
+              <Badge variant="secondary" className={cn(
                 gameStatus === 'active' ? 'bg-green-100 text-green-800' :
-                  gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
-                    gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-              }`}>
+                gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
+                gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
+                'bg-yellow-100 text-yellow-800'
+              )}>
                 {gameStatus === 'active' ? 'In Progress' :
-                  gameStatus === 'completed' ? 'Completed' :
-                    gameStatus === 'cancelled' ? 'Cancelled' :
-                      'Starting Soon'}
-              </span>
+                 gameStatus === 'completed' ? 'Completed' :
+                 gameStatus === 'cancelled' ? 'Cancelled' :
+                 'Starting Soon'}
+              </Badge>
 
-              {/* Game Control Buttons */}
+              {/* Game Control Buttons - Always show if user can manage */}
               {canManageGame && (
                 <div className="flex items-center gap-2">
                   {gameStatus === 'pending' && (
                     <>
                       <Button
-                        size="sm"
                         onClick={() => updateGameStatus.mutate({ status: 'active' })}
                         disabled={updateGameStatus.isPending}
+                        size="sm"
+                        className="bg-green-500 hover:bg-green-600"
                       >
                         {updateGameStatus.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Starting...
-                          </>
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <>
                             <Play className="h-4 w-4 mr-2" />
-                            Start Game
+                            Start
                           </>
                         )}
                       </Button>
@@ -272,14 +275,11 @@ export default function Game() {
                       disabled={updateGameStatus.isPending}
                     >
                       {updateGameStatus.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Ending...
-                        </>
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <>
                           <X className="h-4 w-4 mr-2" />
-                          End Game
+                          End
                         </>
                       )}
                     </Button>
