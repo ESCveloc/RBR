@@ -216,76 +216,58 @@ export default function Game() {
               </div>
             )}
 
-            <span className={`text-sm px-2 py-1 rounded-full ${
-              gameStatus === 'active' ? 'bg-green-100 text-green-800' :
-                gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
-                  gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-            }`}>
-              {gameStatus === 'active' ? 'In Progress' :
-                gameStatus === 'completed' ? 'Completed' :
-                  gameStatus === 'cancelled' ? 'Cancelled' :
-                    'Starting Soon'}
-            </span>
-          </div>
-        </div>
-      </header>
+            {/* Game Status and Controls */}
+            <div className="flex items-center gap-2">
+              <span className={`text-sm px-2 py-1 rounded-full ${
+                gameStatus === 'active' ? 'bg-green-100 text-green-800' :
+                  gameStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
+                    gameStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+              }`}>
+                {gameStatus === 'active' ? 'In Progress' :
+                  gameStatus === 'completed' ? 'Completed' :
+                    gameStatus === 'cancelled' ? 'Cancelled' :
+                      'Starting Soon'}
+              </span>
 
-      <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
-        <div className="order-2 md:order-1">
-          <MapView game={game} />
-        </div>
-
-        <div className="order-1 md:order-2 space-y-4">
-          {/* Game Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Game Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
-                <p><strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}</p>
-                <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
-                {game.startTime && (
-                  <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
-                )}
-              </div>
-
-              {/* Game Controls - Debug wrapper */}
-              <div className="border p-2 rounded-lg bg-muted/10">
-                <p className="text-sm text-muted-foreground mb-2">Debug Info:</p>
-                <p className="text-sm">Can Manage: {canManageGame ? 'Yes' : 'No'}</p>
-                <p className="text-sm">Status: {gameStatus}</p>
-              </div>
-
-              {/* Game Controls */}
+              {/* Game Control Buttons */}
               {canManageGame && (
-                <div className="flex flex-col gap-2 pt-4">
+                <div className="flex items-center gap-2">
                   {gameStatus === 'pending' && (
-                    <Button
-                      className="w-full"
-                      onClick={() => updateGameStatus.mutate({ status: 'active' })}
-                      disabled={updateGameStatus.isPending}
-                    >
-                      {updateGameStatus.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Starting...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Game
-                        </>
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => updateGameStatus.mutate({ status: 'active' })}
+                        disabled={updateGameStatus.isPending}
+                      >
+                        {updateGameStatus.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Starting...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Start Game
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
+                        disabled={updateGameStatus.isPending}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </>
                   )}
 
                   {gameStatus === 'active' && (
                     <Button
                       variant="destructive"
-                      className="w-full"
+                      size="sm"
                       onClick={() => updateGameStatus.mutate({ status: 'completed' })}
                       disabled={updateGameStatus.isPending}
                     >
@@ -302,20 +284,33 @@ export default function Game() {
                       )}
                     </Button>
                   )}
-
-                  {gameStatus === 'pending' && (
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={() => updateGameStatus.mutate({ status: 'cancelled' })}
-                      disabled={updateGameStatus.isPending}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel Game
-                    </Button>
-                  )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
+        <div className="order-2 md:order-1">
+          <MapView game={game} />
+        </div>
+
+        <div className="order-1 md:order-2 space-y-4">
+          {/* Game Details Card - removed control buttons */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Game Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
+                <p><strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}</p>
+                <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
+                {game.startTime && (
+                  <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
