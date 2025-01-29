@@ -7,16 +7,15 @@ export function useEvent(eventId: number, isParticipant = false) {
   const { data: event, isLoading } = useQuery<Event>({
     queryKey: ['/api/events', eventId],
     enabled: !!eventId,
-    staleTime: Infinity, // Never stale for now
+    staleTime: 30000, // 30 seconds
     gcTime: 60000, // 1 minute
-    refetchInterval: false, // Disable polling for now
-    refetchOnWindowFocus: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
     refetchOnMount: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
   });
 
-  // Location updates temporarily disabled
   const updateLocation = useMutation({
     mutationFn: async (location: GeolocationCoordinates) => {
       const response = await fetch(`/api/events/${eventId}/update-location`, {
@@ -33,16 +32,15 @@ export function useEvent(eventId: number, isParticipant = false) {
       return response.json();
     },
     onSuccess: (data: EventParticipant) => {
-      // Disabled real-time updates
-      // queryClient.setQueryData(['/api/events', eventId], (oldData: Event | undefined) => {
-      //   if (!oldData) return oldData;
-      //   return {
-      //     ...oldData,
-      //     participants: oldData.participants?.map(p =>
-      //       p.id === data.id ? { ...p, ...data } : p
-      //     )
-      //   };
-      // });
+      queryClient.setQueryData(['/api/events', eventId], (oldData: Event | undefined) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          participants: oldData.participants?.map(p =>
+            p.id === data.id ? { ...p, ...data } : p
+          )
+        };
+      });
     }
   });
 
