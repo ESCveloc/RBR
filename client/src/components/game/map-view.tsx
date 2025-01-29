@@ -73,18 +73,6 @@ const ZONE_STYLES = {
   className: 'zone-transition'
 };
 
-// Add CSS for transitions
-const zoneTransitionStyles = `
-  .zone-transition {
-    transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .leaflet-interactive {
-    transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-`;
-
-
 interface MapViewProps {
   game?: Game;
   mode?: "view" | "draw";
@@ -135,16 +123,15 @@ export function MapView({
       if (!game?.boundaries) {
         // Create initial zone circle
         const initialRadius = defaultRadiusMiles * 1609.34; // Convert miles to meters
-        const initialCircle = L.circle(
+        const defaultCircle = L.circle(
           [defaultCenter.lat, defaultCenter.lng],
-          initialRadius,
           {
+            radius: initialRadius,
             color: ZONE_COLORS[0].color,
             fillColor: ZONE_COLORS[0].color,
             fillOpacity: ZONE_STYLES.fillOpacity,
             weight: ZONE_STYLES.weight,
             opacity: ZONE_STYLES.opacity,
-            className: ZONE_STYLES.className,
           }
         ).addTo(map);
 
@@ -154,14 +141,13 @@ export function MapView({
           const nextRadius = currentRadius * config.radiusMultiplier;
           L.circle(
             [defaultCenter.lat, defaultCenter.lng],
-            nextRadius,
             {
+              radius: nextRadius,
               color: ZONE_COLORS[index + 1].color,
               fillColor: ZONE_COLORS[index + 1].color,
               fillOpacity: ZONE_STYLES.fillOpacity,
               weight: ZONE_STYLES.weight,
               opacity: ZONE_STYLES.opacity,
-              className: ZONE_STYLES.className,
               dashArray: '5, 10',
             }
           ).addTo(map);
@@ -169,11 +155,8 @@ export function MapView({
           currentRadius = nextRadius;
         });
 
-        // Store references for cleanup
-        defaultCircleRef.current = initialCircle;
-
-        // Fit bounds to show all circles
-        const bounds = initialCircle.getBounds();
+        defaultCircleRef.current = defaultCircle;
+        const bounds = defaultCircle.getBounds();
         map.fitBounds(bounds, { padding: [50, 50] });
       }
 
@@ -213,13 +196,11 @@ export function MapView({
         });
       }
 
-      // Add starting location legend if in view mode
+      // Add legends
       if (mode === "view") {
         map.addControl(new StartingLocationLegend({ position: 'bottomright' }));
       }
-      // Add legend
       map.addControl(new ZoneLegend({ position: 'topright' }));
-
     }
 
     return () => {
@@ -254,14 +235,14 @@ export function MapView({
       { lat: 0, lng: 0 }
     );
 
-    // Calculate radius for marker placement
+    // Calculate radius (distance from center to furthest point)
     const radius = Math.max(...coordinates.map(coord => {
       const lat = coord[1];
       const lng = coord[0];
       const latDiff = center.lat - lat;
       const lngDiff = center.lng - lng;
       return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    }));
+    })) * 0.95; // Slightly reduce radius to keep markers inside boundary
 
     // Create markers for each starting position
     for (let i = 0; i < game.maxTeams; i++) {
@@ -269,7 +250,7 @@ export function MapView({
       const lat = center.lat + radius * Math.sin(angle);
       const lng = center.lng + radius * Math.cos(angle);
 
-      // Create custom marker icon
+      // Create marker with custom icon
       const markerIcon = L.divIcon({
         className: 'starting-location-marker',
         html: `<div style="
@@ -295,8 +276,9 @@ export function MapView({
         p => p.startingLocation?.position === i + 1
       );
 
-      // Create marker with popup showing team assignment if any
+      // Create marker with tooltip showing team assignment
       const marker = L.marker([lat, lng], { icon: markerIcon });
+
       if (assignedTeam) {
         marker.bindTooltip(`Position ${i + 1}: Team ${assignedTeam.teamId}`, {
           permanent: false,
@@ -311,7 +293,6 @@ export function MapView({
 
       marker.addTo(markersLayer);
     }
-
   }, [game?.boundaries, game?.maxTeams, game?.participants]);
 
   // Update map when game boundaries and zones change
@@ -331,7 +312,7 @@ export function MapView({
       zonesLayerRef.current.remove();
     }
 
-    // Create new layer group
+    // Create new layer group for zones
     zonesLayerRef.current = L.layerGroup().addTo(map);
 
     // Draw the main boundary
@@ -354,18 +335,18 @@ export function MapView({
       game.zoneConfigs.forEach((zone, index) => {
         if (!zone || typeof zone.radiusMultiplier !== 'number') return;
 
-        // Calculate next radius based on current radius and multiplier
         const nextRadius = currentRadius * zone.radiusMultiplier;
         const zoneColor = ZONE_COLORS[index + 1] || ZONE_COLORS[ZONE_COLORS.length - 1];
 
-        // Create zone circle
         L.circle(
           [center.lat, center.lng],
-          nextRadius,
           {
+            radius: nextRadius,
             color: zoneColor.color,
             fillColor: zoneColor.color,
-            ...ZONE_STYLES,
+            fillOpacity: ZONE_STYLES.fillOpacity,
+            weight: ZONE_STYLES.weight,
+            opacity: ZONE_STYLES.opacity,
             dashArray: '5, 10',
           }
         ).addTo(zonesLayerRef.current!);
