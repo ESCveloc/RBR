@@ -82,19 +82,6 @@ interface MapViewProps {
   defaultRadiusMiles?: number;
 }
 
-// Add CSS styles for the starting position markers
-const markerStyles = `
-  .starting-position-number {
-    z-index: 1000 !important;
-  }
-  .starting-position-bg {
-    z-index: 400;
-  }
-  .starting-position-border {
-    z-index: 450;
-  }
-`;
-
 export function MapView({
   game,
   mode = "view",
@@ -112,11 +99,6 @@ export function MapView({
   // Initialize map
   useEffect(() => {
     if (!mapRef.current) {
-      // Add marker styles to document
-      const style = document.createElement('style');
-      style.textContent = markerStyles;
-      document.head.appendChild(style);
-
       const map = L.map("map", {
         zoomControl: true,
         doubleClickZoom: false,
@@ -262,63 +244,40 @@ export function MapView({
       return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
     })) * 0.9; // Use 90% of max radius to keep inside boundary
 
+    // Simplify the marker creation to focus on visibility and positioning
     // Create markers for each starting position
     for (let i = 0; i < game.maxTeams; i++) {
       const angle = (i * 2 * Math.PI) / game.maxTeams;
       const lat = center.lat + radius * Math.sin(angle);
       const lng = center.lng + radius * Math.cos(angle);
 
-      // White background circle (bottom layer)
-      const bgCircle = L.circle([lat, lng], {
-        radius: 35,
-        color: '#ffffff',
-        fillColor: '#ffffff',
-        fillOpacity: 1,
-        weight: 3,
-        opacity: 1,
-        className: 'starting-position-bg',
-        pane: 'markerPane'
-      }).addTo(markersLayer);
-
-      // Blue border circle (middle layer)
-      const borderCircle = L.circle([lat, lng], {
-        radius: 35,
-        color: '#3b82f6',
-        fillColor: 'transparent',
-        fillOpacity: 0,
-        weight: 3,
-        opacity: 1,
-        className: 'starting-position-border',
-        pane: 'markerPane'
-      }).addTo(markersLayer);
-
-      // Number marker (top layer)
-      const numberDiv = L.divIcon({
-        className: 'starting-position-number',
+      // Create a simple, highly visible marker using divIcon
+      const icon = L.divIcon({
         html: `
           <div style="
-            width: 40px;
-            height: 40px;
+            background-color: white;
+            border: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             font-size: 16px;
             color: #1f2937;
-            background-color: transparent;
-            z-index: 1000;
-            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           ">${i + 1}</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
+        className: '',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
       });
 
-      // Create marker with high z-index
-      const numberMarker = L.marker([lat, lng], { 
-        icon: numberDiv,
-        interactive: true,
-        zIndexOffset: 1000,
-        pane: 'markerPane'
+      // Create marker in the overlay pane for maximum visibility
+      const marker = L.marker([lat, lng], {
+        icon: icon,
+        pane: 'overlayPane',
+        zIndexOffset: 1000
       }).addTo(markersLayer);
 
       // Find assigned team for this position
@@ -327,17 +286,16 @@ export function MapView({
       );
 
       // Add tooltip
-      const tooltipContent = assignedTeam 
-        ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
-        : `Position ${i + 1}: Unassigned`;
-
-      bgCircle.bindTooltip(tooltipContent, {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -20],
-        opacity: 0.9,
-        className: 'starting-position-tooltip'
-      });
+      marker.bindTooltip(
+        assignedTeam 
+          ? `Position ${i + 1}: Team ${assignedTeam.teamId}`
+          : `Position ${i + 1}: Unassigned`,
+        {
+          permanent: false,
+          direction: 'top',
+          offset: [0, -15]
+        }
+      );
     }
   }, [game?.boundaries, game?.maxTeams, game?.participants]);
 
