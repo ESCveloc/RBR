@@ -15,6 +15,7 @@ import { useTeams } from "@/hooks/use-teams";
 import type { Game } from "@db/schema";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   const { user, logout } = useUser();
@@ -35,6 +36,11 @@ export default function Home() {
       </div>
     );
   }
+
+  // Filter to only show active and pending games
+  const activeGames = games?.filter(game => 
+    game.status === "active" || game.status === "pending"
+  );
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -66,26 +72,45 @@ export default function Home() {
               <h2 className="text-2xl font-semibold">Active Games</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {games?.map((game) => (
-                <Link key={`game-${game.id}`} href={`/game/${game.id}`}>
-                  <Card className="hover:bg-accent/80 transition-colors cursor-pointer backdrop-blur-sm bg-background/80">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5 text-primary" />
-                        {game.name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        {game.status === "active" ? "In Progress" : "Starting Soon"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {game.participants?.length || 0} teams participating
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+              {activeGames?.length === 0 ? (
+                <Card className="col-span-2 p-6">
+                  <p className="text-center text-muted-foreground">
+                    No active games available at the moment.
+                  </p>
+                </Card>
+              ) : (
+                activeGames?.map((game) => (
+                  <Link key={`game-${game.id}`} href={`/game/${game.id}`}>
+                    <Card className="hover:bg-accent/80 transition-colors cursor-pointer backdrop-blur-sm bg-background/80">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="h-5 w-5 text-primary" />
+                            {game.name}
+                          </div>
+                          <Badge variant="secondary" className={
+                            game.status === "active" 
+                              ? "bg-green-500/10 text-green-500"
+                              : "bg-yellow-500/10 text-yellow-500"
+                          }>
+                            {game.status === "active" ? "In Progress" : "Starting Soon"}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                          {game.participants?.length || 0} teams participating
+                        </p>
+                        {game.startTime && (
+                          <p className="text-sm text-muted-foreground">
+                            Started: {new Date(game.startTime).toLocaleString()}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              )}
             </div>
           </section>
 
