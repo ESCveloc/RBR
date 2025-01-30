@@ -3,16 +3,34 @@ import { useRoute, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Users, Trophy, ActivitySquare } from "lucide-react";
+import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2 } from "lucide-react";
 import { useTeams } from "@/hooks/use-teams";
 
 export default function TeamManagement() {
   const [match, params] = useRoute<{ id: string }>("/team/:id");
   const { toast } = useToast();
-  const { teams } = useTeams();
+  const { teams, isLoading } = useTeams();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('TeamManagement Debug:', {
+      match,
+      params,
+      teamsLength: teams?.length,
+      teams
+    });
+  }, [match, params, teams]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // Find the current team
-  const team = teams?.find(team => team.id.toString() === params?.id);
+  const team = teams?.find(t => t.id === parseInt(params?.id || "0"));
 
   if (!match || !team) {
     return (
