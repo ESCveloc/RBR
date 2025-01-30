@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import type { Team } from "@db/schema";
 
 export function useTeams() {
-  const { data: teams, isLoading } = useQuery({
+  const { data: teams, isLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     staleTime: 0,
     refetchInterval: false,
