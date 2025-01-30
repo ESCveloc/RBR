@@ -378,6 +378,57 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for removing team members
+  app.delete("/api/teams/:teamId/members/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const userId = parseInt(req.params.userId);
+
+      if (isNaN(teamId) || isNaN(userId)) {
+        return res.status(400).send("Invalid team ID or user ID");
+      }
+
+      // Verify team exists and user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== req.user.id) {
+        return res.status(403).send("Only team captain can remove members");
+      }
+
+      // Prevent captain from removing themselves
+      if (userId === team.captainId) {
+        return res.status(400).send("Team captain cannot be removed");
+      }
+
+      // Remove team member
+      await db
+        .delete(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.teamId, teamId),
+            eq(teamMembers.userId, userId)
+          )
+        );
+
+      res.json({ message: "Member removed successfully" });
+    } catch (error) {
+      console.error("Remove team member error:", error);
+      res.status(500).send("Failed to remove team member");
+    }
+  });
+
   // Search users endpoint
   app.get("/api/users/search", async (req, res) => {
     if (!req.isAuthenticated()) {

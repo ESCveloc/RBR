@@ -2,10 +2,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, Crown } from "lucide-react";
+import { Loader2, Crown, UserMinus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@db/schema";
 import { InviteMemberDialog } from "./invite-member-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface TeamMembersCardProps {
   teamId: number;
@@ -20,6 +31,37 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
   const { data: members = [], isLoading } = useQuery<User[]>({
     queryKey: [`/api/teams/${teamId}/members`],
     enabled: !!teamId // Only fetch if we have a teamId
+  });
+
+  const removeMember = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await fetch(`/api/teams/${teamId}/members/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate both team and member queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/teams/${teamId}/members`] });
+      toast({
+        title: "Success",
+        description: "Team member removed successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const updateCaptain = useMutation({
@@ -92,18 +134,55 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
               <div className="flex items-center gap-2">
                 {member.id === captainId ? (
                   <Crown className="h-4 w-4 text-yellow-500" />
-                ) : isCaptain && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => updateCaptain.mutate(member.id)}
-                    disabled={updateCaptain.isPending}
-                  >
-                    {updateCaptain.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    {isCaptain && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateCaptain.mutate(member.id)}
+                          disabled={updateCaptain.isPending}
+                        >
+                          {updateCaptain.isPending && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Make Captain
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to remove {member.username} from the team? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => removeMember.mutate(member.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {removeMember.isPending && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                Remove
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
                     )}
-                    Make Captain
-                  </Button>
+                  </>
                 )}
               </div>
             </div>
