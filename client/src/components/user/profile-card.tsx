@@ -69,11 +69,6 @@ export function ProfileCard() {
               </Button>
             </Link>
             <CreateTeamDialog />
-            {user?.role === "admin" && (
-              <Link href="/admin">
-                <Button className="w-full">Admin Dashboard</Button>
-              </Link>
-            )}
           </div>
         </div>
       </CardContent>
