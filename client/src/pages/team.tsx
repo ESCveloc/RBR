@@ -103,7 +103,7 @@ export default function TeamManagement() {
     mutationFn: async () => {
       const response = await fetch(`/api/teams/${teamId}/deactivate`, {
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
@@ -138,7 +138,7 @@ export default function TeamManagement() {
     mutationFn: async () => {
       const response = await fetch(`/api/teams/${teamId}/reactivate`, {
         method: "PATCH",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
@@ -187,7 +187,7 @@ export default function TeamManagement() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
-          <Link href="/">
+          <Link href="/?view=player">
             <Button>Return to Home</Button>
           </Link>
         </div>
@@ -204,7 +204,7 @@ export default function TeamManagement() {
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link href="/">
+            <Link href="/?view=player">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -214,7 +214,7 @@ export default function TeamManagement() {
           {isCaptain && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
+                <Button
                   variant={team.active ? "destructive" : "default"}
                   size="sm"
                 >
@@ -226,7 +226,7 @@ export default function TeamManagement() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {team.active 
+                    {team.active
                       ? "This action will deactivate the team. The team will no longer be able to participate in games."
                       : "This action will reactivate the team. The team will be able to participate in games again."
                     }
@@ -333,8 +333,8 @@ export default function TeamManagement() {
 
         {/* Team Members */}
         <div className="space-y-4">
-          <TeamMembersCard 
-            teamId={team.id} 
+          <TeamMembersCard
+            teamId={team.id}
             captainId={team.captainId}
             isCaptain={isCaptain}
           />
