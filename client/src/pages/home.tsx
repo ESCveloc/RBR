@@ -39,7 +39,7 @@ export default function Home() {
   }
 
   // Filter for active teams only
-  const activeTeams = teams?.filter(team => team.teams.active === true);
+  const activeTeams = teams?.filter(team => team.active === true);
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -105,7 +105,7 @@ export default function Home() {
               <CardContent>
                 <div className="space-y-4">
                   {activeTeams?.map((team) => (
-                    <TeamCard key={team.teams.id} team={team.teams} />
+                    <TeamCard key={team.id} team={team} />
                   ))}
                 </div>
               </CardContent>
