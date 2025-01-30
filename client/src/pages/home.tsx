@@ -51,9 +51,16 @@ export default function Home() {
             </h1>
             <p className="text-muted-foreground">Welcome back, {user?.username}</p>
           </div>
-          <Button onClick={handleLogout} variant="outline">
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            {user?.role === "admin" && (
+              <Link href="/admin">
+                <Button variant="outline">Admin Dashboard</Button>
+              </Link>
+            )}
+            <Button onClick={handleLogout} variant="outline">
+              Logout
+            </Button>
+          </div>
         </header>
 
         <div className="grid gap-8 md:grid-cols-[2fr_1fr]">
@@ -89,7 +96,6 @@ export default function Home() {
             <section>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold">Your Teams</h2>
-                <CreateTeamDialog />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {teams?.map((team) => (

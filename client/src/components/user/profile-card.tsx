@@ -9,6 +9,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { CreateTeamDialog } from "@/components/game/create-team-dialog";
 
 export function ProfileCard() {
   const { user } = useUser();
@@ -67,7 +68,7 @@ export function ProfileCard() {
                 Edit Profile
               </Button>
             </Link>
-
+            <CreateTeamDialog />
             {user?.role === "admin" && (
               <Link href="/admin">
                 <Button className="w-full">Admin Dashboard</Button>
