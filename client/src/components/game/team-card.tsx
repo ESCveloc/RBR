@@ -28,7 +28,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
-      if (!gameId || !participant) return;
+      if (!gameId || !participant?.teamId) return;
 
       const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
         method: "POST",
@@ -60,7 +60,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   // If we're displaying a team outside of a game context
-  if (team && team.id !== undefined) {
+  if (team?.id) {
     return (
       <Link href={`/team/${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
@@ -79,7 +79,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                       {team.active ? 'Active' : 'Inactive'}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      W/L: {team.wins}/{team.losses}
+                      W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
                   </div>
                 </div>
@@ -92,7 +92,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   }
 
   // If we're displaying a participant in a game
-  if (participant) {
+  if (participant?.teamId) {
     return (
       <Card
         className={`
