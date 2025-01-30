@@ -44,6 +44,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
+import { useTeams } from "@/hooks/use-teams";
 
 const settingsSchema = z.object({
   defaultCenter: z.object({
@@ -124,6 +125,7 @@ export default function Admin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { user } = useUser();
+  const { teams, isLoading: teamsLoading } = useTeams();
 
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -155,7 +157,6 @@ export default function Admin() {
         description: "Game created successfully",
       });
 
-      // Use useEffect to handle navigation after state updates
       setTimeout(() => {
         setLocation(`/game/${game.id}`);
       }, 0);
@@ -279,7 +280,7 @@ export default function Admin() {
     },
   });
 
-  if (gamesLoading || usersLoading) {
+  if (gamesLoading || usersLoading || teamsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -308,6 +309,10 @@ export default function Admin() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="teams" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Teams
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -559,6 +564,59 @@ export default function Admin() {
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           )}
                           Toggle Admin
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="teams">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Management</CardTitle>
+              <CardDescription>View and manage all teams</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Members</TableHead>
+                    <TableHead>Win/Loss</TableHead>
+                    <TableHead>Created At</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teams?.map((team) => (
+                    <TableRow key={team.id}>
+                      <TableCell>{team.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={
+                          team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        }>
+                          {team.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{team.teamMembers?.length || 0} members</TableCell>
+                      <TableCell>
+                        {team.wins || 0}/{team.losses || 0}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(team.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.location.href = `/team/${team.id}`}
+                        >
+                          View Details
                         </Button>
                       </TableCell>
                     </TableRow>
