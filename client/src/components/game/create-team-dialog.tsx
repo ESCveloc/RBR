@@ -40,24 +40,33 @@ export function CreateTeamDialog() {
     },
   });
 
+  // Updating the createTeam mutation
   const createTeam = useMutation({
-    mutationFn: async (data: z.infer<typeof formSchema>) => {
+    mutationFn: async (formData: z.infer<typeof formSchema>) => {
+      console.log("Sending create team request:", { name: formData.name });
       const response = await fetch("/api/teams", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify({ name: data.name }), // Only send the name field
-        credentials: "include",
+        body: JSON.stringify({ name: formData.name }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Create team error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         throw new Error(errorText || "Failed to create team");
       }
 
-      return response.json();
+      const responseData = await response.json();
+      console.log("Create team response:", responseData);
+      return responseData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -69,6 +78,7 @@ export function CreateTeamDialog() {
       });
     },
     onError: (error: Error) => {
+      console.error("Create team mutation error:", error);
       toast({
         title: "Error",
         description: error.message,

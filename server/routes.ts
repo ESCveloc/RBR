@@ -275,32 +275,44 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      console.log("Creating team with request body:", req.body);
       const { name } = req.body;
 
       if (!name || typeof name !== "string" || name.length < 3) {
         return res.status(400).send("Team name must be at least 3 characters long");
       }
 
+      // Simple insert with only required fields
       const [team] = await db
         .insert(teams)
         .values({
           name,
-          captainId: (req.user as any).id,
-          active: true, // Set team as active by default
+          captainId: req.user.id,
+          active: true,
         })
         .returning();
 
+      console.log("Team created successfully:", team);
+
+      // Add captain as first team member
       await db.insert(teamMembers).values({
         teamId: team.id,
-        userId: (req.user as any).id,
+        userId: req.user.id,
       });
 
       res.json(team);
     } catch (error: any) {
+      console.error("Team creation error details:", {
+        error: error.message,
+        code: error.code,
+        detail: error.detail,
+        table: error.table,
+        constraint: error.constraint
+      });
+
       if (error.code === "23505") {
         return res.status(400).send("Team name already exists");
       }
-      console.error("Team creation error:", error);
       res.status(500).send("Failed to create team");
     }
   });
