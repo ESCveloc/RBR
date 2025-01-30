@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2 } from "lucide-react";
 import { useTeams } from "@/hooks/use-teams";
+import { TeamMembersCard } from "@/components/game/team-members-card";
+import { useUser } from "@/hooks/use-user";
 
 export default function TeamManagement() {
   const [match, params] = useRoute<{ id: string }>("/team/:id");
   const { toast } = useToast();
   const { teams, isLoading } = useTeams();
+  const { user } = useUser();
 
   // Debug logging
   useEffect(() => {
@@ -31,6 +34,7 @@ export default function TeamManagement() {
 
   // Find the current team
   const team = teams?.find(t => t.id === parseInt(params?.id || "0"));
+  const isCaptain = team?.captainId === user?.id;
 
   if (!match || !team) {
     return (
@@ -109,18 +113,11 @@ export default function TeamManagement() {
 
         {/* Team Members */}
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Team Members
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Team members will be implemented later */}
-              <p className="text-sm text-muted-foreground">Team members list coming soon...</p>
-            </CardContent>
-          </Card>
+          <TeamMembersCard 
+            teamId={team.id} 
+            captainId={team.captainId}
+            isCaptain={isCaptain}
+          />
         </div>
       </main>
     </div>
