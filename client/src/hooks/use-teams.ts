@@ -21,6 +21,8 @@ export function useTeams() {
   });
 
   const processedTeams = data?.reduce<Team[]>((acc, item) => {
+    if (!item.teams.id) return acc;
+
     const existingTeam = acc.find(t => t.id === item.teams.id);
     if (!existingTeam) {
       const members = item.team_members ? [item.team_members] : [];
@@ -28,6 +30,9 @@ export function useTeams() {
         ...item.teams,
         members
       });
+    } else if (item.team_members) {
+      existingTeam.members = existingTeam.members || [];
+      existingTeam.members.push(item.team_members);
     }
     return acc;
   }, []) || [];

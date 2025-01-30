@@ -62,7 +62,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   // If we're displaying a team outside of a game context
   if (team?.id) {
     return (
-      <Link href={`/team/${team.id}`}>
+      <Link href={`/team/${team.id}`} key={`team-${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -95,6 +95,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   if (participant?.teamId) {
     return (
       <Card
+        key={`participant-${participant.teamId}`}
         className={`
           ${participant.status === "eliminated" ? "opacity-50" : ""}
           hover:bg-accent/50 transition-colors
