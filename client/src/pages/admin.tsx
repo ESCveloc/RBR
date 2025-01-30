@@ -212,22 +212,7 @@ export default function Admin() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (!selectedArea) {
-        toast({
-          title: "Error",
-          description: "Please draw game boundaries on the map",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Include the selected area boundaries in the game creation request
-      const gameData = {
-        ...values,
-        boundaries: selectedArea,
-      };
-
-      await createGame.mutateAsync(gameData);
+      await createGame.mutateAsync(values);
     } catch (error) {
       console.error("Error in form submission:", error);
       toast({
