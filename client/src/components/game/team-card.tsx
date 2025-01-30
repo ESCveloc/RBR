@@ -70,9 +70,23 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               </div>
               <div>
                 <h3 className="font-semibold">{team.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {team.active ? "Active" : "Inactive"}
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                    team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {team.active ? 'Active' : 'Inactive'}
+                  </span>
+                  {team.captainId && (
+                    <span className="text-xs text-muted-foreground">
+                      Captain ID: {team.captainId}
+                    </span>
+                  )}
+                  {team.createdAt && (
+                    <span className="text-xs text-muted-foreground">
+                      Created: {new Date(team.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -107,11 +121,20 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               </div>
               <div>
                 <h3 className="font-semibold">Team {participant.teamId}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {participant.status === "eliminated" ? "Eliminated" : "Active"}
-                  {participant.startingLocation && 
-                    ` - Position ${participant.startingLocation.position}`}
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                    participant.status === "eliminated" 
+                      ? 'bg-red-100 text-red-700' 
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {participant.status === "eliminated" ? "Eliminated" : "Active"}
+                  </span>
+                  {participant.startingLocation && (
+                    <span className="text-xs text-muted-foreground">
+                      Position {participant.startingLocation.position}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
