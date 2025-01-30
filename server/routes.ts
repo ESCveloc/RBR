@@ -287,9 +287,12 @@ export function registerRoutes(app: Express): Server {
         .insert(teams)
         .values({
           name,
-          captain_id: req.user.id,
-          active: true,
-          created_at: new Date()
+          captainId: req.user.id,
+          wins: 0,
+          losses: 0,
+          tags: [],
+          createdAt: new Date(),
+          active: true
         })
         .returning();
 
@@ -297,8 +300,9 @@ export function registerRoutes(app: Express): Server {
 
       // Add captain as first team member
       await db.insert(teamMembers).values({
-        team_id: team.id,
-        user_id: req.user.id
+        teamId: team.id,
+        userId: req.user.id,
+        joinedAt: new Date()
       });
 
       res.json(team);
@@ -327,11 +331,11 @@ export function registerRoutes(app: Express): Server {
       const userTeams = await db
         .select()
         .from(teams)
-        .leftJoin(teamMembers, eq(teams.id, teamMembers.team_id))
+        .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
           or(
-            eq(teams.captain_id, (req.user as any).id),
-            eq(teamMembers.user_id, (req.user as any).id)
+            eq(teams.captainId, (req.user as any).id),
+            eq(teamMembers.userId, (req.user as any).id)
           )
         );
 
@@ -363,8 +367,8 @@ export function registerRoutes(app: Express): Server {
           avatar: users.avatar,
         })
         .from(teamMembers)
-        .innerJoin(users, eq(teamMembers.user_id, users.id))
-        .where(eq(teamMembers.team_id, teamId));
+        .innerJoin(users, eq(teamMembers.userId, users.id))
+        .where(eq(teamMembers.teamId, teamId));
 
       res.json(members);
     } catch (error) {
@@ -428,7 +432,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captain_id !== (req.user as any).id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only team captain can add members");
       }
 
@@ -437,8 +441,8 @@ export function registerRoutes(app: Express): Server {
         .select()
         .from(teamMembers)
         .where(and(
-          eq(teamMembers.team_id, teamId),
-          eq(teamMembers.user_id, userId)
+          eq(teamMembers.teamId, teamId),
+          eq(teamMembers.userId, userId)
         ))
         .limit(1)
         .then(results => results[0]);
@@ -484,7 +488,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captain_id !== (req.user as any).id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only the current captain can transfer leadership");
       }
 
@@ -492,8 +496,8 @@ export function registerRoutes(app: Express): Server {
       const isMemberQuery = db
         .select()
         .from(teamMembers)
-        .where((teamMembers) => eq(teamMembers.team_id, teamId))
-        .where((teamMembers) => eq(teamMembers.user_id, newCaptainId));
+        .where((teamMembers) => eq(teamMembers.teamId, teamId))
+        .where((teamMembers) => eq(teamMembers.userId, newCaptainId));
       const [isMember] = await isMemberQuery;
 
 
@@ -504,7 +508,7 @@ export function registerRoutes(app: Express): Server {
       // Update team captain
       const [updatedTeam] = await db
         .update(teams)
-        .set({ captain_id: newCaptainId })
+        .set({ captainId: newCaptainId })
         .where(eq(teams.id, teamId))
         .returning();
 
@@ -540,7 +544,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captain_id !== (req.user as any).id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only team captain can update team details");
       }
 
@@ -592,7 +596,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captain_id !== (req.user as any).id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only team captain can deactivate the team");
       }
 
@@ -634,7 +638,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captain_id !== (req.user as any).id) {
+      if (team.captainId !== (req.user as any).id) {
         return res.status(403).send("Only team captain can reactivate the team");
       }
 
