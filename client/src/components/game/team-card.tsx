@@ -16,8 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: GameParticipant & { team?: Team };
-  team?: Team;
+  participant?: GameParticipant & { team?: Team & { teamMembers?: any[] } };
+  team?: Team & { teamMembers?: any[] };
   canAssignPosition?: boolean;
 }
 
@@ -81,6 +81,9 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     <span className="text-xs text-muted-foreground">
                       W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
+                    <span className="text-xs text-muted-foreground">
+                      • {team.teamMembers?.length || 0} members
+                    </span>
                   </div>
                 </div>
               </div>
@@ -120,8 +123,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <h3 className="font-semibold">{participant.team?.name || `Team ${participant.teamId}`}</h3>
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                    participant.status === "eliminated" 
-                      ? 'bg-red-100 text-red-700' 
+                    participant.status === "eliminated"
+                      ? 'bg-red-100 text-red-700'
                       : 'bg-green-100 text-green-700'
                   }`}>
                     {participant.status === "eliminated" ? "Eliminated" : "Active"}
@@ -131,6 +134,9 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                       Position {participant.startingLocation.position}
                     </span>
                   )}
+                  <span className="text-xs text-muted-foreground">
+                    • {participant.team?.teamMembers?.length || 0} members
+                  </span>
                 </div>
               </div>
             </div>
