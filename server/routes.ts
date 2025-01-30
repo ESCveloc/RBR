@@ -736,11 +736,45 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/games", async (req, res) => {
     try {
       const allGames = await db
-        .select()
+        .select({
+          id: games.id,
+          name: games.name,
+          status: games.status,
+          startTime: games.startTime,
+          endTime: games.endTime,
+          gameLengthMinutes: games.gameLengthMinutes,
+          maxTeams: games.maxTeams,
+          playersPerTeam: games.playersPerTeam,
+          boundaries: games.boundaries,
+          zoneConfigs: games.zoneConfigs,
+          createdBy: games.createdBy,
+          createdAt: games.createdAt,
+        })
         .from(games)
         .orderBy(games.createdAt);
 
-      res.json(allGames);
+      // Fetch participants for all games
+      const gamesWithParticipants = await Promise.all(
+        allGames.map(async (game) => {
+          const participants = await db
+            .select({
+              id: gameParticipants.id,
+              gameId: gameParticipants.gameId,
+              teamId: gameParticipants.teamId,
+              status: gameParticipants.status,
+              eliminatedAt: gameParticipants.eliminatedAt,
+              location: gameParticipants.location,
+              startingLocation: gameParticipants.startingLocation,
+              startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt
+            })
+            .from(gameParticipants)
+            .where(eq(gameParticipants.gameId, game.id));
+
+          return { ...game, participants };
+        })
+      );
+
+      res.json(gamesWithParticipants);
     } catch (error) {
       console.error("Fetch games error:", error);
       res.status(500).json({ message: "Failed to fetch games" });
