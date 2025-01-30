@@ -44,13 +44,17 @@ export function CreateTeamDialog() {
     mutationFn: async (data: z.infer<typeof formSchema>) => {
       const response = await fetch("/api/teams", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ name: data.name }), // Only send the name field
         credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to create team");
       }
 
       return response.json();
