@@ -2,8 +2,19 @@ import { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2, Edit2, Save } from "lucide-react";
+import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2, Edit2, Save, Power } from "lucide-react";
 import { useTeams } from "@/hooks/use-teams";
 import { TeamMembersCard } from "@/components/game/team-members-card";
 import { useUser } from "@/hooks/use-user";
@@ -88,6 +99,41 @@ export default function TeamManagement() {
     },
   });
 
+  const deactivateTeam = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/teams/${teamId}/deactivate`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      toast({
+        title: "Success",
+        description: "Team has been deactivated",
+      });
+      // Redirect to home page after deactivation
+      window.location.href = "/";
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Set initial description when team data is loaded
   useEffect(() => {
     if (team?.description) {
@@ -108,7 +154,7 @@ export default function TeamManagement() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
-          <Link href="/?view=player">
+          <Link href="/">
             <Button>Return to Home</Button>
           </Link>
         </div>
@@ -125,13 +171,43 @@ export default function TeamManagement() {
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link href="/?view=player">
+            <Link href="/">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <h1 className="text-xl font-bold">{team.name}</h1>
           </div>
+          {isCaptain && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Power className="h-4 w-4 mr-2" />
+                  Deactivate Team
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will deactivate the team. The team will no longer be able to participate in games.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deactivateTeam.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deactivateTeam.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Deactivate
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </header>
 

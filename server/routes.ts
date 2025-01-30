@@ -544,6 +544,48 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for deactivating team
+  app.patch("/api/teams/:teamId/deactivate", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+
+      if (isNaN(teamId)) {
+        return res.status(400).send("Invalid team ID");
+      }
+
+      // Verify team exists and user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== (req.user as any).id) {
+        return res.status(403).send("Only team captain can deactivate the team");
+      }
+
+      // Update team active status
+      const [updatedTeam] = await db
+        .update(teams)
+        .set({ active: false })
+        .where(eq(teams.id, teamId))
+        .returning();
+
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Deactivate team error:", error);
+      res.status(500).send("Failed to deactivate team");
+    }
+  });
+
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {
