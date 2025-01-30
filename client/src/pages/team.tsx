@@ -1,18 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Trophy, ActivitySquare, Loader2, Edit2, Save } from "lucide-react";
 import { useTeams } from "@/hooks/use-teams";
 import { TeamMembersCard } from "@/components/game/team-members-card";
 import { useUser } from "@/hooks/use-user";
+import { Textarea } from "@/components/ui/textarea";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function TeamManagement() {
   const [match, params] = useRoute<{ id: string }>("/team/:id");
   const { toast } = useToast();
   const { teams, isLoading } = useTeams();
   const { user } = useUser();
+  const [isEditing, setIsEditing] = useState(false);
+  const [description, setDescription] = useState("");
+  const queryClient = useQueryClient();
 
   // Debug logging
   useEffect(() => {
@@ -23,6 +28,38 @@ export default function TeamManagement() {
       teams
     });
   }, [match, params, teams]);
+
+  const updateTeam = useMutation({
+    mutationFn: async (newDescription: string) => {
+      const response = await fetch(`/api/teams/${params?.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: newDescription }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      setIsEditing(false);
+      toast({
+        title: "Success",
+        description: "Team description updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -36,6 +73,13 @@ export default function TeamManagement() {
   const team = teams?.find(t => t.id === parseInt(params?.id || "0"));
   const isCaptain = team?.captainId === user?.id;
 
+  // Set initial description when team data is loaded
+  useEffect(() => {
+    if (team?.description) {
+      setDescription(team.description);
+    }
+  }, [team?.description]);
+
   if (!match || !team) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -48,6 +92,10 @@ export default function TeamManagement() {
       </div>
     );
   }
+
+  const handleSave = async () => {
+    await updateTeam.mutate(description);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,15 +137,49 @@ export default function TeamManagement() {
           {/* Team Description */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ActivitySquare className="h-5 w-5" />
-                About Team
-              </CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <ActivitySquare className="h-5 w-5" />
+                  About Team
+                </CardTitle>
+                {isCaptain && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (isEditing) {
+                        handleSave();
+                      } else {
+                        setIsEditing(true);
+                      }
+                    }}
+                    disabled={updateTeam.isPending}
+                  >
+                    {updateTeam.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : isEditing ? (
+                      <Save className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Edit2 className="h-4 w-4 mr-2" />
+                    )}
+                    {isEditing ? "Save" : "Edit"}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                {team.description || "No team description available."}
-              </p>
+              {isEditing ? (
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter team description..."
+                  className="min-h-[100px]"
+                />
+              ) : (
+                <p className="text-muted-foreground">
+                  {team.description || "No team description available."}
+                </p>
+              )}
               {team.tags && team.tags.length > 0 && (
                 <div className="mt-4 flex gap-2 flex-wrap">
                   {team.tags.map((tag) => (
