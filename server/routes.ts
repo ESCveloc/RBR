@@ -8,6 +8,7 @@ import { eq, ilike, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { sql } from 'drizzle-orm';
 
 const scryptAsync = promisify(scrypt);
 
@@ -230,7 +231,7 @@ export function registerRoutes(app: Express): Server {
         .from(users)
         .orderBy(users.createdAt);
 
-      res.json(allUsers);
+      res.json(allGames);
     } catch (error) {
       console.error("Fetch users error:", error);
       res.status(500).send("Failed to fetch users");
@@ -804,7 +805,7 @@ export function registerRoutes(app: Express): Server {
         .from(games)
         .orderBy(games.createdAt);
 
-      // Fetch participants for all games
+      // Fetch participants for all games with team data
       const gamesWithParticipants = await Promise.all(
         allGames.map(async (game) => {
           const participants = await db
@@ -816,12 +817,44 @@ export function registerRoutes(app: Express): Server {
               eliminatedAt: gameParticipants.eliminatedAt,
               location: gameParticipants.location,
               startingLocation: gameParticipants.startingLocation,
-              startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt
+              startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt,
+              team: {
+                id: teams.id,
+                name: teams.name,
+                active: teams.active,
+                captainId: teams.captainId,
+                wins: teams.wins,
+                losses: teams.losses,
+              }
             })
             .from(gameParticipants)
+            .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
             .where(eq(gameParticipants.gameId, game.id));
 
-          return { ...game, participants };
+          // For each participant, fetch the team members count if there's a team
+          const participantsWithTeamMembers = await Promise.all(
+            participants.map(async (participant) => {
+              if (!participant.teamId) {
+                return participant;
+              }
+
+              const memberCount = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(teamMembers)
+                .where(eq(teamMembers.teamId, participant.teamId))
+                .then(result => result[0]?.count || 0);
+
+              return {
+                ...participant,
+                team: participant.team ? {
+                  ...participant.team,
+                  teamMembers: new Array(memberCount)
+                } : undefined
+              };
+            })
+          );
+
+          return { ...game, participants: participantsWithTeamMembers };
         })
       );
 
@@ -832,7 +865,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get game by ID
+  // Get game by ID with enhanced team data
   app.get("/api/games/:gameId", async (req, res) => {
     try {
       const gameId = parseInt(req.params.gameId);
@@ -850,7 +883,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      // Get game participants
+      // Get game participants with team data
       const participants = await db
         .select({
           id: gameParticipants.id,
@@ -860,12 +893,44 @@ export function registerRoutes(app: Express): Server {
           eliminatedAt: gameParticipants.eliminatedAt,
           location: gameParticipants.location,
           startingLocation: gameParticipants.startingLocation,
-          startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt
+          startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt,
+          team: {
+            id: teams.id,
+            name: teams.name,
+            active: teams.active,
+            captainId: teams.captainId,
+            wins: teams.wins,
+            losses: teams.losses,
+          }
         })
         .from(gameParticipants)
+        .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
         .where(eq(gameParticipants.gameId, gameId));
 
-      res.json({ ...game, participants });
+      // For each participant, fetch the team members count if there's a team
+      const participantsWithTeamMembers = await Promise.all(
+        participants.map(async (participant) => {
+          if (!participant.teamId) {
+            return participant;
+          }
+
+          const memberCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(teamMembers)
+            .where(eq(teamMembers.teamId, participant.teamId))
+            .then(result => result[0]?.count || 0);
+
+          return {
+            ...participant,
+            team: participant.team ? {
+              ...participant.team,
+              teamMembers: new Array(memberCount)
+            } : undefined
+          };
+        })
+      );
+
+      res.json({ ...game, participants: participantsWithTeamMembers });
     } catch (error) {
       console.error("Fetch game error:", error);
       res.status(500).json({ message: "Failed to fetch game" });
@@ -1061,7 +1126,8 @@ export function registerRoutes(app: Express): Server {
       res.json(participant);
     } catch (error) {
       console.error("Join game error:", error);
-      res.status(500).send("Failed to join game");    }
+      res.status(500).send("Failed to join game");
+    }
   });
 
   return httpServer;
