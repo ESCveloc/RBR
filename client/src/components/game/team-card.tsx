@@ -60,7 +60,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   // If we're displaying a team outside of a game context
-  if (team) {
+  if (team && team.id) {
     return (
       <Link href={`/team/${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
