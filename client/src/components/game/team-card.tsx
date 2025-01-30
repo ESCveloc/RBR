@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: GameParticipant;
+  participant?: GameParticipant & { team?: Team };
   team?: Team;
   canAssignPosition?: boolean;
 }
@@ -116,7 +116,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold">Team {participant.teamId}</h3>
+                <h3 className="font-semibold">{participant.team?.name || `Team ${participant.teamId}`}</h3>
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                     participant.status === "eliminated" 

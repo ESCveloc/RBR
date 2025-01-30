@@ -69,7 +69,7 @@ export default function Home() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {games?.map((game) => (
-                <Link key={game.id} href={`/game/${game.id}`}>
+                <Link key={`game-${game.id}`} href={`/game/${game.id}`}>
                   <Card className="hover:bg-accent/80 transition-colors cursor-pointer backdrop-blur-sm bg-background/80">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -94,7 +94,6 @@ export default function Home() {
           <div className="space-y-4">
             <ProfileCard />
 
-            {/* Teams section moved under profile card */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Your Teams</CardTitle>
@@ -102,7 +101,7 @@ export default function Home() {
               <CardContent>
                 <div className="space-y-4">
                   {teams?.map((team) => (
-                    <TeamCard key={team.id} team={team} />
+                    <TeamCard key={`team-${team.id}`} team={team} />
                   ))}
                 </div>
               </CardContent>
