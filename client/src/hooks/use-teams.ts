@@ -20,11 +20,25 @@ export function useTeams() {
     refetchInterval: false,
   });
 
-  // Process the teams data to handle the nested structure
-  const teams = data?.map(item => ({
-    ...item.teams,
-    teamMembers: item.team_members ? [item.team_members] : []
-  })) || [];
+  // Process the teams data to handle the nested structure and remove duplicates
+  const teams = data?.reduce<Team[]>((acc, item) => {
+    const existingTeam = acc.find(t => t.id === item.teams.id);
+
+    if (!existingTeam) {
+      // Add new team with its member
+      acc.push({
+        ...item.teams,
+        teamMembers: item.team_members ? [item.team_members] : []
+      });
+    } else if (item.team_members) {
+      // Add member to existing team if not already present
+      if (!existingTeam.teamMembers?.some(m => m.id === item.team_members!.id)) {
+        existingTeam.teamMembers = [...(existingTeam.teamMembers || []), item.team_members];
+      }
+    }
+
+    return acc;
+  }, []) || [];
 
   return {
     teams,
