@@ -1,0 +1,47 @@
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+Warning: Encountered two children with the same key, &#x60;team-undefined&#x60;. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+    at div
+    at div
+    at _c9 (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:106:12)
+    at div
+    at _c (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at div
+    at div
+    at Home (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/pages/home.tsx:35:28)
+    at ProtectedRoute (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=MX4A1_U8fd9nA2ppsQExW:32:38)
+    at Route (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:323:16)
+    at Switch (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b29efe20:379:17)
+    at Router (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/App.tsx?v=MX4A1_U8fd9nA2ppsQExW:81:31)
+    at QueryClientProvider (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b29efe20:2805:3)
+    at App

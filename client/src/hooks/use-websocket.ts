@@ -22,12 +22,13 @@ export function useWebSocket(gameId: number) {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    // Get the current host and protocol
-    const host = window.location.host;
+    // Get the current host and construct the WebSocket URL
+    const host = window.location.hostname;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const port = process.env.NODE_ENV === 'production' ? window.location.port : '5000';
 
-    // Construct WebSocket URL
-    const wsUrl = `${protocol}//${host}`;
+    // Construct WebSocket URL with explicit port
+    const wsUrl = `${protocol}//${host}${port ? `:${port}` : ''}`;
     console.log('Connecting to WebSocket:', wsUrl);
 
     try {
@@ -35,7 +36,7 @@ export function useWebSocket(gameId: number) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         reconnectAttemptRef.current = 0;
         // Join game room
         sendMessage('JOIN_GAME', { gameId });
@@ -44,6 +45,7 @@ export function useWebSocket(gameId: number) {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('Received WebSocket message:', message);
 
           switch (message.type) {
             case 'LOCATION_UPDATE':
@@ -64,22 +66,23 @@ export function useWebSocket(gameId: number) {
               break;
           }
         } catch (error) {
-          console.error('WebSocket message error:', error);
+          console.error('WebSocket message parsing error:', error);
         }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('WebSocket connection error:', error);
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        console.log('WebSocket connection closed');
         wsRef.current = null;
 
         // Attempt to reconnect if not at max attempts
         if (reconnectAttemptRef.current < maxReconnectAttempts) {
           reconnectAttemptRef.current++;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+          console.log(`Attempting to reconnect in ${delay}ms`);
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else {
           toast({
@@ -91,6 +94,11 @@ export function useWebSocket(gameId: number) {
       };
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
+      toast({
+        title: "Connection Error",
+        description: "Failed to establish WebSocket connection",
+        variant: "destructive"
+      });
     }
   }, [gameId, toast, sendMessage]);
 
