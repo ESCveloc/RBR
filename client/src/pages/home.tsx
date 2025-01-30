@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trophy } from "lucide-react";
+import { Trophy, Users } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -27,6 +27,8 @@ export default function Home() {
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
+    // Shorter polling interval to keep participant count up to date
+    refetchInterval: 5000,
   });
 
   const joinGameMutation = useMutation({
@@ -86,6 +88,11 @@ export default function Home() {
   // Get user's first active team
   const activeTeam = teams?.find(team => team.active);
 
+  // Check if user's team is already participating in a game
+  const isTeamParticipating = (game: Game) => {
+    return game.participants?.some(participant => participant.teamId === activeTeam?.id);
+  };
+
   return (
     <div className="relative min-h-screen bg-background">
       <OctagonsBackground />
@@ -142,16 +149,19 @@ export default function Home() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          {game.participants?.length || 0} teams participating
-                        </p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span>
+                            {game.participants?.length || 0} / {game.maxTeams} teams registered
+                          </span>
+                        </div>
                         {game.startTime && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mt-2">
                             Started: {new Date(game.startTime).toLocaleString()}
                           </p>
                         )}
                       </CardContent>
-                      {game.status === "pending" && activeTeam && (
+                      {game.status === "pending" && activeTeam && !isTeamParticipating(game) && (
                         <CardFooter>
                           <Button 
                             className="w-full"
@@ -159,13 +169,20 @@ export default function Home() {
                               e.preventDefault();
                               handleJoinGame(game.id, activeTeam.id);
                             }}
-                            disabled={joinGameMutation.isPending}
+                            disabled={joinGameMutation.isPending || game.participants?.length >= game.maxTeams}
                           >
                             {joinGameMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             ) : null}
-                            Join Game
+                            {game.participants?.length >= game.maxTeams ? "Game Full" : "Join Game"}
                           </Button>
+                        </CardFooter>
+                      )}
+                      {game.status === "pending" && activeTeam && isTeamParticipating(game) && (
+                        <CardFooter>
+                          <Badge variant="outline" className="w-full flex justify-center py-2">
+                            Team Registered
+                          </Badge>
                         </CardFooter>
                       )}
                     </Card>
