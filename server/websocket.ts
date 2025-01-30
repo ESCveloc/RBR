@@ -18,7 +18,8 @@ export function setupWebSocketServer(server: Server) {
     maxPayload: 64 * 1024, // 64kb
     // Ignore Vite HMR WebSocket connections
     verifyClient: (info: any) => {
-      return !info.req.headers['sec-websocket-protocol']?.includes('vite-hmr');
+      const protocol = info.req.headers['sec-websocket-protocol'];
+      return !protocol || !protocol.includes('vite-hmr');
     }
   });
 
@@ -28,8 +29,13 @@ export function setupWebSocketServer(server: Server) {
     ws.on("message", (message) => {
       try {
         const data = JSON.parse(message.toString());
+        console.log("Received WebSocket message:", data);
+
         // Handle different message types
         switch (data.type) {
+          case "JOIN_GAME":
+            console.log(`Client joined game ${data.payload.gameId}`);
+            break;
           case "LOCATION_UPDATE":
             // Broadcast location update to all clients
             wss.broadcast(JSON.stringify(data));

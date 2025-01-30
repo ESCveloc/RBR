@@ -22,8 +22,13 @@ export function useWebSocket(gameId: number) {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
+    // Use the current window location to determine the WebSocket URL
+    const host = window.location.host;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    const ws = new WebSocket(`${protocol}//${host}`);
+
+    console.log('Connecting to WebSocket:', `${protocol}//${host}`);
+
     wsRef.current = ws;
 
     ws.onopen = () => {
