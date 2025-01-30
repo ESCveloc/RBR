@@ -60,7 +60,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   // If we're displaying a team outside of a game context
-  if (team && team.id) {
+  if (team && team.id !== undefined) {
     return (
       <Link href={`/team/${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
@@ -180,5 +180,5 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     );
   }
 
-  return null; // Return null if no valid props are provided
+  return null;
 }
