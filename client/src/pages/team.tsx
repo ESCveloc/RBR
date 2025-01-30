@@ -41,7 +41,7 @@ export default function TeamManagement() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
-          <Link href="/">
+          <Link href="/?view=player">
             <Button>Return to Home</Button>
           </Link>
         </div>
@@ -54,7 +54,7 @@ export default function TeamManagement() {
       <header className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link href="/">
+            <Link href="/?view=player">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
