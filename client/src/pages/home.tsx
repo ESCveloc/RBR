@@ -11,19 +11,17 @@ import { TeamCard } from "@/components/game/team-card";
 import { ProfileCard } from "@/components/user/profile-card";
 import { OctagonsBackground } from "@/components/game/octagons-background";
 import { useUser } from "@/hooks/use-user";
-import type { Game, Team } from "@db/schema";
+import { useTeams } from "@/hooks/use-teams";
+import type { Game } from "@db/schema";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const { user, logout } = useUser();
+  const { teams, isLoading: teamsLoading } = useTeams();
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
-  });
-
-  const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
   });
 
   const handleLogout = async () => {
@@ -101,7 +99,7 @@ export default function Home() {
               <CardContent>
                 <div className="space-y-4">
                   {teams?.map((team) => (
-                    <TeamCard key={`team-${team.id}`} team={team} />
+                    <TeamCard key={team.id} team={team} />
                   ))}
                 </div>
               </CardContent>
