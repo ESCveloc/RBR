@@ -212,19 +212,25 @@ export default function Admin() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      if (!selectedArea) {
+      if (!settings) {
         toast({
           title: "Error",
-          description: "Please draw game boundaries on the map",
+          description: "Game settings not loaded. Please try again.",
           variant: "destructive",
         });
         return;
       }
 
-      // Include the selected area in the values
+      // Generate boundaries using settings
+      const boundaries = generateDefaultBoundaries(
+        settings.defaultCenter,
+        settings.defaultRadiusMiles
+      );
+
+      // Include the generated boundaries in the values
       const gameData = {
         ...values,
-        boundaries: selectedArea
+        boundaries
       };
 
       console.log("Creating game with data:", gameData);
@@ -443,18 +449,13 @@ export default function Admin() {
                       <FormLabel>Game Area</FormLabel>
                       <div className="h-[300px] rounded-lg overflow-hidden border mt-2">
                         <MapView
-                          mode="draw"
+                          mode="view"
                           onAreaSelect={setSelectedArea}
                           selectedArea={selectedArea}
                           defaultCenter={settings?.defaultCenter}
                           defaultRadiusMiles={settings?.defaultRadiusMiles}
                         />
                       </div>
-                      {!selectedArea && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Draw a polygon or rectangle on the map to set the game boundaries
-                        </p>
-                      )}
                     </div>
 
                     <Button
