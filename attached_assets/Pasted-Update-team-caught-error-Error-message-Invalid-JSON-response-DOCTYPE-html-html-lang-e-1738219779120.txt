@@ -1,0 +1,62 @@
+Update team caught error: 
+Error {}
+message: "Invalid JSON response: <!DOCTYPE html>↵<html lang="en">↵ <head>↵ <style data-vite-theme="" data-inject-first="">:root {↵ --background: 262 100% 1%;↵--foreground: 269 100% 97%;↵--muted: 274 53% 34%;↵--muted-foreground: 269 100% 97%;↵--popover: 275 74% 11%;↵--popover-foreground: 269 100% 97%;↵--card: 275 74% 11%;↵--card-foreground: 269 100% 97%;↵--border: 274 53% 34%;↵--input: 274 53% 34%;↵--primary: 273 65% 60%;↵--primary-foreground: 268 76% 99%;↵--secondary: 274 53% 34%;↵--secondary-foreground: 269 100% 97%;↵--accent: 274 53% 34%;↵--accent-foreground: 269 100% 97%;↵--destructive: 0 62.8% 30.6%;↵--destructive-foreground: 0 0% 98%;↵--ring: 273 65% 60%;↵--radius: 0.75rem;↵ }↵ .light {↵ --background: 270 70% 81%;↵--foreground: 278 100% 11%;↵--muted: 271 67% 71%;↵--muted-foreground: 278 100% 11%;↵--popover: 268 100% 99%;↵--popover-foreground: 278 100% 11%;↵--card: 268 100% 99%;↵--card-foreground: 278 100% 11%;↵--border: 271 67% 71%;↵--input: 271 67% 71%;↵--primary: 273 98% 73%;↵--primary-foreground: 268 100% 99%;↵--secondary: 270 100% 87%;↵--secondary-foreground: 278 100% 11%;↵--accent: 270 100% 87%;↵--accent-foreground: 278 100% 11%;↵--destructive: 0 84.2% 60.2%;↵--destructive-foreground: 60 9.1% 97.8%;↵--ring: 273 98% 73%;↵--radius: 0.75rem;↵ }</style>↵↵ <script type="module">↵import { createHotContext } from "/@vite/client";↵const hot = createHotContext("/__dummy__runtime-error-plugin");↵↵function sendError(error) {↵ if (!(error instanceof Error)) {↵ error = new Error("(unknown runtime error)");↵ }↵ const serialized = {↵ message: error.message,↵ stack: error.stack,↵ };↵ hot.send("runtime-error-plugin:error", serialized);↵}↵↵window.addEventListener("error", (evt) => {↵ sendError(evt.error);↵});↵↵window.addEventListener("unhandledrejection", (evt) => {↵ sendError(evt.reason);↵});↵</script>↵↵ <script type="module">↵import RefreshRuntime from "/@react-refresh"↵RefreshRuntime.injectIntoGlobalHook(window)↵window.$RefreshReg$ = () => {}↵window.$RefreshSig$ = () => (type) => type↵window.__vite_plugin_react_preamble_installed__ = true↵</script>↵↵ <script type="module" src="/@vite/client"></script>↵↵ <meta charset="UTF-8" />↵ <meta name="viewport" content="width=device-width, initial-scale=1.0" />↵ </head>↵ <body>↵ <div id="root"></div>↵ <script type="module" src="/src/main.tsx?v=0U-9J1Bv2qh07ulg1RTi6"></script>↵ </body>↵</html>"
+stack: "Error: Invalid JSON response: <!DOCTYPE html>↵<html lang="en">↵ <head>↵ <style data-vite-theme="" data-inject-first="">:root {↵ --background: 262 100% 1%;↵--foreground: 269 100% 97%;↵--muted: 274 53% 34%;↵--muted-foreground: 269 100% 97%;↵--popover: 275 74% 11%;↵--popover-foreground: 269 100% 97%;↵--card: 275 74% 11%;↵--card-foreground: 269 100% 97%;↵--border: 274 53% 34%;↵--input: 274 53% 34%;↵--primary: 273 65% 60%;↵--primary-foreground: 268 76% 99%;↵--secondary: 274 53% 34%;↵--secondary-foreground: 269 100% 97%;↵--accent: 274 53% 34%;↵--accent-foreground: 269 100% 97%;↵--destructive: 0 62.8% 30.6%;↵--destructive-foreground: 0 0% 98%;↵--ring: 273 65% 60%;↵--radius: 0.75rem;↵ }↵ .light {↵ --background: 270 70% 81%;↵--foreground: 278 100% 11%;↵--muted: 271 67% 71%;↵--muted-foreground: 278 100% 11%;↵--popover: 268 100% 99%;↵--popover-foreground: 278 100% 11%;↵--card: 268 100% 99%;↵--card-foreground: 278 100% 11%;↵--border: 271 67% 71%;↵--input: 271 67% 71%;↵--primary: 273 98% 73%;↵--primary-foreground: 268 100% 99%;↵--secondary: 270 100% 87%;↵--secondary-foreground: 278 100% 11%;↵--accent: 270 100% 87%;↵--accent-foreground: 278 100% 11%;↵--destructive: 0 84.2% 60.2%;↵--destructive-foreground: 60 9.1% 97.8%;↵--ring: 273 98% 73%;↵--radius: 0.75rem;↵ }</style>↵↵ <script type="module">↵import { createHotContext } from "/@vite/client";↵const hot = createHotContext("/__dummy__runtime-error-plugin");↵↵function sendError(error) {↵ if (!(error instanceof Error)) {↵ error = new Error("(unknown runtime error)");↵ }↵ const serialized = {↵ message: error.message,↵ stack: error.stack,↵ };↵ hot.send("runtime-error-plugin:error", serialized);↵}↵↵window.addEventListener("error", (evt) => {↵ sendError(evt.error);↵});↵↵window.addEventListener("unhandledrejection", (evt) => {↵ sendError(evt.reason);↵});↵</script>↵↵ <script type="module">↵import RefreshRuntime from "/@react-refresh"↵RefreshRuntime.injectIntoGlobalHook(window)↵window.$RefreshReg$ = () => {}↵window.$RefreshSig$ = () => (type) => type↵window.__vite_plugin_react_preamble_installed__ = true↵</script>↵↵ <script type="module" src="/@vite/client"></script>↵↵ <meta charset="UTF-8" />↵ <meta name="viewport" content="width=device-width, initial-scale=1.0" />↵ </head>↵ <body>↵ <div id="root"></div>↵ <script type="module" src="/src/main.tsx?v=0U-9J1Bv2qh07ulg1RTi6"></script>↵ </body>↵</html>↵ at Object.mutationFn (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/src/pages/team.tsx:69:17)"
+get stack: ƒ ()
+length: 0
+name: ""
+[[Prototype]]: ƒ ()
+apply: ƒ apply()
+length: 2
+name: "apply"
+[[Prototype]]: ƒ ()
+arguments: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get arguments: ƒ ()
+length: 0
+name: ""
+[[Prototype]]: ƒ ()
+set arguments: ƒ ()
+length: 0
+name: ""
+[[Prototype]]: ƒ ()
+bind: ƒ bind()
+call: ƒ call()
+caller: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get caller: ƒ ()
+set caller: ƒ ()
+constructor: ƒ Function()
+length: 0
+name: ""
+toString: ƒ toString()
+Symbol(Symbol.hasInstance): undefined
+[[Prototype]]: Object
+set stack: ƒ ()
+length: 1
+name: ""
+[[Prototype]]: ƒ ()
+apply: ƒ apply()
+arguments: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get arguments: ƒ ()
+set arguments: ƒ ()
+bind: ƒ bind()
+call: ƒ call()
+caller: "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"
+get caller: ƒ ()
+set caller: ƒ ()
+constructor: ƒ Function()
+length: 0
+name: ""
+toString: ƒ toString()
+Symbol(Symbol.hasInstance): undefined
+[[Prototype]]: Object
+[[Prototype]]: Object
+constructor: ƒ Error()
+message: "Invalid JSON response: <!DOCTYPE html>↵<html lang="en">↵ <head>↵ <style data-vite-theme="" data-inject-first="">:root {↵ --background: 262 100% 1%;↵--foreground: 269 100% 97%;↵--muted: 274 53% 34%;↵--muted-foreground: 269 100% 97%;↵--popover: 275 74% 11%;↵--popover-foreground: 269 100% 97%;↵--card: 275 74% 11%;↵--card-foreground: 269 100% 97%;↵--border: 274 53% 34%;↵--input: 274 53% 34%;↵--primary: 273 65% 60%;↵--primary-foreground: 268 76% 99%;↵--secondary: 274 53% 34%;↵--secondary-foreground: 269 100% 97%;↵--accent: 274 53% 34%;↵--accent-foreground: 269 100% 97%;↵--destructive: 0 62.8% 30.6%;↵--destructive-foreground: 0 0% 98%;↵--ring: 273 65% 60%;↵--radius: 0.75rem;↵ }↵ .light {↵ --background: 270 70% 81%;↵--foreground: 278 100% 11%;↵--muted: 271 67% 71%;↵--muted-foreground: 278 100% 11%;↵--popover: 268 100% 99%;↵--popover-foreground: 278 100% 11%;↵--card: 268 100% 99%;↵--card-foreground: 278 100% 11%;↵--border: 271 67% 71%;↵--input: 271 67% 71%;↵--primary: 273 98% 73%;↵--primary-foreground: 268 100% 99%;↵--secondary: 270 100% 87%;↵--secondary-foreground: 278 100% 11%;↵--accent: 270 100% 87%;↵--accent-foreground: 278 100% 11%;↵--destructive: 0 84.2% 60.2%;↵--destructive-foreground: 60 9.1% 97.8%;↵--ring: 273 98% 73%;↵--radius: 0.75rem;↵ }</style>↵↵ <script type="module">↵import { createHotContext } from "/@vite/client";↵const hot = createHotContext("/__dummy__runtime-error-plugin");↵↵function sendError(error) {↵ if (!(error instanceof Error)) {↵ error = new Error("(unknown runtime error)");↵ }↵ const serialized = {↵ message: error.message,↵ stack: error.stack,↵ };↵ hot.send("runtime-error-plugin:error", serialized);↵}↵↵window.addEventListener("error", (evt) => {↵ sendError(evt.error);↵});↵↵window.addEventListener("unhandledrejection", (evt) => {↵ sendError(evt.reason);↵});↵</script>↵↵ <script type="module">↵import RefreshRuntime from "/@react-refresh"↵RefreshRuntime.injectIntoGlobalHook(window)↵window.$RefreshReg$ = () => {}↵window.$RefreshSig$ = () => (type) => type↵window.__vite_plugin_react_preamble_installed__ = true↵</script>↵↵ <script type="module" src="/@vite/client"></script>↵↵ <meta charset="UTF-8" />↵ <meta name="viewport" content="width=device-width, initial-scale=1.0" />↵ </head>↵ <body>↵ <div id="root"></div>↵ <script type="module" src="/src/main.tsx?v=0U-9J1Bv2qh07ulg1RTi6"></script>↵ </body>↵</html>"
+name: "Error"
+toString: ƒ toString()
+[[Prototype]]: Object
+
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:

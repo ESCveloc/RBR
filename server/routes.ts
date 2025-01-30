@@ -501,6 +501,49 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for updating team details
+  app.patch("/api/teams/:teamId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { description } = req.body;
+
+      if (isNaN(teamId)) {
+        return res.status(400).send("Invalid team ID");
+      }
+
+      // Verify team exists and user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== (req.user as any).id) {
+        return res.status(403).send("Only team captain can update team details");
+      }
+
+      // Update team description
+      const [updatedTeam] = await db
+        .update(teams)
+        .set({ description })
+        .where(eq(teams.id, teamId))
+        .returning();
+
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Update team error:", error);
+      res.status(500).send("Failed to update team");
+    }
+  });
+
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {

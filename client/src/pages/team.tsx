@@ -22,6 +22,12 @@ export default function TeamManagement() {
   const updateTeam = useMutation({
     mutationFn: async (newDescription: string) => {
       try {
+        // Log the request details
+        console.log('Making update team request:', {
+          url: `/api/teams/${params?.id}`,
+          description: newDescription
+        });
+
         const response = await fetch(`/api/teams/${params?.id}`, {
           method: "PATCH",
           headers: {
@@ -79,15 +85,12 @@ export default function TeamManagement() {
     },
   });
 
-  // Debug logging
+  // Set initial description when team data is loaded
   useEffect(() => {
-    console.log('TeamManagement Debug:', {
-      match,
-      params,
-      teamsLength: teams?.length,
-      teams
-    });
-  }, [match, params, teams]);
+    if (team?.description) {
+      setDescription(team.description);
+    }
+  }, [team?.description]);
 
   if (isLoading) {
     return (
@@ -100,13 +103,6 @@ export default function TeamManagement() {
   // Find the current team
   const team = teams?.find(t => t.id === parseInt(params?.id || "0"));
   const isCaptain = team?.captainId === user?.id;
-
-  // Set initial description when team data is loaded
-  useEffect(() => {
-    if (team?.description) {
-      setDescription(team.description);
-    }
-  }, [team?.description]);
 
   if (!match || !team) {
     return (
