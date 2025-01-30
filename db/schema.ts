@@ -16,8 +16,12 @@ export const users = pgTable("users", {
 
 export const teams = pgTable("teams", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(), 
+  name: text("name").notNull().unique(),
+  description: text("description"),
   captainId: serial("captain_id").references(() => users.id).notNull(),
+  wins: integer("wins").default(0).notNull(),
+  losses: integer("losses").default(0).notNull(),
+  tags: jsonb("tags").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   active: boolean("active").default(true)
 });

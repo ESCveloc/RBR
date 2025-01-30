@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,37 +62,32 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   // If we're displaying a team outside of a game context
   if (team) {
     return (
-      <Card className="hover:bg-accent/50 transition-colors">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{team.name}</h3>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                    team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {team.active ? 'Active' : 'Inactive'}
-                  </span>
-                  {team.captainId && (
-                    <span className="text-xs text-muted-foreground">
-                      Captain ID: {team.captainId}
+      <Link href={`/team/${team.id}`}>
+        <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{team.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {team.active ? 'Active' : 'Inactive'}
                     </span>
-                  )}
-                  {team.createdAt && (
                     <span className="text-xs text-muted-foreground">
-                      Created: {new Date(team.createdAt).toLocaleDateString()}
+                      W/L: {team.wins}/{team.losses}
                     </span>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </Link>
     );
   }
 
