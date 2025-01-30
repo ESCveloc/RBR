@@ -1,12 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Team } from "@db/schema";
-
-interface TeamMember {
-  id: number;
-  teamId: number;
-  userId: number;
-  joinedAt: string;
-}
+import type { Team, TeamMember } from "@db/schema";
 
 interface TeamWithMembers extends Team {
   teamMembers?: TeamMember[];

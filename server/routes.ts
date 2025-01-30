@@ -276,7 +276,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       console.log("Creating team with request body:", req.body);
-      const { name } = req.body;
+      const { name, description } = req.body;
 
       if (!name || typeof name !== "string" || name.length < 3) {
         return res.status(400).send("Team name must be at least 3 characters long");
@@ -287,12 +287,13 @@ export function registerRoutes(app: Express): Server {
         .insert(teams)
         .values({
           name,
+          description: description || null,
           captainId: req.user.id,
+          active: true,
           wins: 0,
           losses: 0,
           tags: [],
-          createdAt: new Date(),
-          active: true
+          createdAt: new Date()
         })
         .returning();
 
@@ -975,8 +976,7 @@ export function registerRoutes(app: Express): Server {
       res.json(participant);
     } catch (error) {
       console.error("Join game error:", error);
-      res.status(500).send("Failed to join game");
-    }
+      res.status(500).send("Failed to join game");    }
   });
 
   return httpServer;

@@ -17,12 +17,13 @@ export const users = pgTable("users", {
 export const teams = pgTable("teams", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
+  description: text("description"),
   captainId: serial("captain_id").references(() => users.id).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   wins: integer("wins").default(0).notNull(),
   losses: integer("losses").default(0).notNull(),
   tags: jsonb("tags").$type<string[]>().default([]),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  active: boolean("active").default(true)
 });
 
 export const teamMembers = pgTable("team_members", {
@@ -92,6 +93,17 @@ export const teamRelations = relations(teams, ({ many, one }) => ({
   games: many(gameParticipants)
 }));
 
+export const teamMemberRelations = relations(teamMembers, ({ one }) => ({
+  team: one(teams, {
+    fields: [teamMembers.teamId],
+    references: [teams.id]
+  }),
+  user: one(users, {
+    fields: [teamMembers.userId],
+    references: [users.id]
+  })
+}));
+
 export const gameRelations = relations(games, ({ many, one }) => ({
   participants: many(gameParticipants),
   creator: one(users, {
@@ -119,9 +131,7 @@ export const gameBoundariesSchema = z.object({
 // Base schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
-export const insertTeamSchema = createInsertSchema(teams).extend({
-  name: z.string().min(1, "Team name is required").max(50, "Team name must be less than 50 characters"),
-});
+export const insertTeamSchema = createInsertSchema(teams);
 export const selectTeamSchema = createSelectSchema(teams);
 export const insertGameSchema = createInsertSchema(games);
 export const selectGameSchema = createSelectSchema(games);
@@ -130,6 +140,8 @@ export const selectGameSchema = createSelectSchema(games);
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
+export type InsertTeam = typeof teams.$inferInsert;
+export type TeamMember = typeof teamMembers.$inferSelect;
 export type Game = typeof games.$inferSelect & {
   participants?: (typeof gameParticipants.$inferSelect)[];
 };

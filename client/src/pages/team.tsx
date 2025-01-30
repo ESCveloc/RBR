@@ -263,11 +263,11 @@ export default function TeamManagement() {
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Wins</p>
-                <p className="text-2xl font-bold">{team.wins || 0}</p>
+                <p className="text-2xl font-bold">{team.wins ?? 0}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Losses</p>
-                <p className="text-2xl font-bold">{team.losses || 0}</p>
+                <p className="text-2xl font-bold">{team.losses ?? 0}</p>
               </div>
             </CardContent>
           </Card>
