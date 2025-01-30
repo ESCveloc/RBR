@@ -286,6 +286,7 @@ export function registerRoutes(app: Express): Server {
         .values({
           name,
           captainId: (req.user as any).id,
+          active: true, // Set team as active by default
         })
         .returning();
 
@@ -509,7 +510,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const teamId = parseInt(req.params.teamId);
-      const { description } = req.body;
+      const { name } = req.body;  // Only allow updating the name for now
 
       if (isNaN(teamId)) {
         return res.status(400).send("Invalid team ID");
@@ -530,10 +531,20 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can update team details");
       }
 
-      // Update team description
+      // Update team name if provided
+      const updateData: any = {};
+      if (name) {
+        updateData.name = name;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).send("No valid fields to update");
+      }
+
+      // Update team
       const [updatedTeam] = await db
         .update(teams)
-        .set({ description })
+        .set(updateData)
         .where(eq(teams.id, teamId))
         .returning();
 
@@ -975,6 +986,6 @@ const settingsSchema = z.object({
   zoneConfigs: z.array(z.object({
     durationMinutes: z.number().min(5).max(60),
     radiusMultiplier: z.number().min(0.1).max(1),
-    intervalMinutes: z.number().min(5).max(60),
+    intervalMinutes: z.number().min(5).max(60)
   })).min(1),
 });
