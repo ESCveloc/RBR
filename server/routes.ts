@@ -874,6 +874,83 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for joining a game
+  app.post("/api/games/:gameId/join", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId } = req.body;
+
+      if (isNaN(gameId) || !teamId) {
+        return res.status(400).send("Invalid game ID or team ID");
+      }
+
+      // Verify team exists and is active
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (!team.active) {
+        return res.status(400).send("Inactive teams cannot join games");
+      }
+
+      // Verify game exists and is in pending state
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      if (game.status !== "pending") {
+        return res.status(400).send("Can only join pending games");
+      }
+
+      // Check if team is already participating
+      const [existingParticipant] = await db
+        .select()
+        .from(gameParticipants)
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1);
+
+      if (existingParticipant) {
+        return res.status(400).send("Team is already participating in this game");
+      }
+
+      // Add team as participant
+      const [participant] = await db
+        .insert(gameParticipants)
+        .values({
+          gameId,
+          teamId,
+          status: "active",
+        })
+        .returning();
+
+      res.json(participant);
+    } catch (error) {
+      console.error("Join game error:", error);
+      res.status(500).send("Failed to join game");
+    }
+  });
+
   return httpServer;
 }
 

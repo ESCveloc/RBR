@@ -11,6 +11,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface SelectTeamProps {
   gameId: number;
@@ -22,11 +23,14 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Filter out inactive teams
+  const activeTeams = teams.filter(team => team.teams?.active || team.active);
+
   const assignTeam = useMutation({
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
-      const response = await fetch(`/api/games/${gameId}/teams`, {
+      const response = await fetch(`/api/games/${gameId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
@@ -72,8 +76,8 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
             <SelectValue placeholder="Select a team" />
           </SelectTrigger>
           <SelectContent>
-            {teams && teams.length > 0 ? (
-              teams.map((team) => (
+            {activeTeams && activeTeams.length > 0 ? (
+              activeTeams.map((team) => (
                 <SelectItem 
                   key={team.teams?.id || team.id} 
                   value={String(team.teams?.id || team.id)}
@@ -83,7 +87,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
               ))
             ) : (
               <SelectItem value="" disabled>
-                No teams available
+                No active teams available
               </SelectItem>
             )}
           </SelectContent>
