@@ -84,7 +84,7 @@ export default function Home() {
   );
 
   // Get user's first active team
-  const activeTeam = teams?.find(team => team.teams.active);
+  const activeTeam = teams?.find(team => team.active);
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -157,7 +157,7 @@ export default function Home() {
                             className="w-full"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleJoinGame(game.id, activeTeam.teams.id);
+                              handleJoinGame(game.id, activeTeam.id);
                             }}
                             disabled={joinGameMutation.isPending}
                           >
@@ -185,7 +185,7 @@ export default function Home() {
               <CardContent>
                 <div className="space-y-4">
                   {teams?.map((team) => (
-                    <TeamCard key={team.teams.id} team={team.teams} />
+                    <TeamCard key={team.id} team={team} />
                   ))}
                 </div>
               </CardContent>
