@@ -8,6 +8,10 @@ interface TeamMember {
   joinedAt: string;
 }
 
+interface TeamWithMembers extends Team {
+  teamMembers?: TeamMember[];
+}
+
 interface TeamResponse {
   teams: Team;
   team_members: TeamMember | null;
@@ -21,7 +25,7 @@ export function useTeams() {
   });
 
   // Process the teams data to handle the nested structure and remove duplicates
-  const teams = data?.reduce<Team[]>((acc, item) => {
+  const teams = data?.reduce<TeamWithMembers[]>((acc, item) => {
     const existingTeam = acc.find(t => t.id === item.teams.id);
 
     if (!existingTeam) {

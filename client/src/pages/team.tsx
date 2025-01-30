@@ -19,16 +19,20 @@ export default function TeamManagement() {
   const [description, setDescription] = useState("");
   const queryClient = useQueryClient();
 
+  // Find the current team first
+  const teamId = parseInt(params?.id || "0");
+  const team = teams?.find(t => t.id === teamId);
+  const isCaptain = team?.captainId === user?.id;
+
   const updateTeam = useMutation({
     mutationFn: async (newDescription: string) => {
       try {
-        // Log the request details
         console.log('Making update team request:', {
-          url: `/api/teams/${params?.id}`,
+          url: `/api/teams/${teamId}`,
           description: newDescription
         });
 
-        const response = await fetch(`/api/teams/${params?.id}`, {
+        const response = await fetch(`/api/teams/${teamId}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -38,7 +42,6 @@ export default function TeamManagement() {
           credentials: "include",
         });
 
-        // Log the response details for debugging
         console.log('Update team response:', {
           status: response.status,
           headers: Object.fromEntries(response.headers.entries()),
@@ -99,10 +102,6 @@ export default function TeamManagement() {
       </div>
     );
   }
-
-  // Find the current team
-  const team = teams?.find(t => t.id === parseInt(params?.id || "0"));
-  const isCaptain = team?.captainId === user?.id;
 
   if (!match || !team) {
     return (
