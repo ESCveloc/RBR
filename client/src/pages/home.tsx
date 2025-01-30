@@ -36,11 +36,6 @@ export default function Home() {
     );
   }
 
-  // Filter games to show only pending and active ones
-  const activeGames = games?.filter(game => 
-    game.status === "pending" || game.status === "active"
-  );
-
   return (
     <div className="relative min-h-screen bg-background">
       <OctagonsBackground />
@@ -71,7 +66,7 @@ export default function Home() {
               <h2 className="text-2xl font-semibold">Active Games</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {activeGames?.map((game) => (
+              {games?.map((game) => (
                 <Link key={`game-${game.id}`} href={`/game/${game.id}`}>
                   <Card className="hover:bg-accent/80 transition-colors cursor-pointer backdrop-blur-sm bg-background/80">
                     <CardHeader>
