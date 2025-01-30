@@ -7,6 +7,7 @@ import AuthPage from "@/pages/auth-page";
 import Home from "@/pages/home";
 import Game from "@/pages/game";
 import Admin from "@/pages/admin";
+import Team from "@/pages/team";
 import Profile from "@/pages/profile";
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
@@ -91,6 +92,9 @@ function Router() {
       </Route>
       <Route path="/game/:id">
         <ProtectedRoute component={Game} />
+      </Route>
+      <Route path="/team/:id">
+        <ProtectedRoute component={Team} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
