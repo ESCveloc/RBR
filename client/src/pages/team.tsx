@@ -19,30 +19,35 @@ export default function TeamManagement() {
   const [description, setDescription] = useState("");
   const queryClient = useQueryClient();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('TeamManagement Debug:', {
-      match,
-      params,
-      teamsLength: teams?.length,
-      teams
-    });
-  }, [match, params, teams]);
-
   const updateTeam = useMutation({
     mutationFn: async (newDescription: string) => {
-      const response = await fetch(`/api/teams/${params?.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: newDescription }),
-        credentials: "include",
-      });
+      try {
+        const response = await fetch(`/api/teams/${params?.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ description: newDescription }),
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to update team description");
+          } else {
+            const errorText = await response.text();
+            throw new Error("Server error: " + response.status + " - " + errorText);
+          }
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error: any) {
+        throw new Error(error.message || "Failed to update team description");
       }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -60,6 +65,16 @@ export default function TeamManagement() {
       });
     },
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('TeamManagement Debug:', {
+      match,
+      params,
+      teamsLength: teams?.length,
+      teams
+    });
+  }, [match, params, teams]);
 
   if (isLoading) {
     return (
