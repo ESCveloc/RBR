@@ -134,6 +134,39 @@ export default function TeamManagement() {
     },
   });
 
+  const reactivateTeam = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/teams/${teamId}/reactivate`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      toast({
+        title: "Success",
+        description: "Team has been reactivated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Set initial description when team data is loaded
   useEffect(() => {
     if (team?.description) {
@@ -181,28 +214,34 @@ export default function TeamManagement() {
           {isCaptain && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
+                <Button 
+                  variant={team.active ? "destructive" : "default"}
+                  size="sm"
+                >
                   <Power className="h-4 w-4 mr-2" />
-                  Deactivate Team
+                  {team.active ? "Deactivate" : "Reactivate"} Team
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action will deactivate the team. The team will no longer be able to participate in games.
+                    {team.active 
+                      ? "This action will deactivate the team. The team will no longer be able to participate in games."
+                      : "This action will reactivate the team. The team will be able to participate in games again."
+                    }
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => deactivateTeam.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => team.active ? deactivateTeam.mutate() : reactivateTeam.mutate()}
+                    className={team.active ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
                   >
-                    {deactivateTeam.isPending ? (
+                    {(deactivateTeam.isPending || reactivateTeam.isPending) && (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Deactivate
+                    )}
+                    {team.active ? "Deactivate" : "Reactivate"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
