@@ -32,21 +32,34 @@ export default function TeamManagement() {
           credentials: "include",
         });
 
+        // Log the response details for debugging
+        console.log('Update team response:', {
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+
         if (!response.ok) {
           const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Failed to update team description");
-          } else {
-            const errorText = await response.text();
-            throw new Error("Server error: " + response.status + " - " + errorText);
-          }
+          const errorText = await response.text();
+          console.error('Update team error:', {
+            status: response.status,
+            contentType,
+            errorText
+          });
+          throw new Error(errorText);
         }
 
-        const data = await response.json();
-        return data;
+        const text = await response.text();
+        console.log('Response text:', text);
+
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          throw new Error(`Invalid JSON response: ${text}`);
+        }
       } catch (error: any) {
-        throw new Error(error.message || "Failed to update team description");
+        console.error('Update team caught error:', error);
+        throw error;
       }
     },
     onSuccess: () => {
