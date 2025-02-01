@@ -231,7 +231,7 @@ export function registerRoutes(app: Express): Server {
         .from(users)
         .orderBy(users.createdAt);
 
-      res.json(allGames);
+      res.json(allUsers);
     } catch (error) {
       console.error("Fetch users error:", error);
       res.status(500).send("Failed to fetch users");
@@ -784,7 +784,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get all games with status
+  // Get all games with status and team members
   app.get("/api/games", async (req, res) => {
     try {
       const allGames = await db
@@ -831,15 +831,15 @@ export function registerRoutes(app: Express): Server {
             .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
             .where(eq(gameParticipants.gameId, game.id));
 
-          // For each participant, fetch the actual team members if there's a team
+          // For each participant, get their team members
           const participantsWithTeamMembers = await Promise.all(
             participants.map(async (participant) => {
               if (!participant.teamId) {
                 return participant;
               }
 
-              // Get actual team members instead of just the count
-              const teamMembers = await db
+              // Get all team members for this team
+              const members = await db
                 .select({
                   id: teamMembers.id,
                   userId: teamMembers.userId,
@@ -852,7 +852,7 @@ export function registerRoutes(app: Express): Server {
                 ...participant,
                 team: participant.team ? {
                   ...participant.team,
-                  teamMembers
+                  teamMembers: members
                 } : undefined
               };
             })
@@ -887,7 +887,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      // Get game participants with team data
+      // Get game participants with team data and actual team members
       const participants = await db
         .select({
           id: gameParticipants.id,
@@ -911,24 +911,28 @@ export function registerRoutes(app: Express): Server {
         .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
         .where(eq(gameParticipants.gameId, gameId));
 
-      // For each participant, fetch the team members count if there's a team
+      // For each participant, get their team members
       const participantsWithTeamMembers = await Promise.all(
         participants.map(async (participant) => {
           if (!participant.teamId) {
             return participant;
           }
 
-          const memberCount = await db
-            .select({ count: sql<number>`count(*)` })
+          // Get actual team members
+          const members = await db
+            .select({
+              id: teamMembers.id,
+              userId: teamMembers.userId,
+              joinedAt: teamMembers.joinedAt
+            })
             .from(teamMembers)
-            .where(eq(teamMembers.teamId, participant.teamId))
-            .then(result => result[0]?.count || 0);
+            .where(eq(teamMembers.teamId, participant.teamId));
 
           return {
             ...participant,
             team: participant.team ? {
               ...participant.team,
-              teamMembers: new Array(memberCount)
+              teamMembers: members
             } : undefined
           };
         })
