@@ -43,6 +43,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
           teamId: participant.teamId,
           ready: !participant.ready
         }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -50,11 +51,25 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedParticipant) => {
+      // Immediately update the cache with the new ready status
+      queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
+        if (!oldData?.participants) return oldData;
+
+        return {
+          ...oldData,
+          participants: oldData.participants.map((p: any) =>
+            p.id === updatedParticipant.id ? updatedParticipant : p
+          )
+        };
+      });
+
+      // Also invalidate the query to ensure data consistency
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+
       toast({
         title: "Status Updated",
-        description: `Team is now ${participant?.ready ? "not ready" : "ready"} for the game.`,
+        description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
       });
     },
     onError: (error: Error) => {
@@ -73,6 +88,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: participant.teamId }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -103,7 +119,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     if (participant?.team?.member_count !== undefined) {
       return participant.team.member_count;
     }
-    return 0;
+    return currentTeam?.teamMembers?.length || 0;
   };
 
   // Team card outside game context
@@ -185,7 +201,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex items-center gap-2">
                   <Switch
-                    checked={participant.ready || false}
+                    checked={participant.ready}
                     onCheckedChange={() => toggleReady.mutate()}
                     disabled={toggleReady.isPending}
                   />
