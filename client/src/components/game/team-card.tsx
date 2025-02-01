@@ -61,32 +61,49 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       console.log('Toggle response:', result);
       return result;
     },
-    onSuccess: (updatedParticipant) => {
-      // Update the game data in the cache
-      queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
-        if (!oldData) return oldData;
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
 
-        const newParticipants = oldData.participants?.map((p: any) =>
-          p.teamId === updatedParticipant.teamId ? updatedParticipant : p
-        ) || [];
+      // Snapshot the previous value
+      const previousGame = queryClient.getQueryData([`/api/games/${gameId}`]);
 
+      // Optimistically update the cache
+      queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
+        if (!old) return old;
         return {
-          ...oldData,
-          participants: newParticipants
+          ...old,
+          participants: old.participants?.map((p: any) =>
+            p.teamId === participant?.teamId
+              ? { ...p, ready: !participant.ready }
+              : p
+          ),
         };
       });
 
+      return { previousGame };
+    },
+    onError: (err, variables, context) => {
+      console.error('Toggle ready error:', err);
+      // Revert the optimistic update
+      queryClient.setQueryData(
+        [`/api/games/${gameId}`],
+        context?.previousGame
+      );
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+    },
+    onSuccess: (updatedParticipant) => {
       toast({
         title: "Status Updated",
         description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
-      });
-    },
-    onError: (error: Error) => {
-      console.error('Toggle ready error:', error);
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
       });
     },
   });

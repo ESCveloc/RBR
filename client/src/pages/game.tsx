@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
 
 export default function Game() {
@@ -19,8 +19,38 @@ export default function Game() {
 
   // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
-  const { game, isLoading, error } = useGame(gameId!);
+  const { data: game, isLoading, error } = useQuery({
+    queryKey: [`/api/games/${gameId}`],
+    refetchInterval: 5000,
+    // Add staleTime to prevent unnecessary refreshes
+    staleTime: 2000,
+    // Keep previous data while revalidating
+    keepPreviousData: true,
+    // Custom merge function to preserve ready states
+    select: (data: any) => {
+      // Get the existing data from cache
+      const existingData = queryClient.getQueryData([`/api/games/${gameId}`]);
+      if (!existingData) return data;
 
+      // Preserve ready states from existing participants
+      if (data.participants && existingData.participants) {
+        data.participants = data.participants.map((newParticipant: any) => {
+          const existingParticipant = existingData.participants.find(
+            (p: any) => p.teamId === newParticipant.teamId
+          );
+          if (existingParticipant && existingParticipant.ready !== undefined) {
+            return {
+              ...newParticipant,
+              ready: existingParticipant.ready
+            };
+          }
+          return newParticipant;
+        });
+      }
+      return data;
+    }
+  });
+  
   // Simple admin check
   const isAdmin = user?.role === 'admin';
 
