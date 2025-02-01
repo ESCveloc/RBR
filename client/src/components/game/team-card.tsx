@@ -41,39 +41,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
 
-  const assignPosition = useMutation({
-    mutationFn: async (position: number) => {
-      if (!gameId || !participant?.teamId) return;
-
-      const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: participant.teamId, position }),
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      setIsAssigning(false);
-      toast({
-        title: "Position Assigned",
-        description: "Starting position has been assigned successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const toggleReady = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
@@ -198,42 +165,20 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            {/* Left side - Team info */}
             <div className="flex items-center gap-3">
-              <div
-                className={`
-                  w-10 h-10 rounded-full flex items-center justify-center
-                  ${
-                    participant.status === "eliminated"
-                      ? "bg-destructive"
-                      : "bg-primary"
-                  }
-                `}
-              >
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>
                 <h3 className="font-semibold">{participant.team.name}</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {getTeamMembersCount()} members
-                  </span>
-                  {participant.startingLocation && (
-                    <>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground">
-                        Position {participant.startingLocation.position}
-                      </span>
-                    </>
-                  )}
-                </div>
+                <span className="text-xs text-muted-foreground">
+                  {getTeamMembersCount()} members
+                </span>
               </div>
             </div>
 
-            {/* Right side - Controls */}
-            <div className="flex items-center gap-4">
-              {/* Game status badge */}
-              <div className={`rounded-full px-3 py-1 text-xs font-medium ${
+            <div className="flex items-center gap-6">
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 participant.status === "eliminated"
                   ? 'bg-red-100 text-red-700'
                   : participant.ready
@@ -246,11 +191,10 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                   ? "Ready"
                   : "Not Ready"
                 }
-              </div>
+              </span>
 
-              {/* Captain controls */}
               {isCaptain && participant.status !== "eliminated" && (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={participant.ready || false}
@@ -266,51 +210,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     onClick={() => leaveGame.mutate()}
                     disabled={leaveGame.isPending}
                   >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Leave
+                    <LogOut className="h-4 w-4" />
                   </Button>
-                </div>
-              )}
-
-              {/* Admin position assignment */}
-              {canAssignPosition && !participant.startingLocation && (
-                <div className="flex items-center gap-2">
-                  {isAssigning ? (
-                    <>
-                      <Select
-                        onValueChange={(value) => {
-                          assignPosition.mutate(parseInt(value));
-                        }}
-                        disabled={assignPosition.isPending}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue placeholder="Position" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
-                            <SelectItem key={position} value={position.toString()}>
-                              Position {position}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAssigning(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAssigning(true)}
-                    >
-                      Assign Position
-                    </Button>
-                  )}
                 </div>
               )}
             </div>
