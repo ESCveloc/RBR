@@ -6,7 +6,12 @@ type WebSocketMessage = {
   payload: any;
 };
 
-export function useWebSocket(gameId: number) {
+interface WebSocketConnection {
+  socket: WebSocket | null;
+  sendMessage: (type: string, payload: any) => void;
+}
+
+export function useWebSocket(gameId?: number): WebSocketConnection {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
@@ -38,8 +43,10 @@ export function useWebSocket(gameId: number) {
       ws.onopen = () => {
         console.log('WebSocket connected successfully');
         reconnectAttemptRef.current = 0;
-        // Join game room
-        sendMessage('JOIN_GAME', { gameId });
+        // Join game room if gameId is provided
+        if (gameId) {
+          sendMessage('JOIN_GAME', { gameId });
+        }
       };
 
       ws.onmessage = (event) => {
@@ -115,5 +122,8 @@ export function useWebSocket(gameId: number) {
     };
   }, [connect]);
 
-  return { sendMessage };
+  return {
+    socket: wsRef.current,
+    sendMessage
+  };
 }

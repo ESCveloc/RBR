@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { SelectTeam } from "@/components/game/select-team";
+import { useWebSocket } from "@/hooks/use-websocket";
 import type { Game } from "@db/schema";
 
 export default function Game() {
@@ -22,20 +23,42 @@ export default function Game() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
+  // Only set gameId if we have a match and valid ID
+  const gameId = match && params?.id ? parseInt(params.id) : undefined;
+  const { socket } = useWebSocket(gameId);
+
   // Simple admin check
   const isAdmin = user?.role === 'admin';
 
   // Get the back link based on user role
   const backLink = isAdmin ? "/admin" : "/";
 
-  // Only set gameId if we have a match and valid ID
-  const gameId = match && params?.id ? parseInt(params.id) : undefined;
+  // Subscribe to real-time game updates
+  useEffect(() => {
+    if (!socket || !gameId) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'GAME_UPDATE' && data.gameId === gameId) {
+          queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, [socket, gameId, queryClient]);
+
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 30000,
+    refetchInterval: false,
     placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
+
 
   // Debug logging
   useEffect(() => {

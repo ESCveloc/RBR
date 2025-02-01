@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Team, TeamMember } from "@db/schema";
+import { useWebSocket } from "./use-websocket";
+import { useEffect } from "react";
 
 interface TeamWithMembers extends Team {
   teamMembers: TeamMember[];
@@ -12,11 +14,32 @@ interface TeamResponse {
 }
 
 export function useTeams() {
-  const { data, isLoading } = useQuery<TeamResponse[]>({
+  const { socket } = useWebSocket();
+  const { data, isLoading, refetch } = useQuery<TeamResponse[]>({
     queryKey: ["/api/teams"],
-    staleTime: 0,
-    refetchInterval: false,
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: false, // Disable polling
   });
+
+  // Subscribe to team updates via WebSocket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'TEAM_UPDATE') {
+          // Trigger a refetch when we receive a team update
+          refetch();
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, [socket, refetch]);
 
   // Process the teams data to handle the nested structure and remove duplicates
   const teams = data?.reduce<TeamWithMembers[]>((acc, item) => {
