@@ -4,13 +4,6 @@ import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, LogOut } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -37,14 +30,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  // Get team object based on context
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
 
   const toggleReady = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
-
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,7 +48,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       if (!response.ok) {
         throw new Error(await response.text());
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -79,7 +69,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   const leaveGame = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
-
       const response = await fetch(`/api/games/${gameId}/leave`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,7 +78,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       if (!response.ok) {
         throw new Error(await response.text());
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -118,7 +106,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     return 0;
   };
 
-  // If we're displaying a team outside of a game context
+  // Team card outside game context
   if (team) {
     return (
       <Link href={`/team/${team.id}`} key={`team-${team.id}`}>
@@ -131,7 +119,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 </div>
                 <div>
                   <h3 className="font-semibold">{team.name}</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                       team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                     }`}>
@@ -153,31 +141,29 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     );
   }
 
-  // If we're displaying a participant in a game
+  // Team card in game context
   if (participant?.team) {
     return (
       <Card
         key={`participant-${participant.teamId}`}
-        className={`
-          ${participant.status === "eliminated" ? "opacity-50" : ""}
-          hover:bg-accent/50 transition-colors
-        `}
+        className={`${participant.status === "eliminated" ? "opacity-50" : ""}`}
       >
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <Users className="h-5 w-5 text-white" />
+          <div className="space-y-4">
+            {/* Team info row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{participant.team.name}</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {getTeamMembersCount()} members
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">{participant.team.name}</h3>
-                <span className="text-xs text-muted-foreground">
-                  {getTeamMembersCount()} members
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-6">
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 participant.status === "eliminated"
                   ? 'bg-red-100 text-red-700'
@@ -192,29 +178,31 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                   : "Not Ready"
                 }
               </span>
-
-              {isCaptain && participant.status !== "eliminated" && (
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={participant.ready || false}
-                      onCheckedChange={() => toggleReady.mutate()}
-                      disabled={toggleReady.isPending}
-                    />
-                    <span className="text-sm">Ready</span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => leaveGame.mutate()}
-                    disabled={leaveGame.isPending}
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
             </div>
+
+            {/* Controls row - only show if captain and not eliminated */}
+            {isCaptain && participant.status !== "eliminated" && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={participant.ready || false}
+                    onCheckedChange={() => toggleReady.mutate()}
+                    disabled={toggleReady.isPending}
+                  />
+                  <span className="text-sm text-muted-foreground">Ready</span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => leaveGame.mutate()}
+                  disabled={leaveGame.isPending}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Leave
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
