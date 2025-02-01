@@ -138,9 +138,17 @@ export default function Game() {
 
           {/* Right side - Status and controls */}
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
+            <div className={`rounded-full px-3 py-1 text-sm font-medium ${
+              game.status === 'active' 
+                ? 'bg-green-500/10 text-green-500'
+                : game.status === 'pending'
+                ? 'bg-yellow-500/10 text-yellow-500'
+                : game.status === 'completed'
+                ? 'bg-purple-500/15 text-purple-700'
+                : 'bg-red-500/10 text-red-500'
+            }`}>
               {game.status === 'active' ? 'In Progress' :
-               game.status === 'pending' ? 'Pending' :
+               game.status === 'pending' ? 'Starting Soon' :
                game.status === 'completed' ? 'Completed' :
                game.status === 'cancelled' ? 'Cancelled' : 'Unknown'}
             </div>
