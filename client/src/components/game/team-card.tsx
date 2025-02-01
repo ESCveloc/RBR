@@ -36,6 +36,13 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   const toggleReady = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
+
+      console.log('Toggling ready status:', { 
+        gameId, 
+        teamId: participant.teamId, 
+        currentReady: participant.ready 
+      });
+
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,23 +56,25 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       if (!response.ok) {
         throw new Error(await response.text());
       }
-      return response.json();
+
+      const result = await response.json();
+      console.log('Toggle response:', result);
+      return result;
     },
     onSuccess: (updatedParticipant) => {
-      // Immediately update the cache with the new ready status
+      // Update the game data in the cache
       queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
-        if (!oldData?.participants) return oldData;
+        if (!oldData) return oldData;
+
+        const newParticipants = oldData.participants?.map((p: any) =>
+          p.teamId === updatedParticipant.teamId ? updatedParticipant : p
+        ) || [];
 
         return {
           ...oldData,
-          participants: oldData.participants.map((p: any) =>
-            p.id === updatedParticipant.id ? updatedParticipant : p
-          )
+          participants: newParticipants
         };
       });
-
-      // Also invalidate the query to ensure data consistency
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
 
       toast({
         title: "Status Updated",
@@ -73,6 +82,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       });
     },
     onError: (error: Error) => {
+      console.error('Toggle ready error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -159,6 +169,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   // Team card in game context
   if (participant?.team) {
+    const isReady = !!participant.ready;
     return (
       <Card
         key={`participant-${participant.teamId}`}
@@ -183,13 +194,13 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 participant.status === "eliminated"
                   ? 'bg-red-100 text-red-700'
-                  : participant.ready
+                  : isReady
                   ? 'bg-green-100 text-green-700'
                   : 'bg-yellow-100 text-yellow-700'
               }`}>
                 {participant.status === "eliminated" 
                   ? "Eliminated" 
-                  : participant.ready 
+                  : isReady
                   ? "Ready"
                   : "Not Ready"
                 }
@@ -201,8 +212,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex items-center gap-2">
                   <Switch
-                    checked={participant.ready}
-                    onCheckedChange={() => toggleReady.mutate()}
+                    checked={isReady}
+                    onCheckedChange={() => {
+                      if (!toggleReady.isPending) {
+                        toggleReady.mutate();
+                      }
+                    }}
                     disabled={toggleReady.isPending}
                   />
                   <span className="text-sm text-muted-foreground">Ready</span>
