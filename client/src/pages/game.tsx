@@ -2,13 +2,19 @@ import { useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { MapView } from "@/components/game/map-view";
 import { TeamCard } from "@/components/game/team-card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { SelectTeam } from "@/components/game/select-team";
+import type { Game } from "@db/schema";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -16,12 +22,18 @@ export default function Game() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
+  // Simple admin check
+  const isAdmin = user?.role === 'admin';
+
+  // Get the back link based on user role
+  const backLink = isAdmin ? "/admin" : "/";
+
   // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
-  const { data: game, isLoading, error } = useQuery({
+  const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    refetchInterval: 10000, // Increase interval to 10 seconds
-    staleTime: 8000, // Increase stale time to reduce unnecessary refetches
+    refetchInterval: 5000,
+    staleTime: 2000,
     placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
 
@@ -36,12 +48,6 @@ export default function Game() {
       error
     });
   }, [user, isAdmin, game, gameId, error]);
-
-  // Simple admin check
-  const isAdmin = user?.role === 'admin';
-
-  // Get the back link based on user role
-  const backLink = isAdmin ? "/admin" : "/";
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -140,7 +146,6 @@ export default function Game() {
             <h1 className="text-xl font-bold">{game?.name}</h1>
           </div>
 
-          {/* Right side - Status and controls */}
           <div className="flex items-center gap-3">
             <div className={`rounded-full px-3 py-1 text-sm font-medium ${
               game.status === 'active' 
@@ -157,7 +162,6 @@ export default function Game() {
                game.status === 'cancelled' ? 'Cancelled' : 'Unknown'}
             </div>
 
-            {/* Admin controls */}
             {isAdmin && (
               <div className="flex items-center gap-2">
                 {game.status === 'pending' && (
@@ -209,14 +213,12 @@ export default function Game() {
 
       <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
         <div className="order-2 md:order-1">
-          {/* Increase height of map container */}
           <div className="h-[600px] w-full rounded-lg overflow-hidden border">
             <MapView game={game} />
           </div>
         </div>
 
         <div className="order-1 md:order-2 space-y-4">
-          {/* Game Details Card */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Game Details</CardTitle>
@@ -233,7 +235,6 @@ export default function Game() {
             </CardContent>
           </Card>
 
-          {/* Team Assignment Section */}
           {isAdmin && game.status === 'pending' && (
             <Card>
               <CardHeader>
@@ -245,36 +246,35 @@ export default function Game() {
             </Card>
           )}
 
-            {/* Teams List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Teams
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {game.participants && game.participants.length > 0 ? (
-                  game.participants.map((participant) => (
-                    <TeamCard
-                      key={participant.id}
-                      gameId={game.id}
-                      participant={{
-                        ...participant,
-                        team: {
-                          ...participant.team,
-                          teamMembers: participant.team?.teamMembers || [],
-                          member_count: participant.team?.teamMembers?.length || 0
-                        }
-                      }}
-                      canAssignPosition={isAdmin && game.status === 'pending'}
-                    />
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
-                )}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Teams
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {game.participants && game.participants.length > 0 ? (
+                game.participants.map((participant) => (
+                  <TeamCard
+                    key={participant.id}
+                    gameId={game.id}
+                    participant={{
+                      ...participant,
+                      team: {
+                        ...participant.team,
+                        teamMembers: participant.team?.teamMembers || [],
+                        member_count: participant.team?.teamMembers?.length || 0
+                      }
+                    }}
+                    canAssignPosition={isAdmin && game.status === 'pending'}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
