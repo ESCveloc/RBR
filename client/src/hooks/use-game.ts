@@ -6,12 +6,12 @@ import { useToast } from '@/hooks/use-toast';
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
-  const ws = useWebSocket();
+  const { socket, addEventListener, removeEventListener } = useWebSocket(gameId);
   const { toast } = useToast();
 
   // Subscribe to game status updates
   useEffect(() => {
-    if (!ws) return;
+    if (!socket) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -25,9 +25,9 @@ export function useGame(gameId: number) {
       }
     };
 
-    ws.addEventListener('message', handleMessage);
-    return () => ws.removeEventListener('message', handleMessage);
-  }, [ws, gameId, queryClient]);
+    addEventListener('message', handleMessage);
+    return () => removeEventListener('message', handleMessage);
+  }, [socket, gameId, queryClient, addEventListener, removeEventListener]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
@@ -84,17 +84,21 @@ export function useGame(gameId: number) {
       const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
       // Optimistically update the cache
-      if (previousGame) {
-        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
-          ...previousGame,
-          participants: previousGame.participants?.map(p => 
-            p.teamId === previousGame.participants.find(
-              participant => participant.team?.captainId === (game?.createdBy ?? -1)
-            )?.teamId
-              ? { ...p, location }
-              : p
-          )
-        });
+      if (previousGame && previousGame.participants) {
+        const userTeam = previousGame.participants.find(
+          participant => participant.team?.captainId === game?.createdBy
+        );
+
+        if (userTeam) {
+          queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+            ...previousGame,
+            participants: previousGame.participants.map(p => 
+              p.teamId === userTeam.teamId
+                ? { ...p, location }
+                : p
+            )
+          });
+        }
       }
 
       return { previousGame };

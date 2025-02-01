@@ -3,6 +3,10 @@ import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { parse } from "cookie";
 
+interface CustomWebSocket extends WebSocket {
+  gameId?: number;
+}
+
 class CustomWebSocketServer extends WebSocketServer {
   broadcast(msg: string, excludeSocket?: WebSocket): void {
     this.clients.forEach((client) => {
@@ -13,7 +17,7 @@ class CustomWebSocketServer extends WebSocketServer {
   }
 
   broadcastToGame(gameId: number, msg: string, excludeSocket?: WebSocket): void {
-    this.clients.forEach((client: WebSocket & { gameId?: number }) => {
+    this.clients.forEach((client: CustomWebSocket) => {
       if (client !== excludeSocket && client.readyState === WebSocket.OPEN && client.gameId === gameId) {
         client.send(msg);
       }
@@ -26,54 +30,54 @@ export function setupWebSocketServer(server: Server) {
     server,
     perMessageDeflate: false,
     maxPayload: 64 * 1024, // 64kb
-    verifyClient: ({ req }: { req: IncomingMessage }) => {
+    verifyClient: ({ req }: { req: IncomingMessage }, done) => {
       // Ignore Vite HMR WebSocket connections
       const protocol = req.headers['sec-websocket-protocol'];
       if (protocol && protocol.includes('vite-hmr')) {
-        return false;
+        return done(false);
       }
 
       // Verify session authentication
       const cookies = req.headers.cookie;
       if (!cookies) {
         console.log("WebSocket connection rejected: No cookies provided");
-        return false;
+        return done(false);
       }
 
       const parsedCookies = parse(cookies);
       if (!parsedCookies['connect.sid']) {
         console.log("WebSocket connection rejected: No session cookie");
-        return false;
+        return done(false);
       }
 
-      return true;
+      return done(true);
     }
   });
 
-  wss.on("connection", (ws: WebSocket & { gameId?: number }, req: IncomingMessage) => {
+  wss.on("connection", (ws: CustomWebSocket, req: IncomingMessage) => {
     console.log("WebSocket client connected");
 
-    ws.on("message", (message: WebSocket.Data) => {
+    ws.on("message", (data) => {
       try {
-        const data = JSON.parse(message.toString());
-        console.log("Received WebSocket message:", data);
+        const message = JSON.parse(data.toString());
+        console.log("Received WebSocket message:", message);
 
         // Handle different message types
-        switch (data.type) {
+        switch (message.type) {
           case "JOIN_GAME":
-            ws.gameId = data.payload.gameId;
-            console.log(`Client joined game ${data.payload.gameId}`);
+            ws.gameId = message.payload.gameId;
+            console.log(`Client joined game ${message.payload.gameId}`);
             break;
           case "LOCATION_UPDATE":
             // Broadcast location update only to clients in the same game
             if (ws.gameId) {
-              wss.broadcastToGame(ws.gameId, JSON.stringify(data), ws);
+              wss.broadcastToGame(ws.gameId, JSON.stringify(message), ws);
             }
             break;
           case "GAME_UPDATE":
             // Broadcast game state changes to all clients in the game
             if (ws.gameId) {
-              wss.broadcastToGame(ws.gameId, JSON.stringify(data));
+              wss.broadcastToGame(ws.gameId, JSON.stringify(message));
             }
             break;
         }

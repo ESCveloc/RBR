@@ -1,0 +1,67 @@
+[vite] connecting...
+[Auth] Current user state: 
+Object {user: null, isLoading: true, error: null}
+[Auth] Current user state: 
+Object {user: null, isLoading: true, error: null}
+[Auth] Fetching user data
+[Auth] User data received: 
+Object {id: 1, username: "Ickarss", role: "user", password: "[REDACTED]"}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+Connecting to WebSocket: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev:5000
+WebSocket connection error: 
+Event {isTrusted: true}
+
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+WebSocket connection closed
+Attempting to reconnect in 2000ms
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+DOMException {}
+
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+Connecting to WebSocket: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev:5000
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+[Auth] Current user state: 
+Object {user: {…}, isLoading: false, error: null}
+Connecting to WebSocket: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev:5000
+
