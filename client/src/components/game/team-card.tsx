@@ -14,18 +14,28 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+interface TeamMember {
+  id: number;
+  userId: number;
+  joinedAt: string;
+  user?: {
+    id: number;
+    username: string;
+    firstName?: string;
+    avatar?: string;
+  };
+}
+
+interface TeamWithMembers extends Team {
+  teamMembers: TeamMember[];
+}
+
 interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
-    team: Team & { 
-      teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
-      member_count?: number;
-    } 
+    team: TeamWithMembers;
   };
-  team?: Team & { 
-    teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
-    member_count?: number;
-  };
+  team?: TeamWithMembers;
   canAssignPosition?: boolean;
 }
 
@@ -68,11 +78,11 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   const getTeamMembersCount = () => {
-    if (team?.member_count !== undefined) {
-      return team.member_count;
+    if (team?.teamMembers) {
+      return team.teamMembers.length;
     }
-    if (participant?.team?.member_count !== undefined) {
-      return participant.team.member_count;
+    if (participant?.team?.teamMembers) {
+      return participant.team.teamMembers.length;
     }
     return 0;
   };

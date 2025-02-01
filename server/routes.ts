@@ -331,11 +331,17 @@ export function registerRoutes(app: Express): Server {
     try {
       const userTeams = await db
         .select({
-          teams: teams,
-          team_members: sql<number>`count(DISTINCT ${teamMembers.userId})::int`.mapWith(Number).as('member_count')
+          id: teams.id,
+          name: teams.name,
+          description: teams.description,
+          captainId: teams.captainId,
+          active: teams.active,
+          wins: teams.wins,
+          losses: teams.losses,
+          tags: teams.tags,
+          createdAt: teams.createdAt,
         })
         .from(teams)
-        .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
           or(
             eq(teams.captainId, (req.user as any).id),
@@ -348,11 +354,39 @@ export function registerRoutes(app: Express): Server {
                 ))
             )
           )
-        )
-        .groupBy(teams.id);
+        );
 
-      console.log('Teams with member counts:', userTeams);
-      res.json(userTeams);
+      // Fetch team members for each team
+      const teamsWithMembers = await Promise.all(
+        userTeams.map(async (team) => {
+          const members = await db
+            .select({
+              id: teamMembers.id,
+              userId: teamMembers.userId,
+              joinedAt: teamMembers.joinedAt,
+              user: {
+                id: users.id,
+                username: users.username,
+                firstName: users.firstName,
+                avatar: users.avatar,
+              },
+            })
+            .from(teamMembers)
+            .innerJoin(users, eq(teamMembers.userId, users.id))
+            .where(eq(teamMembers.teamId, team.id));
+
+          return {
+            ...team,
+            teamMembers: members.map(member => ({
+              ...member,
+              joinedAt: member.joinedAt.toISOString()
+            }))
+          };
+        })
+      );
+
+      console.log('Teams with members:', JSON.stringify(teamsWithMembers, null, 2));
+      res.json(teamsWithMembers);
     } catch (error) {
       console.error("Teams fetch error:", error);
       res.status(500).send("Failed to fetch teams");
@@ -924,7 +958,7 @@ export function registerRoutes(app: Express): Server {
       );
 
       res.json(gamesWithParticipants);
-    } catch (error) {
+    } catch (error){
       console.error("Fetch games error:", error);
       res.status(500).json({ message: "Failed to fetch games" });
     }
