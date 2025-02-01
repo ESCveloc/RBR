@@ -6,12 +6,7 @@ type WebSocketMessage = {
   payload: any;
 };
 
-interface WebSocketConnection {
-  socket: WebSocket | null;
-  sendMessage: (type: string, payload: any) => void;
-}
-
-export function useWebSocket(gameId?: number): WebSocketConnection {
+export function useWebSocket(gameId?: number) {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
@@ -40,16 +35,16 @@ export function useWebSocket(gameId?: number): WebSocketConnection {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.addEventListener('open', () => {
         console.log('WebSocket connected successfully');
         reconnectAttemptRef.current = 0;
         // Join game room if gameId is provided
         if (gameId) {
           sendMessage('JOIN_GAME', { gameId });
         }
-      };
+      });
 
-      ws.onmessage = (event) => {
+      ws.addEventListener('message', (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           console.log('Received WebSocket message:', message);
@@ -75,13 +70,13 @@ export function useWebSocket(gameId?: number): WebSocketConnection {
         } catch (error) {
           console.error('WebSocket message parsing error:', error);
         }
-      };
+      });
 
-      ws.onerror = (error) => {
+      ws.addEventListener('error', (error) => {
         console.error('WebSocket connection error:', error);
-      };
+      });
 
-      ws.onclose = () => {
+      ws.addEventListener('close', () => {
         console.log('WebSocket connection closed');
         wsRef.current = null;
 
@@ -98,7 +93,8 @@ export function useWebSocket(gameId?: number): WebSocketConnection {
             variant: "destructive"
           });
         }
-      };
+      });
+
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       toast({
@@ -118,12 +114,27 @@ export function useWebSocket(gameId?: number): WebSocketConnection {
       }
       if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
   }, [connect]);
 
+  const addListener = useCallback((event: string, handler: (event: MessageEvent) => void) => {
+    if (wsRef.current) {
+      wsRef.current.addEventListener(event, handler);
+    }
+  }, []);
+
+  const removeListener = useCallback((event: string, handler: (event: MessageEvent) => void) => {
+    if (wsRef.current) {
+      wsRef.current.removeEventListener(event, handler);
+    }
+  }, []);
+
   return {
     socket: wsRef.current,
-    sendMessage
+    sendMessage,
+    addEventListener: addListener,
+    removeEventListener: removeListener
   };
 }

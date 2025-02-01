@@ -169,8 +169,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <div>
                   <h3 className="font-semibold">{team.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center justify-center w-20 rounded-full px-2 py-1 text-xs font-medium ${
-                      team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                    <span className={`inline-flex items-center justify-center w-16 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      team.active ? 'bg-green-100 text-green-700' : 'bg-zinc-200 text-zinc-700'
                     }`}>
                       {team.active ? 'Active' : 'Inactive'}
                     </span>
@@ -213,12 +213,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 </div>
               </div>
 
-              <span className={`inline-flex items-center justify-center w-24 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
+              <span className={`inline-flex items-center justify-center w-16 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
                 participant.status === "eliminated"
                   ? 'bg-red-100 text-red-700'
                   : isReady
                   ? 'bg-green-100 text-green-700'
-                  : 'bg-yellow-100 text-yellow-700'
+                  : 'bg-zinc-200 text-zinc-700'
               }`}>
                 {participant.status === "eliminated" 
                   ? "Eliminated" 

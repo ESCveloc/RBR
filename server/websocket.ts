@@ -4,9 +4,17 @@ import type { IncomingMessage } from "http";
 import { parse } from "cookie";
 
 class CustomWebSocketServer extends WebSocketServer {
-  broadcast(msg: string): void {
+  broadcast(msg: string, excludeSocket?: WebSocket): void {
     this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client !== excludeSocket && client.readyState === WebSocket.OPEN) {
+        client.send(msg);
+      }
+    });
+  }
+
+  broadcastToGame(gameId: number, msg: string, excludeSocket?: WebSocket): void {
+    this.clients.forEach((client: WebSocket & { gameId?: number }) => {
+      if (client !== excludeSocket && client.readyState === WebSocket.OPEN && client.gameId === gameId) {
         client.send(msg);
       }
     });
@@ -18,7 +26,7 @@ export function setupWebSocketServer(server: Server) {
     server,
     perMessageDeflate: false,
     maxPayload: 64 * 1024, // 64kb
-    verifyClient: ({ req }) => {
+    verifyClient: ({ req }: { req: IncomingMessage }) => {
       // Ignore Vite HMR WebSocket connections
       const protocol = req.headers['sec-websocket-protocol'];
       if (protocol && protocol.includes('vite-hmr')) {
@@ -42,7 +50,7 @@ export function setupWebSocketServer(server: Server) {
     }
   });
 
-  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+  wss.on("connection", (ws: WebSocket & { gameId?: number }, req: IncomingMessage) => {
     console.log("WebSocket client connected");
 
     ws.on("message", (message: WebSocket.Data) => {
@@ -53,15 +61,20 @@ export function setupWebSocketServer(server: Server) {
         // Handle different message types
         switch (data.type) {
           case "JOIN_GAME":
+            ws.gameId = data.payload.gameId;
             console.log(`Client joined game ${data.payload.gameId}`);
             break;
           case "LOCATION_UPDATE":
-            // Broadcast location update to all clients
-            wss.broadcast(JSON.stringify(data));
+            // Broadcast location update only to clients in the same game
+            if (ws.gameId) {
+              wss.broadcastToGame(ws.gameId, JSON.stringify(data), ws);
+            }
             break;
           case "GAME_UPDATE":
-            // Broadcast game state changes
-            wss.broadcast(JSON.stringify(data));
+            // Broadcast game state changes to all clients in the game
+            if (ws.gameId) {
+              wss.broadcastToGame(ws.gameId, JSON.stringify(data));
+            }
             break;
         }
       } catch (error) {
@@ -75,6 +88,8 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on("close", () => {
       console.log("WebSocket client disconnected");
+      // Clean up any game-specific state
+      delete ws.gameId;
     });
   });
 
