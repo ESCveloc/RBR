@@ -720,6 +720,56 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this endpoint after the other team-related endpoints
+  app.post("/api/teams/:teamId/ready", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { ready } = req.body;
+
+      if (isNaN(teamId)) {
+        return res.status(400).send("Invalid team ID");
+      }
+
+      // Verify team exists and user is a member
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      // Check if user is a team member
+      const [isMember] = await db
+        .select()
+        .from(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.teamId, teamId),
+            eq(teamMembers.userId, (req.user as any).id)
+          )
+        )
+        .limit(1);
+
+      if (!isMember) {
+        return res.status(403).send("Only team members can update ready status");
+      }
+
+      // Update team ready status
+      // Note: We'll add the ready column to the teams table when implementing database migrations
+      res.json({ ready });
+    } catch (error) {
+      console.error("Update team ready status error:", error);
+      res.status(500).send("Failed to update team ready status");
+    }
+  });
+
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -899,7 +949,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Get game participants with team data and actual team members
-      const participants = await db
+      constparticipants = await db
         .select({
           id: gameParticipants.id,
           gameId: gameParticipants.gameId,

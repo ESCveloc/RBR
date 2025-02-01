@@ -31,8 +31,43 @@ interface TeamCardProps {
 
 export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamCardProps) {
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const toggleReadyStatus = useMutation({
+    mutationFn: async () => {
+      if (!team?.id && !participant?.team?.id) return;
+
+      const teamId = team?.id || participant?.team?.id;
+      const response = await fetch(`/api/teams/${teamId}/ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ready: !isReady }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsReady(!isReady);
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      toast({
+        title: isReady ? "Team marked as not ready" : "Team marked as ready",
+        description: `Team status has been updated.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
@@ -68,16 +103,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   const getTeamMembersCount = () => {
-    // If we have a direct team reference from the teams list
     if (team?.member_count !== undefined) {
       return team.member_count;
     }
-
-    // If we have a team reference through game participant
     if (participant?.team?.member_count !== undefined) {
       return participant.team.member_count;
     }
-
     return 0;
   };
 
@@ -109,6 +140,16 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                   </div>
                 </div>
               </div>
+              <Button
+                variant={isReady ? "default" : "outline"}
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault(); // Prevent Link navigation
+                  toggleReadyStatus.mutate();
+                }}
+              >
+                {isReady ? "Ready" : "Not Ready"}
+              </Button>
             </div>
           </CardContent>
         </Card>
