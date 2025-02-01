@@ -14,16 +14,19 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+interface TeamUser {
+  id: number;
+  username: string;
+  firstName: string | null;
+  avatar: string | null;
+}
+
 interface TeamMember {
   id: number;
+  teamId: number;
   userId: number;
   joinedAt: string;
-  user?: {
-    id: number;
-    username: string;
-    firstName?: string;
-    avatar?: string;
-  };
+  user: TeamUser;
 }
 
 interface TeamWithMembers extends Team {
@@ -64,7 +67,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       setIsAssigning(false);
       toast({
-        title: "Position Assigned",
+        title: "Success",
         description: "Starting position has been assigned successfully.",
       });
     },
@@ -78,19 +81,14 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   const getTeamMembersCount = () => {
-    if (team?.teamMembers) {
-      return team.teamMembers.length;
-    }
-    if (participant?.team?.teamMembers) {
-      return participant.team.teamMembers.length;
-    }
-    return 0;
+    const teamToUse = team || participant?.team;
+    return teamToUse?.teamMembers?.length || 0;
   };
 
   // If we're displaying a team outside of a game context
   if (team) {
     return (
-      <Link href={`/team/${team.id}`} key={`team-${team.id}`}>
+      <Link href={`/team/${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -125,26 +123,13 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   // If we're displaying a participant in a game
   if (participant?.team) {
     return (
-      <Card
-        key={`participant-${participant.teamId}`}
-        className={`
-          ${participant.status === "eliminated" ? "opacity-50" : ""}
-          hover:bg-accent/50 transition-colors
-        `}
-      >
+      <Card className={`${participant.status === "eliminated" ? "opacity-50" : ""} hover:bg-accent/50 transition-colors`}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div
-                className={`
-                  w-10 h-10 rounded-full flex items-center justify-center
-                  ${
-                    participant.status === "eliminated"
-                      ? "bg-destructive"
-                      : "bg-primary"
-                  }
-                `}
-              >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                participant.status === "eliminated" ? "bg-destructive" : "bg-primary"
+              }`}>
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>

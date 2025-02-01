@@ -27,7 +27,6 @@ export default function Home() {
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
-    // Shorter polling interval to keep participant count up to date
     refetchInterval: 5000,
   });
 
@@ -123,15 +122,15 @@ export default function Home() {
               <h2 className="text-2xl font-semibold">Active Games</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {activeGames?.length === 0 ? (
+              {!activeGames || activeGames.length === 0 ? (
                 <Card className="col-span-2 p-6">
                   <p className="text-center text-muted-foreground">
                     No active games available at the moment.
                   </p>
                 </Card>
               ) : (
-                activeGames?.map((game) => (
-                  <Link key={`game-${game.id}`} href={`/game/${game.id}`}>
+                activeGames.map((game) => (
+                  <Link key={game.id} href={`/game/${game.id}`}>
                     <Card className="hover:bg-accent/80 transition-colors cursor-pointer backdrop-blur-sm bg-background/80">
                       <CardHeader>
                         <CardTitle className="flex items-center justify-between">
@@ -204,13 +203,7 @@ export default function Home() {
                   {teams?.map((team) => (
                     <TeamCard 
                       key={team.id} 
-                      team={{
-                        ...team,
-                        teamMembers: team.teamMembers.map(member => ({
-                          ...member,
-                          joinedAt: new Date(member.joinedAt).toISOString()
-                        }))
-                      }} 
+                      team={team}
                     />
                   ))}
                 </div>
