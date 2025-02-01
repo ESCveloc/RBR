@@ -91,6 +91,11 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <div>
                   <h3 className="font-semibold">{team.name}</h3>
                   <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      team.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {team.active ? 'Active' : 'Inactive'}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
