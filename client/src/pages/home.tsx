@@ -204,14 +204,7 @@ export default function Home() {
                   {teams?.map((team) => (
                     <TeamCard 
                       key={team.id} 
-                      team={{
-                        ...team.teams,
-                        member_count: team.team_members,
-                        teamMembers: team.teamMembers.map(member => ({
-                          ...member,
-                          joinedAt: new Date(member.joinedAt).toISOString()
-                        }))
-                      }} 
+                      team={team} 
                     />
                   ))}
                 </div>
