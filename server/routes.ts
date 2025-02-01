@@ -770,6 +770,117 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/games/:gameId/team-ready", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId, ready } = req.body;
+
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
+      }
+
+      // Verify participant exists and user is team captain
+      const [participant] = await db
+        .select({
+          id: gameParticipants.id,
+          teamId: gameParticipants.teamId,
+          team: teams
+        })
+        .from(gameParticipants)
+        .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1);
+
+      if (!participant) {
+        return res.status(404).send("Team is not participating in this game");
+      }
+
+      if (participant.team.captainId !== req.user.id) {
+        return res.status(403).send("Only team captain can update ready status");
+      }
+
+      // Update participant ready status
+      const [updatedParticipant] = await db
+        .update(gameParticipants)
+        .set({ ready })
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .returning();
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error("Update team ready status error:", error);
+      res.status(500).send("Failed to update team ready status");
+    }
+  });
+
+  app.post("/api/games/:gameId/leave", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId } = req.body;
+
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
+      }
+
+      // Verify participant exists and user is team captain
+      const [participant] = await db
+        .select({
+          id: gameParticipants.id,
+          teamId: gameParticipants.teamId,
+          team: teams
+        })
+        .from(gameParticipants)
+        .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1);
+
+      if (!participant) {
+        return res.status(404).send("Team is not participating in this game");
+      }
+
+      if (participant.team.captainId !== req.user.id) {
+        return res.status(403).send("Only team captain can leave the game");
+      }
+
+      // Delete the participant
+      await db
+        .delete(gameParticipants)
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        );
+
+      res.json({ message: "Successfully left the game" });
+    } catch (error) {
+      console.error("Leave game error:", error);
+      res.status(500).send("Failed to leave game");
+    }
+  });
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {
