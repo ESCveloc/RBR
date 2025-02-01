@@ -949,7 +949,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Get game participants with team data and actual team members
-      constparticipants = await db
+      const participants = await db
         .select({
           id: gameParticipants.id,
           gameId: gameParticipants.gameId,

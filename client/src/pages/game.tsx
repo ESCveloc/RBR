@@ -140,9 +140,9 @@ export default function Game() {
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-purple-500/15 px-3 py-1 text-sm font-medium text-purple-700">
               {game.status === 'active' ? 'In Progress' :
+               game.status === 'pending' ? 'Pending' :
                game.status === 'completed' ? 'Completed' :
-               game.status === 'cancelled' ? 'Cancelled' :
-               'Pending'}
+               game.status === 'cancelled' ? 'Cancelled' : 'Unknown'}
             </div>
 
             {/* Admin controls */}
@@ -242,17 +242,20 @@ export default function Game() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!game.participants || game.participants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
-              ) : (
+              {game.participants && game.participants.length > 0 ? (
                 game.participants.map((participant) => (
                   <TeamCard
                     key={participant.id}
                     gameId={game.id}
-                    participant={participant}
+                    participant={{
+                      ...participant,
+                      team: participant.team || undefined
+                    }}
                     canAssignPosition={isAdmin && game.status === 'pending'}
                   />
                 ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
               )}
             </CardContent>
           </Card>

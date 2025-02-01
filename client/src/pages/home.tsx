@@ -202,7 +202,16 @@ export default function Home() {
               <CardContent>
                 <div className="space-y-4">
                   {teams?.map((team) => (
-                    <TeamCard key={team.id} team={team} />
+                    <TeamCard 
+                      key={team.id} 
+                      team={{
+                        ...team,
+                        teamMembers: team.teamMembers.map(member => ({
+                          ...member,
+                          joinedAt: new Date(member.joinedAt).toISOString()
+                        }))
+                      }} 
+                    />
                   ))}
                 </div>
               </CardContent>
