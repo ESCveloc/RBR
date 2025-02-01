@@ -18,11 +18,13 @@ interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
     team: Team & { 
-      teamMembers: Array<{ id: number; userId: number; joinedAt: string }> 
+      teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
+      member_count?: number;
     } 
   };
   team?: Team & { 
-    teamMembers: Array<{ id: number; userId: number; joinedAt: string }> 
+    teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
+    member_count?: number;
   };
   canAssignPosition?: boolean;
 }
@@ -67,13 +69,13 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const getTeamMembersCount = () => {
     // If we have a direct team reference from the teams list
-    if (team?.teamMembers) {
-      return team.teamMembers.length;
+    if (team?.member_count !== undefined) {
+      return team.member_count;
     }
 
     // If we have a team reference through game participant
-    if (participant?.team?.teamMembers) {
-      return participant.team.teamMembers.length;
+    if (participant?.team?.member_count !== undefined) {
+      return participant.team.member_count;
     }
 
     return 0;

@@ -333,7 +333,7 @@ export function registerRoutes(app: Express): Server {
       const userTeams = await db
         .select({
           teams: teams,
-          team_members: teamMembers
+          team_members: sql<number>`count(${teamMembers.id})::int`.mapWith(Number).as('member_count')
         })
         .from(teams)
         .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
@@ -342,32 +342,11 @@ export function registerRoutes(app: Express): Server {
             eq(teams.captainId, (req.user as any).id),
             eq(teamMembers.userId, (req.user as any).id)
           )
-        );
+        )
+        .groupBy(teams.id);
 
-      // Process the data to include all members
-      const processedTeams = userTeams.reduce<any[]>((acc, item) => {
-        const existingTeam = acc.find(t => t.teams.id === item.teams.id);
-
-        if (!existingTeam) {
-          // Create new team entry with the first member if it exists
-          acc.push({
-            teams: item.teams,
-            team_members: item.team_members ? [item.team_members] : []
-          });
-        } else if (item.team_members) {
-          // Add additional members to existing team
-          const memberExists = existingTeam.team_members.some(
-            (m: any) => m.id === item.team_members.id
-          );
-          if (!memberExists) {
-            existingTeam.team_members.push(item.team_members);
-          }
-        }
-
-        return acc;
-      }, []);
-
-      res.json(processedTeams);
+      console.log('Teams with member counts:', userTeams);
+      res.json(userTeams);
     } catch (error) {
       console.error("Teams fetch error:", error);
       res.status(500).send("Failed to fetch teams");
@@ -965,8 +944,7 @@ export function registerRoutes(app: Express): Server {
       );
 
       res.json({ ...game, participants: participantsWithTeamMembers });
-    } catch (error) {
-      console.error("Fetch game error:", error);
+    } catch (error) {      console.error("Fetch game error:", error);
       res.status(500).json({ message: "Failed to fetch game" });
     }
   });

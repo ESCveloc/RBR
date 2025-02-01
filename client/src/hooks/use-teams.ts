@@ -3,11 +3,12 @@ import type { Team, TeamMember } from "@db/schema";
 
 interface TeamWithMembers extends Team {
   teamMembers: TeamMember[];
+  member_count?: number;
 }
 
 interface TeamResponse {
   teams: Team;
-  team_members: TeamMember | null;
+  team_members: number;
 }
 
 export function useTeams() {
@@ -25,16 +26,9 @@ export function useTeams() {
       // Create new team entry
       acc.push({
         ...item.teams,
-        teamMembers: item.team_members ? [item.team_members] : []
+        member_count: item.team_members,
+        teamMembers: []
       });
-    } else if (item.team_members) {
-      // Add new team member if not already in the array
-      const memberExists = existingTeam.teamMembers.some(
-        m => m.id === item.team_members!.id
-      );
-      if (!memberExists) {
-        existingTeam.teamMembers.push(item.team_members);
-      }
     }
 
     return acc;
