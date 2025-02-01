@@ -16,8 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: GameParticipant & { team?: Team & { teamMembers?: any[] } };
-  team?: Team & { teamMembers?: any[] };
+  participant?: GameParticipant & { 
+    team?: Team & { 
+      teamMembers?: { id: number }[] 
+    } 
+  };
+  team?: Team & { 
+    teamMembers?: { id: number }[] 
+  };
   canAssignPosition?: boolean;
 }
 
@@ -59,14 +65,18 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     },
   });
 
-  // Get the correct team members count, handling both direct team prop and participant.team
   const getTeamMembersCount = () => {
+    // For direct team display
     if (team?.teamMembers) {
       return team.teamMembers.length;
     }
+
+    // For participant team display
     if (participant?.team?.teamMembers) {
       return participant.team.teamMembers.length;
     }
+
+    // Fallback
     return 0;
   };
 
