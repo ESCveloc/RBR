@@ -1,0 +1,79 @@
+3:59:12 PM [express] POST /api/login 200 in 166ms :: {"message":"Login successful","user":{"id":1,"u…
+3:59:12 PM [express] GET /api/user 304 in 76ms :: {"id":1,"username":"Ickarss","role":"user"}
+Teams with member counts: [
+  {
+    teams: {
+      id: 1,
+      name: 'ESCape Velocity',
+      description: null,
+      captainId: 2,
+      active: true,
+      createdAt: 2025-01-25T05:31:24.609Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 2
+  },
+  {
+    teams: {
+      id: 3,
+      name: 'testies_3',
+      description: null,
+      captainId: 1,
+      active: true,
+      createdAt: 2025-01-28T23:54:49.548Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 3
+  }
+]
+3:59:13 PM [express] GET /api/teams 304 in 228ms :: [{"teams":{"id":1,"name":"ESCape Velocity","desc…
+3:59:15 PM [express] GET /api/user 304 in 75ms :: {"id":1,"username":"Ickarss","role":"user"}
+Teams with member counts: [
+  {
+    teams: {
+      id: 1,
+      name: 'ESCape Velocity',
+      description: null,
+      captainId: 2,
+      active: true,
+      createdAt: 2025-01-25T05:31:24.609Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 2
+  },
+  {
+    teams: {
+      id: 3,
+      name: 'testies_3',
+      description: null,
+      captainId: 1,
+      active: true,
+      createdAt: 2025-01-28T23:54:49.548Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 3
+  }
+]
+3:59:15 PM [express] GET /api/teams 200 in 224ms :: [{"teams":{"id":1,"name":"ESCape Velocity","desc…
+3:59:16 PM [express] GET /api/games 304 in 541ms :: [{"id":1,"name":"test","status":"completed","sta…
+3:59:18 PM [express] GET /api/games/9 304 in 373ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:22 PM [express] POST /api/games/9/team-ready 200 in 308ms :: {"id":5,"gameId":9,"teamId":3,"sta…
+3:59:27 PM [express] GET /api/games/9 304 in 381ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:27 PM [express] POST /api/games/9/team-ready 200 in 306ms :: {"id":5,"gameId":9,"teamId":3,"sta…
+3:59:32 PM [express] GET /api/games/9 304 in 379ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:38 PM [express] GET /api/games/9 304 in 423ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:44 PM [express] GET /api/games/9 304 in 381ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:49 PM [express] GET /api/games/9 304 in 380ms :: {"id":9,"name":"Zones","status":"pending","sta…
+3:59:55 PM [express] GET /api/games/9 304 in 378ms :: {"id":9,"name":"Zones","status":"pending","sta…
+4:00:01 PM [express] GET /api/games/9 304 in 383ms :: {"id":9,"name":"Zones","status":"pending","sta…
+4:00:06 PM [express] GET /api/games/9 304 in 374ms :: {"id":9,"name":"Zones","status":"pending","sta…
+4:00:12 PM [express] GET /api/games/9 304 in 378ms :: {"id":9,"name":"Zones","status":"pending","sta…
+4:00:17 PM [express] GET /api/games/9 304 in 380ms :: {"id":9,"name":"Zones","status":"pending","sta…

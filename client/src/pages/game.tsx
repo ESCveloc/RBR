@@ -20,16 +20,10 @@ export default function Game() {
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
   const { data: game, isLoading, error } = useQuery({
     queryKey: [`/api/games/${gameId}`],
-    refetchInterval: 5000,
-    staleTime: 2000,
+    refetchInterval: 10000, // Increase interval to 10 seconds
+    staleTime: 8000, // Increase stale time to reduce unnecessary refetches
     placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
-
-  // Simple admin check
-  const isAdmin = user?.role === 'admin';
-
-  // Get the back link based on user role
-  const backLink = isAdmin ? "/admin" : "/";
 
   // Debug logging
   useEffect(() => {
@@ -42,6 +36,12 @@ export default function Game() {
       error
     });
   }, [user, isAdmin, game, gameId, error]);
+
+  // Simple admin check
+  const isAdmin = user?.role === 'admin';
+
+  // Get the back link based on user role
+  const backLink = isAdmin ? "/admin" : "/";
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {

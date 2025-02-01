@@ -52,7 +52,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         throw new Error(await response.text());
       }
 
-      return response.json();
+      const result = await response.json();
+      return { ...result, ready: newReadyState };
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
@@ -61,11 +62,14 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
       queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
         if (!old) return old;
+
+        const newReadyState = !participant?.ready;
+
         return {
           ...old,
           participants: old.participants?.map((p: any) =>
             p.teamId === participant?.teamId
-              ? { ...p, ready: !participant.ready }
+              ? { ...p, ready: newReadyState }
               : p
           )
         };
@@ -82,10 +86,30 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         variant: "destructive",
       });
     },
-    onSuccess: () => {
+    onSettled: () => {
+      // Delay the refetch to allow the optimistic update to persist
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      }, 2000);
+    },
+    onSuccess: (updatedParticipant) => {
+      // Update the cache with the server response
+      queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
+        if (!oldData) return oldData;
+
+        return {
+          ...oldData,
+          participants: oldData.participants?.map((p: any) =>
+            p.teamId === updatedParticipant.teamId
+              ? { ...p, ...updatedParticipant }
+              : p
+          )
+        };
+      });
+
       toast({
         title: "Status Updated",
-        description: `Team is now ${!participant?.ready ? "ready" : "not ready"} for the game.`,
+        description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
       });
     }
   });
