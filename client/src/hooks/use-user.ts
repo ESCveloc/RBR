@@ -17,11 +17,7 @@ async function handleRequest(
     console.log(`[Auth] Making ${method} request to ${url}`);
     const response = await fetch(url, {
       method,
-      headers: {
-        ...(body ? { "Content-Type": "application/json" } : {}),
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
-      },
+      headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "include",
     });
@@ -47,31 +43,22 @@ async function handleRequest(
 
 async function fetchUser(): Promise<User | null> {
   console.log('[Auth] Fetching user data');
-  try {
-    const response = await fetch("/api/user", {
-      credentials: "include",
-      headers: {
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
-      }
-    });
+  const response = await fetch("/api/user", {
+    credentials: "include",
+  });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        console.log('[Auth] User not authenticated');
-        return null;
-      }
-      console.error('[Auth] Error fetching user:', response.status);
-      throw new Error(`${response.status}: ${await response.text()}`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      console.log('[Auth] User not authenticated');
+      return null;
     }
-
-    const userData = await response.json();
-    console.log('[Auth] User data received:', { ...userData, password: '[REDACTED]' });
-    return userData;
-  } catch (error) {
-    console.error('[Auth] Error in fetchUser:', error);
-    return null;
+    console.error('[Auth] Error fetching user:', response.status);
+    throw new Error(`${response.status}: ${await response.text()}`);
   }
+
+  const userData = await response.json();
+  console.log('[Auth] User data received:', { ...userData, password: '[REDACTED]' });
+  return userData;
 }
 
 export function useUser() {
@@ -80,10 +67,8 @@ export function useUser() {
   const { data: user, error, isLoading } = useQuery<User | null>({
     queryKey: ["user"],
     queryFn: fetchUser,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: 1,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: Infinity,
+    retry: false,
   });
 
   console.log('[Auth] Current user state:', { 
@@ -106,8 +91,6 @@ export function useUser() {
     onSuccess: () => {
       console.log('[Auth] Logout successful, invalidating user query');
       queryClient.invalidateQueries({ queryKey: ["user"] });
-      // Clear all queries on logout
-      queryClient.clear();
     },
   });
 

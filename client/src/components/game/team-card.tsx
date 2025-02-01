@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import type { GameParticipant } from "@db/schema";
-import type { TeamWithMembers } from "@/hooks/use-teams";
+import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Loader2 } from "lucide-react";
+import { Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -18,9 +17,15 @@ import { useToast } from "@/hooks/use-toast";
 interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
-    team?: TeamWithMembers;
+    team: Team & { 
+      teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
+      member_count?: number;
+    } 
   };
-  team?: TeamWithMembers;
+  team?: Team & { 
+    teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
+    member_count?: number;
+  };
   canAssignPosition?: boolean;
 }
 
@@ -31,15 +36,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
-      if (!gameId || !participant?.teamId) {
-        throw new Error("Missing required game or team information");
-      }
+      if (!gameId || !participant?.teamId) return;
 
       const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: participant.teamId, position }),
-        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -52,7 +54,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       setIsAssigning(false);
       toast({
-        title: "Success",
+        title: "Position Assigned",
         description: "Starting position has been assigned successfully.",
       });
     },
@@ -66,15 +68,19 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   const getTeamMembersCount = () => {
-    const teamToUse = team || participant?.team;
-    if (!teamToUse?.teamMembers) return 0;
-    return teamToUse.teamMembers.length;
+    if (team?.member_count !== undefined) {
+      return team.member_count;
+    }
+    if (participant?.team?.member_count !== undefined) {
+      return participant.team.member_count;
+    }
+    return 0;
   };
 
   // If we're displaying a team outside of a game context
   if (team) {
     return (
-      <Link href={`/team/${team.id}`}>
+      <Link href={`/team/${team.id}`} key={`team-${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -109,13 +115,26 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   // If we're displaying a participant in a game
   if (participant?.team) {
     return (
-      <Card className={`${participant.status === "eliminated" ? "opacity-50" : ""} hover:bg-accent/50 transition-colors`}>
+      <Card
+        key={`participant-${participant.teamId}`}
+        className={`
+          ${participant.status === "eliminated" ? "opacity-50" : ""}
+          hover:bg-accent/50 transition-colors
+        `}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                participant.status === "eliminated" ? "bg-destructive" : "bg-primary"
-              }`}>
+              <div
+                className={`
+                  w-10 h-10 rounded-full flex items-center justify-center
+                  ${
+                    participant.status === "eliminated"
+                      ? "bg-destructive"
+                      : "bg-primary"
+                  }
+                `}
+              >
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>
