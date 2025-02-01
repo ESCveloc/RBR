@@ -53,17 +53,22 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       }
 
       const result = await response.json();
-      return { ...result, ready: newReadyState };
+
+      // Ensure we return the correct ready state
+      return {
+        ...result,
+        ready: newReadyState,
+        teamId: participant.teamId
+      };
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
 
       const previousGame = queryClient.getQueryData([`/api/games/${gameId}`]);
+      const newReadyState = !participant?.ready;
 
       queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
         if (!old) return old;
-
-        const newReadyState = !participant?.ready;
 
         return {
           ...old,
@@ -75,25 +80,20 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         };
       });
 
-      return { previousGame };
+      return { previousGame, newReadyState };
     },
-    onError: (err, variables, context) => {
+    onError: (error, variables, context) => {
+      // Revert to previous state on error
       queryClient.setQueryData([`/api/games/${gameId}`], context?.previousGame);
 
       toast({
         title: "Error",
-        description: err.message,
+        description: error.message,
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      // Delay the refetch to allow the optimistic update to persist
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      }, 2000);
-    },
     onSuccess: (updatedParticipant) => {
-      // Update the cache with the server response
+      // Update cache with server response
       queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
         if (!oldData) return oldData;
 
@@ -101,7 +101,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
           ...oldData,
           participants: oldData.participants?.map((p: any) =>
             p.teamId === updatedParticipant.teamId
-              ? { ...p, ...updatedParticipant }
+              ? { ...p, ready: updatedParticipant.ready }
               : p
           )
         };
