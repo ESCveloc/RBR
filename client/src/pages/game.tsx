@@ -22,13 +22,9 @@ export default function Game() {
   const { data: game, isLoading, error } = useQuery({
     queryKey: [`/api/games/${gameId}`],
     refetchInterval: 5000,
-    // Add staleTime to prevent unnecessary refreshes
     staleTime: 2000,
-    // Keep previous data while revalidating
-    keepPreviousData: true,
-    // Custom merge function to preserve ready states
+    placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`]),
     select: (data: any) => {
-      // Get the existing data from cache
       const existingData = queryClient.getQueryData([`/api/games/${gameId}`]);
       if (!existingData) return data;
 
@@ -38,10 +34,10 @@ export default function Game() {
           const existingParticipant = existingData.participants.find(
             (p: any) => p.teamId === newParticipant.teamId
           );
-          if (existingParticipant && existingParticipant.ready !== undefined) {
+          if (existingParticipant) {
             return {
               ...newParticipant,
-              ready: existingParticipant.ready
+              ready: existingParticipant.ready ?? newParticipant.ready
             };
           }
           return newParticipant;

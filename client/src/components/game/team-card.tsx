@@ -37,10 +37,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
 
+      const newReadyState = !participant.ready;
       console.log('Toggling ready status:', { 
         gameId, 
         teamId: participant.teamId, 
-        currentReady: participant.ready 
+        currentReady: participant.ready,
+        newReadyState 
       });
 
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
@@ -48,7 +50,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           teamId: participant.teamId,
-          ready: !participant.ready
+          ready: newReadyState
         }),
         credentials: 'include'
       });
@@ -59,7 +61,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
       const result = await response.json();
       console.log('Toggle response:', result);
-      return result;
+      return { ...result, ready: newReadyState };
     },
     onMutate: async (variables) => {
       // Cancel outgoing refetches
@@ -71,11 +73,17 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       // Optimistically update the cache
       queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
         if (!old) return old;
+
+        console.log('Optimistic update:', {
+          previousState: old.participants?.find((p: any) => p.teamId === participant?.teamId)?.ready,
+          newState: !participant?.ready
+        });
+
         return {
           ...old,
           participants: old.participants?.map((p: any) =>
             p.teamId === participant?.teamId
-              ? { ...p, ready: !participant.ready }
+              ? { ...p, ready: !participant?.ready }
               : p
           ),
         };
@@ -97,10 +105,17 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       });
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure consistency
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      // Don't immediately refetch to allow optimistic update to persist
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      }, 1000);
     },
     onSuccess: (updatedParticipant) => {
+      console.log('Success handler:', {
+        updatedParticipant,
+        readyState: updatedParticipant.ready
+      });
+
       toast({
         title: "Status Updated",
         description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
@@ -194,7 +209,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       >
         <CardContent className="p-4">
           <div className="space-y-4">
-            {/* Team info row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
@@ -224,7 +238,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               </span>
             </div>
 
-            {/* Controls row - only show if captain and not eliminated */}
             {isCaptain && participant.status !== "eliminated" && (
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex items-center gap-2">
@@ -232,6 +245,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     checked={isReady}
                     onCheckedChange={() => {
                       if (!toggleReady.isPending) {
+                        console.log('Switch toggled:', { currentReady: isReady });
                         toggleReady.mutate();
                       }
                     }}
