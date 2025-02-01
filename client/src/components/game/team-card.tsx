@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
-    team?: Team & { 
+    team: Team & { 
       teamMembers: Array<{ id: number }> 
     } 
   };
@@ -67,12 +67,14 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const getTeamMembersCount = () => {
     // If we have a direct team reference
-    if (team?.teamMembers) {
+    if (team && team.teamMembers) {
+      console.log("Direct team members:", team.teamMembers);
       return team.teamMembers.length;
     }
 
     // If we have a team reference through participant
     if (participant?.team?.teamMembers) {
+      console.log("Participant team members:", participant.team.teamMembers);
       return participant.team.teamMembers.length;
     }
 

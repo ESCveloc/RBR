@@ -831,24 +831,28 @@ export function registerRoutes(app: Express): Server {
             .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
             .where(eq(gameParticipants.gameId, game.id));
 
-          // For each participant, fetch the team members count if there's a team
+          // For each participant, fetch the actual team members if there's a team
           const participantsWithTeamMembers = await Promise.all(
             participants.map(async (participant) => {
               if (!participant.teamId) {
                 return participant;
               }
 
-              const memberCount = await db
-                .select({ count: sql<number>`count(*)` })
+              // Get actual team members instead of just the count
+              const teamMembers = await db
+                .select({
+                  id: teamMembers.id,
+                  userId: teamMembers.userId,
+                  joinedAt: teamMembers.joinedAt
+                })
                 .from(teamMembers)
-                .where(eq(teamMembers.teamId, participant.teamId))
-                .then(result => result[0]?.count || 0);
+                .where(eq(teamMembers.teamId, participant.teamId));
 
               return {
                 ...participant,
                 team: participant.team ? {
                   ...participant.team,
-                  teamMembers: new Array(memberCount)
+                  teamMembers
                 } : undefined
               };
             })

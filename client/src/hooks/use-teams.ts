@@ -19,9 +19,10 @@ export function useTeams() {
 
   // Process the teams data to handle the nested structure and remove duplicates
   const teams = data?.reduce<TeamWithMembers[]>((acc, item) => {
-    const existingTeam = acc.find(t => t.id === item.teams.id);
+    // Find if we already have this team in our accumulator
+    const existingTeamIndex = acc.findIndex(t => t.id === item.teams.id);
 
-    if (!existingTeam) {
+    if (existingTeamIndex === -1) {
       // Add new team with its member
       acc.push({
         ...item.teams,
@@ -29,6 +30,7 @@ export function useTeams() {
       });
     } else if (item.team_members) {
       // Add member to existing team if not already present
+      const existingTeam = acc[existingTeamIndex];
       if (!existingTeam.teamMembers?.some(m => m.id === item.team_members!.id)) {
         existingTeam.teamMembers = [...(existingTeam.teamMembers || []), item.team_members];
       }
