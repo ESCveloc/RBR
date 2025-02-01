@@ -25,7 +25,6 @@ interface TeamCardProps {
 }
 
 export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamCardProps) {
-  const [isAssigning, setIsAssigning] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -38,12 +37,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       if (!gameId || !participant?.teamId) return;
 
       const newReadyState = !participant.ready;
-      console.log('Toggling ready status:', { 
-        gameId, 
-        teamId: participant.teamId, 
-        currentReady: participant.ready,
-        newReadyState 
-      });
 
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
         method: "POST",
@@ -59,68 +52,42 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         throw new Error(await response.text());
       }
 
-      const result = await response.json();
-      console.log('Toggle response:', result);
-      return { ...result, ready: newReadyState };
+      return response.json();
     },
-    onMutate: async (variables) => {
-      // Cancel outgoing refetches
+    onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
 
-      // Snapshot the previous value
       const previousGame = queryClient.getQueryData([`/api/games/${gameId}`]);
 
-      // Optimistically update the cache
       queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
         if (!old) return old;
-
-        console.log('Optimistic update:', {
-          previousState: old.participants?.find((p: any) => p.teamId === participant?.teamId)?.ready,
-          newState: !participant?.ready
-        });
-
         return {
           ...old,
           participants: old.participants?.map((p: any) =>
             p.teamId === participant?.teamId
-              ? { ...p, ready: !participant?.ready }
+              ? { ...p, ready: !participant.ready }
               : p
-          ),
+          )
         };
       });
 
       return { previousGame };
     },
     onError: (err, variables, context) => {
-      console.error('Toggle ready error:', err);
-      // Revert the optimistic update
-      queryClient.setQueryData(
-        [`/api/games/${gameId}`],
-        context?.previousGame
-      );
+      queryClient.setQueryData([`/api/games/${gameId}`], context?.previousGame);
+
       toast({
         title: "Error",
         description: err.message,
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      // Don't immediately refetch to allow optimistic update to persist
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      }, 1000);
-    },
-    onSuccess: (updatedParticipant) => {
-      console.log('Success handler:', {
-        updatedParticipant,
-        readyState: updatedParticipant.ready
-      });
-
+    onSuccess: () => {
       toast({
         title: "Status Updated",
-        description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
+        description: `Team is now ${!participant?.ready ? "ready" : "not ready"} for the game.`,
       });
-    },
+    }
   });
 
   const leaveGame = useMutation({
@@ -245,7 +212,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     checked={isReady}
                     onCheckedChange={() => {
                       if (!toggleReady.isPending) {
-                        console.log('Switch toggled:', { currentReady: isReady });
                         toggleReady.mutate();
                       }
                     }}

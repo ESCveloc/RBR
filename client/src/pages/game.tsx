@@ -1,14 +1,13 @@
 import { useEffect } from "react";
 import { useRoute, Link } from "wouter";
-import { useGame } from "@/hooks/use-game";
-import { MapView } from "@/components/game/map-view";
-import { TeamCard } from "@/components/game/team-card";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapView } from "@/components/game/map-view";
+import { TeamCard } from "@/components/game/team-card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { SelectTeam } from "@/components/game/select-team";
 
 export default function Game() {
@@ -23,30 +22,9 @@ export default function Game() {
     queryKey: [`/api/games/${gameId}`],
     refetchInterval: 5000,
     staleTime: 2000,
-    placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`]),
-    select: (data: any) => {
-      const existingData = queryClient.getQueryData([`/api/games/${gameId}`]);
-      if (!existingData) return data;
-
-      // Preserve ready states from existing participants
-      if (data.participants && existingData.participants) {
-        data.participants = data.participants.map((newParticipant: any) => {
-          const existingParticipant = existingData.participants.find(
-            (p: any) => p.teamId === newParticipant.teamId
-          );
-          if (existingParticipant) {
-            return {
-              ...newParticipant,
-              ready: existingParticipant.ready ?? newParticipant.ready
-            };
-          }
-          return newParticipant;
-        });
-      }
-      return data;
-    }
+    placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
-  
+
   // Simple admin check
   const isAdmin = user?.role === 'admin';
 
