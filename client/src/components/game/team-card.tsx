@@ -18,11 +18,11 @@ interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
     team?: Team & { 
-      teamMembers?: { id: number }[] 
+      teamMembers: Array<{ id: number }> 
     } 
   };
   team?: Team & { 
-    teamMembers?: { id: number }[] 
+    teamMembers: Array<{ id: number }> 
   };
   canAssignPosition?: boolean;
 }
@@ -66,17 +66,16 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   });
 
   const getTeamMembersCount = () => {
-    // For direct team display
+    // If we have a direct team reference
     if (team?.teamMembers) {
       return team.teamMembers.length;
     }
 
-    // For participant team display
+    // If we have a team reference through participant
     if (participant?.team?.teamMembers) {
       return participant.team.teamMembers.length;
     }
 
-    // Fallback
     return 0;
   };
 
@@ -116,7 +115,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   }
 
   // If we're displaying a participant in a game
-  if (participant?.teamId) {
+  if (participant?.team) {
     return (
       <Card
         key={`participant-${participant.teamId}`}
@@ -141,7 +140,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold">{participant.team?.name || `Team ${participant.teamId}`}</h3>
+                <h3 className="font-semibold">{participant.team.name}</h3>
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                     participant.status === "eliminated"
