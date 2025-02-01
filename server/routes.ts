@@ -4,11 +4,10 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
-import { eq, ilike, or, and } from "drizzle-orm";
+import { eq, ilike, or, and, sql, exists } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { sql } from 'drizzle-orm';
 
 const scryptAsync = promisify(scrypt);
 
@@ -333,14 +332,21 @@ export function registerRoutes(app: Express): Server {
       const userTeams = await db
         .select({
           teams: teams,
-          team_members: sql<number>`count(${teamMembers.id})::int`.mapWith(Number).as('member_count')
+          team_members: sql<number>`count(DISTINCT ${teamMembers.userId})::int`.mapWith(Number).as('member_count')
         })
         .from(teams)
         .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
           or(
             eq(teams.captainId, (req.user as any).id),
-            eq(teamMembers.userId, (req.user as any).id)
+            exists(
+              db.select()
+                .from(teamMembers)
+                .where(and(
+                  eq(teamMembers.teamId, teams.id),
+                  eq(teamMembers.userId, (req.user as any).id)
+                ))
+            )
           )
         )
         .groupBy(teams.id);
