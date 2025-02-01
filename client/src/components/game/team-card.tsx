@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import type { GameParticipant, Team } from "@db/schema";
+import type { GameParticipant } from "@db/schema";
+import type { TeamWithMembers } from "@/hooks/use-teams";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Loader2 } from "lucide-react";
@@ -14,29 +15,10 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
-interface TeamUser {
-  id: number;
-  username: string;
-  firstName: string | null;
-  avatar: string | null;
-}
-
-interface TeamMember {
-  id: number;
-  teamId: number;
-  userId: number;
-  joinedAt: string;
-  user: TeamUser;
-}
-
-interface TeamWithMembers extends Team {
-  teamMembers: TeamMember[];
-}
-
 interface TeamCardProps {
   gameId?: number;
   participant?: GameParticipant & { 
-    team: TeamWithMembers;
+    team?: TeamWithMembers;
   };
   team?: TeamWithMembers;
   canAssignPosition?: boolean;
@@ -49,7 +31,9 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
-      if (!gameId || !participant?.teamId) return;
+      if (!gameId || !participant?.teamId) {
+        throw new Error("Missing required game or team information");
+      }
 
       const response = await fetch(`/api/games/${gameId}/assign-starting-location`, {
         method: "POST",
