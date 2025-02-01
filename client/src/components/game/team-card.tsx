@@ -198,6 +198,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
+            {/* Left side - Team info */}
             <div className="flex items-center gap-3">
               <div
                 className={`
@@ -214,36 +215,43 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               <div>
                 <h3 className="font-semibold">{participant.team.name}</h3>
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                    participant.status === "eliminated"
-                      ? 'bg-red-100 text-red-700'
-                      : participant.ready
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {participant.status === "eliminated" 
-                      ? "Eliminated" 
-                      : participant.ready 
-                      ? "Ready"
-                      : "Not Ready"
-                    }
+                  <span className="text-xs text-muted-foreground">
+                    {getTeamMembersCount()} members
                   </span>
                   {participant.startingLocation && (
-                    <span className="text-xs text-muted-foreground">
-                      Position {participant.startingLocation.position}
-                    </span>
+                    <>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className="text-xs text-muted-foreground">
+                        Position {participant.startingLocation.position}
+                      </span>
+                    </>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    • {getTeamMembersCount()} members
-                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Right side - Controls */}
+            <div className="flex items-center gap-4">
+              {/* Game status badge */}
+              <div className={`rounded-full px-3 py-1 text-xs font-medium ${
+                participant.status === "eliminated"
+                  ? 'bg-red-100 text-red-700'
+                  : participant.ready
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {participant.status === "eliminated" 
+                  ? "Eliminated" 
+                  : participant.ready 
+                  ? "Ready"
+                  : "Not Ready"
+                }
+              </div>
+
+              {/* Captain controls */}
               {isCaptain && participant.status !== "eliminated" && (
-                <>
-                  <div className="flex items-center gap-2 mr-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
                     <Switch
                       checked={participant.ready || false}
                       onCheckedChange={() => toggleReady.mutate()}
@@ -251,6 +259,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     />
                     <span className="text-sm">Ready</span>
                   </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -260,9 +269,10 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     <LogOut className="h-4 w-4 mr-2" />
                     Leave
                   </Button>
-                </>
+                </div>
               )}
 
+              {/* Admin position assignment */}
               {canAssignPosition && !participant.startingLocation && (
                 <div className="flex items-center gap-2">
                   {isAssigning ? (
