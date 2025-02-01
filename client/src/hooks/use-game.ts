@@ -2,10 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Game, GameParticipant } from '@db/schema';
 import { useWebSocket } from './use-websocket';
 import { useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
   const ws = useWebSocket();
+  const { toast } = useToast();
 
   // Subscribe to game status updates
   useEffect(() => {
@@ -74,8 +76,39 @@ export function useGame(gameId: number) {
 
       return response.json();
     },
-    onSuccess: (data: GameParticipant) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+    onMutate: async (location) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+
+      // Snapshot the previous value
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      // Optimistically update the cache
+      if (previousGame) {
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: previousGame.participants?.map(p => 
+            p.teamId === previousGame.participants.find(
+              participant => participant.team?.captainId === (game?.createdBy ?? -1)
+            )?.teamId
+              ? { ...p, location }
+              : p
+          )
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (err, newLocation, context) => {
+      // Revert the optimistic update on error
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      toast({
+        title: "Error updating location",
+        description: err.message,
+        variant: "destructive"
+      });
     }
   });
 
@@ -97,8 +130,51 @@ export function useGame(gameId: number) {
 
       return response.json();
     },
+    onMutate: async (teamId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+
+      // Snapshot the previous value
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      // Optimistically update to show the team has joined
+      if (previousGame) {
+        const newParticipant: GameParticipant = {
+          id: -1, // Temporary ID
+          gameId,
+          teamId,
+          status: 'alive',
+          ready: false,
+          eliminatedAt: null,
+          location: null,
+          startingLocation: null,
+          startingLocationAssignedAt: null
+        };
+
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: [...(previousGame.participants || []), newParticipant]
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (err, teamId, context) => {
+      // Revert the optimistic update on error
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      toast({
+        title: "Error joining game",
+        description: err.message,
+        variant: "destructive"
+      });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Successfully joined the game",
+      });
     }
   });
 

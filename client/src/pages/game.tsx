@@ -98,19 +98,39 @@ export default function Game() {
       const data = await response.json();
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Success",
-        description: "Game status updated successfully",
-      });
+    onMutate: async ({ status }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+
+      // Snapshot the previous game state
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      // Optimistically update the game status
+      if (previousGame) {
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          status
+        });
+      }
+
+      return { previousGame };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables, context) => {
+      // Revert to previous state on error
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
       console.error('Error updating game status:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Game status updated successfully",
       });
     }
   });

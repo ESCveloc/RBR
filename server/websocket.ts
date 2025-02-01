@@ -1,5 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
 import type { Server } from "http";
+import type { IncomingMessage } from "http";
+import { parse } from "cookie";
 
 class CustomWebSocketServer extends WebSocketServer {
   broadcast(msg: string): void {
@@ -16,17 +18,34 @@ export function setupWebSocketServer(server: Server) {
     server,
     perMessageDeflate: false,
     maxPayload: 64 * 1024, // 64kb
-    // Ignore Vite HMR WebSocket connections
-    verifyClient: (info: any) => {
-      const protocol = info.req.headers['sec-websocket-protocol'];
-      return !protocol || !protocol.includes('vite-hmr');
+    verifyClient: ({ req }) => {
+      // Ignore Vite HMR WebSocket connections
+      const protocol = req.headers['sec-websocket-protocol'];
+      if (protocol && protocol.includes('vite-hmr')) {
+        return false;
+      }
+
+      // Verify session authentication
+      const cookies = req.headers.cookie;
+      if (!cookies) {
+        console.log("WebSocket connection rejected: No cookies provided");
+        return false;
+      }
+
+      const parsedCookies = parse(cookies);
+      if (!parsedCookies['connect.sid']) {
+        console.log("WebSocket connection rejected: No session cookie");
+        return false;
+      }
+
+      return true;
     }
   });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     console.log("WebSocket client connected");
 
-    ws.on("message", (message) => {
+    ws.on("message", (message: WebSocket.Data) => {
       try {
         const data = JSON.parse(message.toString());
         console.log("Received WebSocket message:", data);
