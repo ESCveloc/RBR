@@ -1,8 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Game, GameParticipant } from '@db/schema';
+import { useWebSocket } from './use-websocket';
+import { useEffect } from 'react';
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
+  const ws = useWebSocket();
+
+  // Subscribe to game status updates
+  useEffect(() => {
+    if (!ws) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'GAME_UPDATE' && data.gameId === gameId) {
+          // Invalidate the game query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    ws.addEventListener('message', handleMessage);
+    return () => ws.removeEventListener('message', handleMessage);
+  }, [ws, gameId, queryClient]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
@@ -13,29 +36,15 @@ export function useGame(gameId: number) {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
           }
         });
 
-        console.log('Game API Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries())
-        });
-
-        const responseText = await response.text();
-        console.log('Response Text:', responseText);
-
-        try {
-          // Try to parse as JSON first
-          const data = JSON.parse(responseText);
-          console.log('Parsed game data:', data);
-          return data;
-        } catch (e) {
-          console.error('JSON Parse Error:', e);
-          throw new Error('Failed to parse game data');
+        if (!response.ok) {
+          throw new Error('Failed to fetch game data');
         }
+
+        const data = await response.json();
+        return data;
       } catch (err) {
         console.error('Error fetching game:', err);
         throw err;
@@ -43,8 +52,8 @@ export function useGame(gameId: number) {
     },
     enabled: !!gameId,
     retry: 3,
-    staleTime: 1000,
-    refetchInterval: 5000
+    staleTime: 30000, // Cache data for 30 seconds
+    refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
   const updateLocation = useMutation({

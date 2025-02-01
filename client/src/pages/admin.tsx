@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
 import { useTeams } from "@/hooks/use-teams";
+import { useWebSocket } from '@/hooks/use-websocket';
 
 const settingsSchema = z.object({
   defaultCenter: z.object({
@@ -181,9 +182,32 @@ export default function Admin() {
     },
   });
 
+  const ws = useWebSocket();
+
+  // Subscribe to game updates
+  useEffect(() => {
+    if (!ws) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'GAME_UPDATE') {
+          // Invalidate the games query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: ["/api/games"] });
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    ws.addEventListener('message', handleMessage);
+    return () => ws.removeEventListener('message', handleMessage);
+  }, [ws, queryClient]);
+
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
-    refetchInterval: 5000,
+    staleTime: 30000, // Cache data for 30 seconds
+    refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
   const { data: users, isLoading: usersLoading } = useQuery({
@@ -675,7 +699,7 @@ export default function Admin() {
                         <FormItem>
                           <FormLabel>Default Center Longitude</FormLabel>
                           <FormControl>
-                            <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                           <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
