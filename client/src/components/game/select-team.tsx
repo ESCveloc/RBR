@@ -11,7 +11,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface SelectTeamProps {
   gameId: number;
@@ -24,7 +23,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
   const queryClient = useQueryClient();
 
   // Filter out inactive teams
-  const activeTeams = teams.filter(team => team.teams?.active || team.active);
+  const activeTeams = teams.filter(team => team.active);
 
   const assignTeam = useMutation({
     mutationFn: async () => {
@@ -79,10 +78,10 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
             {activeTeams && activeTeams.length > 0 ? (
               activeTeams.map((team) => (
                 <SelectItem 
-                  key={team.teams?.id || team.id} 
-                  value={String(team.teams?.id || team.id)}
+                  key={team.id} 
+                  value={String(team.id)}
                 >
-                  {team.teams?.name || team.name}
+                  {team.name} ({team.teamMembers?.length || 0} members)
                 </SelectItem>
               ))
             ) : (

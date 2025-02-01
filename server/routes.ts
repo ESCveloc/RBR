@@ -331,7 +331,10 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const userTeams = await db
-        .select()
+        .select({
+          teams: teams,
+          team_members: teamMembers
+        })
         .from(teams)
         .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
@@ -341,7 +344,30 @@ export function registerRoutes(app: Express): Server {
           )
         );
 
-      res.json(userTeams);
+      // Process the data to include all members
+      const processedTeams = userTeams.reduce<any[]>((acc, item) => {
+        const existingTeam = acc.find(t => t.teams.id === item.teams.id);
+
+        if (!existingTeam) {
+          // Create new team entry with the first member if it exists
+          acc.push({
+            teams: item.teams,
+            team_members: item.team_members ? [item.team_members] : []
+          });
+        } else if (item.team_members) {
+          // Add additional members to existing team
+          const memberExists = existingTeam.team_members.some(
+            (m: any) => m.id === item.team_members.id
+          );
+          if (!memberExists) {
+            existingTeam.team_members.push(item.team_members);
+          }
+        }
+
+        return acc;
+      }, []);
+
+      res.json(processedTeams);
     } catch (error) {
       console.error("Teams fetch error:", error);
       res.status(500).send("Failed to fetch teams");
