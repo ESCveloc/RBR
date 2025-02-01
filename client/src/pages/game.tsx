@@ -233,32 +233,36 @@ export default function Game() {
             </Card>
           )}
 
-          {/* Teams List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Teams
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {game.participants && game.participants.length > 0 ? (
-                game.participants.map((participant) => (
-                  <TeamCard
-                    key={participant.id}
-                    gameId={game.id}
-                    participant={{
-                      ...participant,
-                      team: participant.team || undefined
-                    }}
-                    canAssignPosition={isAdmin && game.status === 'pending'}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
-              )}
-            </CardContent>
-          </Card>
+            {/* Teams List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Teams
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {game.participants && game.participants.length > 0 ? (
+                  game.participants.map((participant) => (
+                    <TeamCard
+                      key={participant.id}
+                      gameId={game.id}
+                      participant={{
+                        ...participant,
+                        team: {
+                          ...participant.team,
+                          teamMembers: participant.team?.teamMembers || [],
+                          member_count: participant.team?.teamMembers?.length || 0
+                        }
+                      }}
+                      canAssignPosition={isAdmin && game.status === 'pending'}
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
+                )}
+              </CardContent>
+            </Card>
         </div>
       </main>
     </div>
