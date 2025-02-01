@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users } from "lucide-react";
+import { Users, LogOut } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-user";
 
 interface TeamCardProps {
   gameId?: number;
@@ -33,6 +35,11 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   const [isAssigning, setIsAssigning] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useUser();
+
+  // Get team object based on context
+  const currentTeam = participant?.team || team;
+  const isCaptain = currentTeam?.captainId === user?.id;
 
   const assignPosition = useMutation({
     mutationFn: async (position: number) => {
@@ -56,6 +63,73 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       toast({
         title: "Position Assigned",
         description: "Starting position has been assigned successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleReady = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId) return;
+
+      const response = await fetch(`/api/games/${gameId}/team-ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          teamId: participant.teamId,
+          ready: !participant.ready
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Status Updated",
+        description: `Team is now ${participant?.ready ? "not ready" : "ready"} for the game.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const leaveGame = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId) return;
+
+      const response = await fetch(`/api/games/${gameId}/leave`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: participant.teamId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Left Game",
+        description: "Your team has left the game.",
       });
     },
     onError: (error: Error) => {
@@ -143,9 +217,16 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                   <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                     participant.status === "eliminated"
                       ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
+                      : participant.ready
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-yellow-100 text-yellow-700'
                   }`}>
-                    {participant.status === "eliminated" ? "Eliminated" : "Active"}
+                    {participant.status === "eliminated" 
+                      ? "Eliminated" 
+                      : participant.ready 
+                      ? "Ready"
+                      : "Not Ready"
+                    }
                   </span>
                   {participant.startingLocation && (
                     <span className="text-xs text-muted-foreground">
@@ -159,46 +240,70 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               </div>
             </div>
 
-            {canAssignPosition && !participant.startingLocation && (
-              <div className="flex items-center gap-2">
-                {isAssigning ? (
-                  <>
-                    <Select
-                      onValueChange={(value) => {
-                        assignPosition.mutate(parseInt(value));
-                      }}
-                      disabled={assignPosition.isPending}
-                    >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Position" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
-                          <SelectItem key={position} value={position.toString()}>
-                            Position {position}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsAssigning(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
+            <div className="flex items-center gap-2">
+              {isCaptain && participant.status !== "eliminated" && (
+                <>
+                  <div className="flex items-center gap-2 mr-4">
+                    <Switch
+                      checked={participant.ready || false}
+                      onCheckedChange={() => toggleReady.mutate()}
+                      disabled={toggleReady.isPending}
+                    />
+                    <span className="text-sm">Ready</span>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsAssigning(true)}
+                    onClick={() => leaveGame.mutate()}
+                    disabled={leaveGame.isPending}
                   >
-                    Assign Position
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave
                   </Button>
-                )}
-              </div>
-            )}
+                </>
+              )}
+
+              {canAssignPosition && !participant.startingLocation && (
+                <div className="flex items-center gap-2">
+                  {isAssigning ? (
+                    <>
+                      <Select
+                        onValueChange={(value) => {
+                          assignPosition.mutate(parseInt(value));
+                        }}
+                        disabled={assignPosition.isPending}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder="Position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((position) => (
+                            <SelectItem key={position} value={position.toString()}>
+                              Position {position}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsAssigning(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAssigning(true)}
+                    >
+                      Assign Position
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
