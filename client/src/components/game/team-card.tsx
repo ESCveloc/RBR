@@ -59,8 +59,19 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
     },
   });
 
+  // Get the correct team members count, handling both direct team prop and participant.team
+  const getTeamMembersCount = () => {
+    if (team?.teamMembers) {
+      return team.teamMembers.length;
+    }
+    if (participant?.team?.teamMembers) {
+      return participant.team.teamMembers.length;
+    }
+    return 0;
+  };
+
   // If we're displaying a team outside of a game context
-  if (team?.id) {
+  if (team) {
     return (
       <Link href={`/team/${team.id}`} key={`team-${team.id}`}>
         <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
@@ -82,7 +93,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                       W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      • {team.teamMembers?.length || 0} members
+                      • {getTeamMembersCount()} members
                     </span>
                   </div>
                 </div>
@@ -135,7 +146,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    • {participant.team?.teamMembers?.length || 0} members
+                    • {getTeamMembersCount()} members
                   </span>
                 </div>
               </div>
