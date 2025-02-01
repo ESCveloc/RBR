@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
 import { useTeams } from "@/hooks/use-teams";
+import type { User } from "@db/schema";
 
 const settingsSchema = z.object({
   defaultCenter: z.object({
@@ -186,7 +187,7 @@ export default function Admin() {
     refetchInterval: 5000,
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
+    const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
@@ -558,7 +559,7 @@ export default function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users?.map((user) => (
+                  {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.username}</TableCell>
                       <TableCell>{user.role}</TableCell>

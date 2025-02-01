@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trophy, Users } from "lucide-react";
+import { Trophy, Users, Loader2 } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -13,8 +13,7 @@ import { ProfileCard } from "@/components/user/profile-card";
 import { OctagonsBackground } from "@/components/game/octagons-background";
 import { useUser } from "@/hooks/use-user";
 import { useTeams } from "@/hooks/use-teams";
-import type { Game } from "@db/schema";
-import { Loader2 } from "lucide-react";
+import type { Game, TeamWithMembers } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +24,7 @@ export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
+  const { data: games = [], isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
     refetchInterval: 5000,
   });
@@ -38,6 +37,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ teamId: payload.teamId }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -71,7 +71,7 @@ export default function Home() {
     await joinGameMutation.mutate({ gameId, teamId });
   };
 
-  if (gamesLoading || teamsLoading) {
+  if (!user || gamesLoading || teamsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -82,14 +82,15 @@ export default function Home() {
   // Filter to only show active and pending games
   const activeGames = games?.filter(game => 
     game.status === "active" || game.status === "pending"
-  );
+  ) || [];
 
   // Get user's first active team
   const activeTeam = teams?.find(team => team.active);
 
   // Check if user's team is already participating in a game
   const isTeamParticipating = (game: Game) => {
-    return game.participants?.some(participant => participant.teamId === activeTeam?.id);
+    if (!game.participants || !activeTeam) return false;
+    return game.participants.some(participant => participant.teamId === activeTeam.id);
   };
 
   return (
@@ -102,10 +103,10 @@ export default function Home() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
               Battle Royale
             </h1>
-            <p className="text-muted-foreground">Welcome back, {user?.username}</p>
+            <p className="text-muted-foreground">Welcome back, {user.username}</p>
           </div>
           <div className="flex gap-2">
-            {user?.role === "admin" && (
+            {user.role === "admin" && (
               <Link href="/admin">
                 <Button variant="outline">Admin Dashboard</Button>
               </Link>
@@ -122,7 +123,7 @@ export default function Home() {
               <h2 className="text-2xl font-semibold">Active Games</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {!activeGames || activeGames.length === 0 ? (
+              {activeGames.length === 0 ? (
                 <Card className="col-span-2 p-6">
                   <p className="text-center text-muted-foreground">
                     No active games available at the moment.
@@ -170,9 +171,9 @@ export default function Home() {
                             }}
                             disabled={joinGameMutation.isPending || (game.participants?.length ?? 0) >= game.maxTeams}
                           >
-                            {joinGameMutation.isPending ? (
+                            {joinGameMutation.isPending && (
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : null}
+                            )}
                             {(game.participants?.length ?? 0) >= game.maxTeams ? "Game Full" : "Join Game"}
                           </Button>
                         </CardFooter>
@@ -200,7 +201,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {teams?.map((team) => (
+                  {teams?.map((team: TeamWithMembers) => (
                     <TeamCard 
                       key={team.id} 
                       team={team}

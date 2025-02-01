@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users } from "lucide-react";
+import { Users, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -55,6 +55,7 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: participant.teamId, position }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -82,7 +83,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
   const getTeamMembersCount = () => {
     const teamToUse = team || participant?.team;
-    return teamToUse?.teamMembers?.length || 0;
+    if (!teamToUse?.teamMembers) return 0;
+    return teamToUse.teamMembers.length;
   };
 
   // If we're displaying a team outside of a game context
