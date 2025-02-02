@@ -11,31 +11,44 @@ export function useGame(gameId: number) {
 
   // Subscribe to game updates
   useEffect(() => {
-    const unsubscribe = subscribeToMessage('GAME_UPDATE', (payload) => {
+    // Subscribe to general game state updates
+    const unsubscribeGameUpdate = subscribeToMessage('GAME_STATE_UPDATE', (payload) => {
       if (payload.gameId === gameId) {
-        // Update the cache with the new data directly instead of invalidating
+        queryClient.setQueryData([`/api/games/${gameId}`], payload.game);
+      }
+    });
+
+    // Subscribe to location updates
+    const unsubscribeLocationUpdate = subscribeToMessage('LOCATION_UPDATE', (payload) => {
+      if (payload.gameId === gameId) {
         queryClient.setQueryData([`/api/games/${gameId}`], (oldData: Game | undefined) => {
-          if (!oldData) return payload.game;
+          if (!oldData) return oldData;
           return {
             ...oldData,
-            ...payload.game,
-            // Merge participants array, preserving optimistic updates
-            participants: payload.game.participants.map((newParticipant: GameParticipant) => {
-              const oldParticipant = oldData.participants?.find(p => p.id === newParticipant.id);
-              return oldParticipant ? { ...oldParticipant, ...newParticipant } : newParticipant;
+            participants: oldData.participants?.map(participant => {
+              if (participant.teamId === payload.teamId) {
+                return {
+                  ...participant,
+                  location: payload.location
+                };
+              }
+              return participant;
             })
           };
         });
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeGameUpdate();
+      unsubscribeLocationUpdate();
+    };
   }, [gameId, queryClient, subscribeToMessage]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
     staleTime: 60000, // Cache data for 1 minute
-    cacheTime: 3600000, // Keep in cache for 1 hour
+    gcTime: 3600000, // Keep in cache for 1 hour
     refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
@@ -65,7 +78,7 @@ export function useGame(gameId: number) {
 
       if (previousGame?.participants) {
         const updatedParticipants = previousGame.participants.map(p => 
-          p.teamId === game?.createdBy ? { ...p, location } : p
+          p.teamId === previousGame.createdBy ? { ...p, location } : p
         );
 
         queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
@@ -105,8 +118,11 @@ export function useGame(gameId: number) {
       }
 
       const data = await response.json();
-      // Broadcast join event through WebSocket
-      sendMessage('GAME_JOIN', { gameId, teamId });
+      sendMessage('GAME_STATE_UPDATE', { 
+        gameId,
+        type: 'TEAM_JOINED',
+        teamId 
+      });
       return data;
     },
     onSuccess: (data) => {

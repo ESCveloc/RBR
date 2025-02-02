@@ -3,8 +3,8 @@ import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { parse } from "cookie";
 import { db } from "@db";
-import { users } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { users, games, teams, gameParticipants } from "@db/schema";
+import { eq, and } from "drizzle-orm";
 import { verify } from "./auth";
 
 interface CustomWebSocket extends WebSocket {
@@ -46,6 +46,92 @@ class GameWebSocketServer extends WebSocketServer {
     }, 30000);
   }
 
+  // Send real-time update to specific game room
+  async broadcastGameUpdate(gameId: number, type: string, data: any) {
+    const room = this.gameRooms.get(gameId);
+    if (!room) {
+      console.log(`No game room found for game ${gameId}`);
+      return;
+    }
+
+    // Get fresh game data from database
+    const [game] = await db
+      .select()
+      .from(games)
+      .where(eq(games.id, gameId))
+      .limit(1);
+
+    if (!game) {
+      console.log(`Game ${gameId} not found in database`);
+      return;
+    }
+
+    // Get participants with their teams
+    const participants = await db
+      .select({
+        id: gameParticipants.id,
+        gameId: gameParticipants.gameId,
+        teamId: gameParticipants.teamId,
+        status: gameParticipants.status,
+        location: gameParticipants.location,
+        team: teams
+      })
+      .from(gameParticipants)
+      .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
+      .where(eq(gameParticipants.gameId, gameId));
+
+    const gameData = {
+      ...game,
+      participants
+    };
+
+    const message = JSON.stringify({
+      type,
+      payload: {
+        gameId,
+        game: gameData,
+        ...data
+      }
+    });
+
+    console.log(`Broadcasting ${type} to game ${gameId}`);
+    room.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  }
+
+  // Send real-time update to team members
+  async broadcastTeamUpdate(teamId: number, type: string, data: any) {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      console.log(`Team ${teamId} not found in database`);
+      return;
+    }
+
+    const message = JSON.stringify({
+      type,
+      payload: {
+        teamId,
+        team,
+        ...data
+      }
+    });
+
+    console.log(`Broadcasting ${type} to team ${teamId} members`);
+    this.clients.forEach((client: CustomWebSocket) => {
+      if (client.readyState === WebSocket.OPEN && client.teamId === teamId) {
+        client.send(message);
+      }
+    });
+  }
+
   joinGame(client: CustomWebSocket, gameId: number) {
     if (client.gameId && client.gameId !== gameId) {
       this.leaveGame(client);
@@ -82,38 +168,6 @@ class GameWebSocketServer extends WebSocketServer {
       client.gameId = undefined;
     }
   }
-
-  broadcastToGame(gameId: number, data: any, excludeClient?: CustomWebSocket) {
-    const room = this.gameRooms.get(gameId);
-    if (!room) {
-      console.log(`Attempted to broadcast to non-existent game room ${gameId}`);
-      return;
-    }
-
-    const now = Date.now();
-    const lastUpdate = room.lastUpdate;
-
-    if (now - lastUpdate.timestamp < this.updateThrottleMs && 
-        JSON.stringify(lastUpdate.data) === JSON.stringify(data)) {
-      return;
-    }
-
-    const message = JSON.stringify(data);
-    let broadcastCount = 0;
-    room.clients.forEach(client => {
-      if (client !== excludeClient && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-        broadcastCount++;
-      }
-    });
-
-    console.log(`Broadcasted to ${broadcastCount} clients in game ${gameId}`);
-
-    room.lastUpdate = {
-      timestamp: now,
-      data
-    };
-  }
 }
 
 export function setupWebSocketServer(server: Server) {
@@ -139,7 +193,6 @@ export function setupWebSocketServer(server: Server) {
           return done(false, 401, "No session ID");
         }
 
-        // Verify session and get user
         const user = await verify(sessionId);
         if (!user) {
           console.log("WebSocket connection rejected: Invalid session");
@@ -156,7 +209,7 @@ export function setupWebSocketServer(server: Server) {
     }
   });
 
-  wss.on("connection", (ws: CustomWebSocket, req: IncomingMessage) => {
+  wss.on("connection", async (ws: CustomWebSocket, req: IncomingMessage) => {
     console.log("New WebSocket connection established");
     ws.isAlive = true;
 
@@ -165,6 +218,18 @@ export function setupWebSocketServer(server: Server) {
     if (user) {
       ws.userId = user.id;
       console.log(`WebSocket authenticated for user ${user.id}`);
+
+      // Get user's team information
+      const [teamMember] = await db
+        .select()
+        .from(teams)
+        .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+        .where(eq(teamMembers.userId, user.id))
+        .limit(1);
+
+      if (teamMember) {
+        ws.teamId = teamMember.id;
+      }
     }
 
     ws.on('pong', () => {
@@ -176,7 +241,6 @@ export function setupWebSocketServer(server: Server) {
         const message = JSON.parse(data.toString());
         console.log("Received WebSocket message:", message);
 
-        // Verify user is authenticated for all messages
         if (!ws.userId) {
           console.log("Rejecting message from unauthenticated connection");
           ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Not authenticated" } }));
@@ -190,32 +254,22 @@ export function setupWebSocketServer(server: Server) {
 
           case "LOCATION_UPDATE":
             if (ws.gameId) {
-              wss.broadcastToGame(ws.gameId, {
-                type: "LOCATION_UPDATE",
-                payload: {
-                  ...message.payload,
-                  userId: ws.userId
-                }
-              }, ws);
+              await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
+                userId: ws.userId,
+                location: message.payload.location
+              });
             }
             break;
 
-          case "GAME_UPDATE":
-            if (ws.gameId) {
-              // Verify user has permission to update game state
-              const user = await db.query.users.findFirst({
-                where: eq(users.id, ws.userId)
-              });
+          case "TEAM_UPDATE":
+            if (ws.teamId) {
+              await wss.broadcastTeamUpdate(ws.teamId, "TEAM_UPDATE", message.payload);
+            }
+            break;
 
-              if (user?.role === 'admin') {
-                wss.broadcastToGame(ws.gameId, message);
-              } else {
-                console.log("Unauthorized game update attempt");
-                ws.send(JSON.stringify({ 
-                  type: "ERROR", 
-                  payload: { message: "Unauthorized" } 
-                }));
-              }
+          case "GAME_STATE_UPDATE":
+            if (ws.gameId) {
+              await wss.broadcastGameUpdate(ws.gameId, "GAME_STATE_UPDATE", message.payload);
             }
             break;
         }
