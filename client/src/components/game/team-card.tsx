@@ -22,9 +22,20 @@ interface TeamCardProps {
     member_count?: number;
   };
   canAssignPosition?: boolean;
+  showMembers?: boolean;
+  showStatus?: boolean;
+  showLocation?: boolean;
 }
 
-export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamCardProps) {
+export function TeamCard({ 
+  gameId, 
+  participant, 
+  team, 
+  canAssignPosition,
+  showMembers = false,
+  showStatus = false,
+  showLocation = false 
+}: TeamCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -60,36 +71,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
         teamId: participant.teamId
       };
     },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
-
-      const previousGame = queryClient.getQueryData([`/api/games/${gameId}`]);
-      const newReadyState = !participant?.ready;
-
-      queryClient.setQueryData([`/api/games/${gameId}`], (old: any) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          participants: old.participants?.map((p: any) =>
-            p.teamId === participant?.teamId
-              ? { ...p, ready: newReadyState }
-              : p
-          )
-        };
-      });
-
-      return { previousGame, newReadyState };
-    },
-    onError: (error, variables, context) => {
-      queryClient.setQueryData([`/api/games/${gameId}`], context?.previousGame);
-
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
     onSuccess: (updatedParticipant) => {
       queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
         if (!oldData) return oldData;
@@ -107,6 +88,13 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       toast({
         title: "Status Updated",
         description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
     }
   });
@@ -207,9 +195,11 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                     <span className="text-xs text-muted-foreground">
                       W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      • {getTeamMembersCount()} members
-                    </span>
+                    {showMembers && (
+                      <span className="text-xs text-muted-foreground">
+                        • {getTeamMembersCount()} members
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -240,10 +230,12 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 <div>
                   <h3 className="font-semibold">{participant.team.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">
-                      {getTeamMembersCount()} members
-                    </span>
-                    {hasStartingPosition && (
+                    {showMembers && (
+                      <span className="text-xs text-muted-foreground">
+                        {getTeamMembersCount()} members
+                      </span>
+                    )}
+                    {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
                         • Starting Position {participant.startingLocation.position + 1}
                       </span>
@@ -252,20 +244,22 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 </div>
               </div>
 
-              <span className={`inline-flex items-center justify-center w-16 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
-                participant.status === "eliminated"
-                  ? 'bg-red-100 text-red-700'
-                  : isReady
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-zinc-200 text-zinc-700'
-              }`}>
-                {participant.status === "eliminated" 
-                  ? "Eliminated" 
-                  : isReady
-                  ? "Ready"
-                  : "Not Ready"
-                }
-              </span>
+              {showStatus && (
+                <span className={`inline-flex items-center justify-center w-16 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+                  participant.status === "eliminated"
+                    ? 'bg-red-100 text-red-700'
+                    : isReady
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-zinc-200 text-zinc-700'
+                }`}>
+                  {participant.status === "eliminated" 
+                    ? "Eliminated" 
+                    : isReady
+                    ? "Ready"
+                    : "Not Ready"
+                  }
+                </span>
+              )}
             </div>
 
             {participant.status !== "eliminated" && (

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,6 @@ export default function Game() {
     refetchInterval: false,
     placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
-
 
   // Debug logging
   useEffect(() => {
@@ -301,21 +300,37 @@ export default function Game() {
             </CardHeader>
             <CardContent className="space-y-4">
               {game.participants && game.participants.length > 0 ? (
-                game.participants.map((participant) => (
-                  <TeamCard
-                    key={participant.id}
-                    gameId={game.id}
-                    participant={{
-                      ...participant,
-                      team: {
-                        ...participant.team,
-                        teamMembers: participant.team?.teamMembers || [],
-                        member_count: participant.team?.teamMembers?.length || 0
-                      }
-                    }}
-                    canAssignPosition={isAdmin && game.status === 'pending'}
-                  />
-                ))
+                game.participants.map((participant) => {
+                  // Ensure the participant object has the correct structure
+                  const enhancedParticipant = {
+                    ...participant,
+                    team: participant.team || {
+                      id: 0,
+                      name: 'Unknown Team',
+                      createdAt: new Date(),
+                      active: true,
+                      description: null,
+                      captainId: 0,
+                      wins: 0,
+                      losses: 0,
+                      tags: null,
+                      teamMembers: [],
+                      member_count: 0
+                    }
+                  };
+    
+                  return (
+                    <TeamCard
+                      key={participant.id}
+                      gameId={game.id}
+                      participant={enhancedParticipant}
+                      canAssignPosition={isAdmin && game.status === 'pending'}
+                      showMembers={true}
+                      showStatus={true}
+                      showLocation={game.status === 'active'}
+                    />
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
               )}
