@@ -24,7 +24,7 @@ interface GameRoom {
 
 class GameWebSocketServer extends WebSocketServer {
   private gameRooms: Map<number, GameRoom> = new Map();
-  private updateThrottleMs = 100; // Minimum time between broadcasts
+  private updateThrottleMs = 100;
 
   constructor(options: any) {
     super(options);
@@ -33,10 +33,9 @@ class GameWebSocketServer extends WebSocketServer {
   }
 
   private setupHeartbeat() {
-    setInterval(() => {
+    const interval = setInterval(() => {
       this.clients.forEach((client: CustomWebSocket) => {
         if (!client.isAlive) {
-          console.log(`Terminating inactive client: ${client.userId}`);
           client.terminate();
           return;
         }
@@ -44,29 +43,24 @@ class GameWebSocketServer extends WebSocketServer {
         client.ping();
       });
     }, 30000);
+
+    this.on('close', () => {
+      clearInterval(interval);
+    });
   }
 
-  // Send real-time update to specific game room
   async broadcastGameUpdate(gameId: number, type: string, data: any) {
     const room = this.gameRooms.get(gameId);
-    if (!room) {
-      console.log(`No game room found for game ${gameId}`);
-      return;
-    }
+    if (!room) return;
 
-    // Get fresh game data from database
     const [game] = await db
       .select()
       .from(games)
       .where(eq(games.id, gameId))
       .limit(1);
 
-    if (!game) {
-      console.log(`Game ${gameId} not found in database`);
-      return;
-    }
+    if (!game) return;
 
-    // Get participants with their teams
     const participants = await db
       .select({
         id: gameParticipants.id,
@@ -80,21 +74,15 @@ class GameWebSocketServer extends WebSocketServer {
       .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
       .where(eq(gameParticipants.gameId, gameId));
 
-    const gameData = {
-      ...game,
-      participants
-    };
-
     const message = JSON.stringify({
       type,
       payload: {
         gameId,
-        game: gameData,
+        game: { ...game, participants },
         ...data
       }
     });
 
-    console.log(`Broadcasting ${type} to game ${gameId}`);
     room.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
@@ -102,43 +90,7 @@ class GameWebSocketServer extends WebSocketServer {
     });
   }
 
-  // Send real-time update to team members
-  async broadcastTeamUpdate(teamId: number, type: string, data: any) {
-    const [team] = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.id, teamId))
-      .limit(1);
-
-    if (!team) {
-      console.log(`Team ${teamId} not found in database`);
-      return;
-    }
-
-    const message = JSON.stringify({
-      type,
-      payload: {
-        teamId,
-        team,
-        ...data
-      }
-    });
-
-    console.log(`Broadcasting ${type} to team ${teamId} members`);
-    this.clients.forEach((client: CustomWebSocket) => {
-      if (client.readyState === WebSocket.OPEN && client.teamId === teamId) {
-        client.send(message);
-      }
-    });
-  }
-
   joinGame(client: CustomWebSocket, gameId: number) {
-    if (client.gameId && client.gameId !== gameId) {
-      this.leaveGame(client);
-    }
-
-    client.gameId = gameId;
-
     if (!this.gameRooms.has(gameId)) {
       this.gameRooms.set(gameId, {
         clients: new Set(),
@@ -147,11 +99,13 @@ class GameWebSocketServer extends WebSocketServer {
           data: null
         }
       });
-      console.log(`Created new game room: ${gameId}`);
     }
 
-    this.gameRooms.get(gameId)?.clients.add(client);
-    console.log(`Client ${client.userId} joined game ${gameId}`);
+    const room = this.gameRooms.get(gameId);
+    if (room) {
+      room.clients.add(client);
+      client.gameId = gameId;
+    }
   }
 
   leaveGame(client: CustomWebSocket) {
@@ -159,10 +113,8 @@ class GameWebSocketServer extends WebSocketServer {
       const room = this.gameRooms.get(client.gameId);
       if (room) {
         room.clients.delete(client);
-        console.log(`Client ${client.userId} left game ${client.gameId}`);
         if (room.clients.size === 0) {
           this.gameRooms.delete(client.gameId);
-          console.log(`Game room ${client.gameId} closed - no more clients`);
         }
       }
       client.gameId = undefined;
@@ -171,23 +123,27 @@ class GameWebSocketServer extends WebSocketServer {
 }
 
 export function setupWebSocketServer(server: Server) {
-  const wss = new GameWebSocketServer({ 
+  const wss = new GameWebSocketServer({
     server,
+    path: '/ws',
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
+    clientTracking: true,
     verifyClient: async ({ req }: { req: IncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
       try {
+        // Skip verification for Vite HMR
         if (req.headers['sec-websocket-protocol']?.includes('vite-hmr')) {
-          return done(false);
+          console.log('Allowing Vite HMR WebSocket connection');
+          return done(true);
         }
 
-        const cookies = req.headers.cookie;
-        if (!cookies) {
+        if (!req.headers.cookie) {
           console.log("WebSocket connection rejected: No cookies");
           return done(false, 401, "No session cookie");
         }
 
-        const sessionId = parse(cookies)['connect.sid'];
+        const cookies = parse(req.headers.cookie);
+        const sessionId = cookies['connect.sid'];
         if (!sessionId) {
           console.log("WebSocket connection rejected: No session ID");
           return done(false, 401, "No session ID");
@@ -199,7 +155,7 @@ export function setupWebSocketServer(server: Server) {
           return done(false, 401, "Invalid session");
         }
 
-        console.log(`WebSocket connection authenticated for user ${user.id}`);
+        console.log(`Authenticated WebSocket connection for user ${user.id}`);
         (req as any).user = user;
         return done(true);
       } catch (error) {
@@ -209,15 +165,13 @@ export function setupWebSocketServer(server: Server) {
     }
   });
 
-  wss.on("connection", async (ws: CustomWebSocket, req: IncomingMessage) => {
-    console.log("New WebSocket connection established");
+  wss.on('connection', async (ws: CustomWebSocket, req: IncomingMessage) => {
+    console.log('New WebSocket connection established');
     ws.isAlive = true;
 
-    // Attach user data from the verified session
     const user = (req as any).user;
     if (user) {
       ws.userId = user.id;
-      console.log(`WebSocket authenticated for user ${user.id}`);
 
       // Get user's team information
       const [userTeam] = await db
@@ -230,7 +184,6 @@ export function setupWebSocketServer(server: Server) {
 
       if (userTeam) {
         ws.teamId = userTeam.teamId;
-        console.log(`User ${user.id} associated with team ${userTeam.teamId}`);
       }
     }
 
@@ -238,14 +191,15 @@ export function setupWebSocketServer(server: Server) {
       ws.isAlive = true;
     });
 
-    ws.on("message", async (data) => {
+    ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString());
-        console.log("Received WebSocket message:", message);
 
         if (!ws.userId) {
-          console.log("Rejecting message from unauthenticated connection");
-          ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Not authenticated" } }));
+          ws.send(JSON.stringify({
+            type: "ERROR",
+            payload: { message: "Not authenticated" }
+          }));
           return;
         }
 
@@ -263,12 +217,6 @@ export function setupWebSocketServer(server: Server) {
             }
             break;
 
-          case "TEAM_UPDATE":
-            if (ws.teamId) {
-              await wss.broadcastTeamUpdate(ws.teamId, "TEAM_UPDATE", message.payload);
-            }
-            break;
-
           case "GAME_STATE_UPDATE":
             if (ws.gameId) {
               await wss.broadcastGameUpdate(ws.gameId, "GAME_STATE_UPDATE", message.payload);
@@ -277,19 +225,19 @@ export function setupWebSocketServer(server: Server) {
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
-        ws.send(JSON.stringify({ 
-          type: "ERROR", 
-          payload: { message: "Invalid message format" } 
+        ws.send(JSON.stringify({
+          type: "ERROR",
+          payload: { message: "Invalid message format" }
         }));
       }
     });
 
-    ws.on("error", (error) => {
-      console.error("WebSocket error:", error);
+    ws.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
     });
 
-    ws.on("close", () => {
-      console.log("WebSocket client disconnected");
+    ws.on('close', () => {
+      console.log('WebSocket connection closed');
       wss.leaveGame(ws);
     });
   });
