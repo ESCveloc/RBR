@@ -37,19 +37,17 @@ export default function Game() {
   useEffect(() => {
     if (!socket || !gameId) return;
 
-    const handleMessage = (event: MessageEvent) => {
+    const unsubscribe = socket.subscribeToMessage('GAME_UPDATE', (data) => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'GAME_UPDATE' && data.gameId === gameId) {
+        if (data.gameId === gameId) {
           queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
         }
       } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+        console.error('Error handling WebSocket message:', err);
       }
-    };
+    });
 
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
+    return () => unsubscribe();
   }, [socket, gameId, queryClient]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
