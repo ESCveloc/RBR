@@ -12,9 +12,10 @@ interface WebSocketInterface {
   sendMessage: (type: string, payload: any) => void;
   subscribeToMessage: (type: string, handler: (payload: any) => void) => () => void;
   isConnected: boolean;
+  joinGame: (gameId: number) => void;
 }
 
-export function useWebSocket(gameId?: number): WebSocketInterface {
+export function useWebSocket(): WebSocketInterface {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
   const { user, isLoading: isUserLoading } = useUser();
@@ -37,12 +38,6 @@ export function useWebSocket(gameId?: number): WebSocketInterface {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       console.log('WebSocket already connected');
       return;
-    }
-
-    if (wsRef.current) {
-      console.log('Closing existing WebSocket connection');
-      wsRef.current.close();
-      wsRef.current = null;
     }
 
     isConnectingRef.current = true;
@@ -69,11 +64,6 @@ export function useWebSocket(gameId?: number): WebSocketInterface {
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
-
-        if (gameId) {
-          console.log('Joining game room:', gameId);
-          ws.send(JSON.stringify({ type: 'JOIN_GAME', payload: { gameId } }));
-        }
       };
 
       ws.onmessage = (event) => {
@@ -151,7 +141,7 @@ export function useWebSocket(gameId?: number): WebSocketInterface {
         variant: "destructive"
       });
     }
-  }, [gameId, user, isUserLoading, toast]);
+  }, [user, isUserLoading, toast]);
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -161,6 +151,16 @@ export function useWebSocket(gameId?: number): WebSocketInterface {
 
     wsRef.current.send(JSON.stringify({ type, payload }));
   }, []);
+
+  const joinGame = useCallback((gameId: number) => {
+    console.log('Attempting to join game:', gameId);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('Sending JOIN_GAME message');
+      sendMessage('JOIN_GAME', { gameId });
+    } else {
+      console.warn('Cannot join game: WebSocket not connected');
+    }
+  }, [sendMessage]);
 
   const subscribeToMessage = useCallback((type: string, handler: (payload: any) => void) => {
     if (!messageHandlersRef.current.has(type)) {
@@ -203,6 +203,7 @@ export function useWebSocket(gameId?: number): WebSocketInterface {
     socket: wsRef.current,
     sendMessage,
     subscribeToMessage,
-    isConnected: wsRef.current?.readyState === WebSocket.OPEN
+    isConnected: wsRef.current?.readyState === WebSocket.OPEN,
+    joinGame
   };
 }
