@@ -3,7 +3,7 @@ import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { parse } from "cookie";
 import { db } from "@db";
-import { users, games, teams, gameParticipants } from "@db/schema";
+import { users, games, teams, teamMembers, gameParticipants } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { verify } from "./auth";
 
@@ -220,15 +220,17 @@ export function setupWebSocketServer(server: Server) {
       console.log(`WebSocket authenticated for user ${user.id}`);
 
       // Get user's team information
-      const [teamMember] = await db
-        .select()
-        .from(teams)
-        .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+      const [userTeam] = await db
+        .select({
+          teamId: teamMembers.teamId
+        })
+        .from(teamMembers)
         .where(eq(teamMembers.userId, user.id))
         .limit(1);
 
-      if (teamMember) {
-        ws.teamId = teamMember.id;
+      if (userTeam) {
+        ws.teamId = userTeam.teamId;
+        console.log(`User ${user.id} associated with team ${userTeam.teamId}`);
       }
     }
 
