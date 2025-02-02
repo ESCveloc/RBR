@@ -44,6 +44,50 @@ declare global {
   }
 }
 
+// Add verify function for WebSocket authentication
+export async function verify(sessionId: string): Promise<User | null> {
+  try {
+    const MemoryStore = createMemoryStore(session);
+    const store = new MemoryStore();
+
+    // Parse session ID from cookie format
+    const sid = sessionId.replace('s:', '').split('.')[0];
+
+    return new Promise((resolve) => {
+      store.get(sid, async (err: any, session: any) => {
+        if (err || !session?.passport?.user) {
+          console.log("Session verification failed:", err || "No user in session");
+          resolve(null);
+          return;
+        }
+
+        try {
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, session.passport.user))
+            .limit(1);
+
+          if (!user) {
+            console.log("User not found for session");
+            resolve(null);
+            return;
+          }
+
+          resolve(user);
+        } catch (dbError) {
+          console.error("Database error during session verification:", dbError);
+          resolve(null);
+        }
+      });
+    });
+  } catch (error) {
+    console.error("Session verification error:", error);
+    return null;
+  }
+}
+
+
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
 

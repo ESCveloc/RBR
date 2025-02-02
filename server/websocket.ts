@@ -2,87 +2,213 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { Server } from "http";
 import type { IncomingMessage } from "http";
 import { parse } from "cookie";
+import { db } from "@db";
+import { users } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { verify } from "./auth";
 
 interface CustomWebSocket extends WebSocket {
   gameId?: number;
+  userId?: number;
+  teamId?: number;
+  isAlive?: boolean;
 }
 
-class CustomWebSocketServer extends WebSocketServer {
-  broadcast(msg: string, excludeSocket?: WebSocket): void {
-    this.clients.forEach((client) => {
-      if (client !== excludeSocket && client.readyState === WebSocket.OPEN) {
-        client.send(msg);
-      }
-    });
+interface GameRoom {
+  clients: Set<CustomWebSocket>;
+  lastUpdate: {
+    timestamp: number;
+    data: any;
+  };
+}
+
+class GameWebSocketServer extends WebSocketServer {
+  private gameRooms: Map<number, GameRoom> = new Map();
+  private updateThrottleMs = 100; // Minimum time between broadcasts
+
+  constructor(options: any) {
+    super(options);
+    this.setupHeartbeat();
   }
 
-  broadcastToGame(gameId: number, msg: string, excludeSocket?: WebSocket): void {
-    this.clients.forEach((client: CustomWebSocket) => {
-      if (client !== excludeSocket && client.readyState === WebSocket.OPEN && client.gameId === gameId) {
-        client.send(msg);
+  private setupHeartbeat() {
+    setInterval(() => {
+      this.clients.forEach((client: CustomWebSocket) => {
+        if (!client.isAlive) {
+          client.terminate();
+          return;
+        }
+        client.isAlive = false;
+        client.ping();
+      });
+    }, 30000);
+  }
+
+  joinGame(client: CustomWebSocket, gameId: number) {
+    if (client.gameId && client.gameId !== gameId) {
+      this.leaveGame(client);
+    }
+
+    client.gameId = gameId;
+
+    if (!this.gameRooms.has(gameId)) {
+      this.gameRooms.set(gameId, {
+        clients: new Set(),
+        lastUpdate: {
+          timestamp: Date.now(),
+          data: null
+        }
+      });
+    }
+
+    this.gameRooms.get(gameId)?.clients.add(client);
+  }
+
+  leaveGame(client: CustomWebSocket) {
+    if (client.gameId) {
+      const room = this.gameRooms.get(client.gameId);
+      if (room) {
+        room.clients.delete(client);
+        if (room.clients.size === 0) {
+          this.gameRooms.delete(client.gameId);
+        }
+      }
+      client.gameId = undefined;
+    }
+  }
+
+  broadcastToGame(gameId: number, data: any, excludeClient?: CustomWebSocket) {
+    const room = this.gameRooms.get(gameId);
+    if (!room) return;
+
+    const now = Date.now();
+    const lastUpdate = room.lastUpdate;
+
+    if (now - lastUpdate.timestamp < this.updateThrottleMs && 
+        JSON.stringify(lastUpdate.data) === JSON.stringify(data)) {
+      return;
+    }
+
+    const message = JSON.stringify(data);
+    room.clients.forEach(client => {
+      if (client !== excludeClient && client.readyState === WebSocket.OPEN) {
+        client.send(message);
       }
     });
+
+    room.lastUpdate = {
+      timestamp: now,
+      data
+    };
   }
 }
 
 export function setupWebSocketServer(server: Server) {
-  const wss = new CustomWebSocketServer({ 
+  const wss = new GameWebSocketServer({ 
     server,
     perMessageDeflate: false,
-    maxPayload: 64 * 1024, // 64kb
-    verifyClient: ({ req }: { req: IncomingMessage }, done) => {
-      // Ignore Vite HMR WebSocket connections
-      const protocol = req.headers['sec-websocket-protocol'];
-      if (protocol && protocol.includes('vite-hmr')) {
-        return done(false);
-      }
+    maxPayload: 64 * 1024,
+    verifyClient: async ({ req }: { req: IncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
+      try {
+        if (req.headers['sec-websocket-protocol']?.includes('vite-hmr')) {
+          return done(false);
+        }
 
-      // Verify session authentication
-      const cookies = req.headers.cookie;
-      if (!cookies) {
-        console.log("WebSocket connection rejected: No cookies provided");
-        return done(false);
-      }
+        const cookies = req.headers.cookie;
+        if (!cookies) {
+          console.log("WebSocket connection rejected: No cookies");
+          return done(false, 401, "No session cookie");
+        }
 
-      const parsedCookies = parse(cookies);
-      if (!parsedCookies['connect.sid']) {
-        console.log("WebSocket connection rejected: No session cookie");
-        return done(false);
-      }
+        const sessionId = parse(cookies)['connect.sid'];
+        if (!sessionId) {
+          console.log("WebSocket connection rejected: No session ID");
+          return done(false, 401, "No session ID");
+        }
 
-      return done(true);
+        // Verify session and get user
+        const user = await verify(sessionId);
+        if (!user) {
+          console.log("WebSocket connection rejected: Invalid session");
+          return done(false, 401, "Invalid session");
+        }
+
+        (req as any).user = user;
+        return done(true);
+      } catch (error) {
+        console.error("WebSocket verification error:", error);
+        return done(false, 500, "Internal server error");
+      }
     }
   });
 
   wss.on("connection", (ws: CustomWebSocket, req: IncomingMessage) => {
-    console.log("WebSocket client connected");
+    ws.isAlive = true;
 
-    ws.on("message", (data) => {
+    // Attach user data from the verified session
+    const user = (req as any).user;
+    if (user) {
+      ws.userId = user.id;
+    }
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+    ws.on("message", async (data) => {
       try {
         const message = JSON.parse(data.toString());
         console.log("Received WebSocket message:", message);
 
-        // Handle different message types
+        // Verify user is authenticated for all messages
+        if (!ws.userId) {
+          console.log("Rejecting message from unauthenticated connection");
+          ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Not authenticated" } }));
+          return;
+        }
+
         switch (message.type) {
           case "JOIN_GAME":
-            ws.gameId = message.payload.gameId;
-            console.log(`Client joined game ${message.payload.gameId}`);
+            wss.joinGame(ws, message.payload.gameId);
             break;
+
           case "LOCATION_UPDATE":
-            // Broadcast location update only to clients in the same game
             if (ws.gameId) {
-              wss.broadcastToGame(ws.gameId, JSON.stringify(message), ws);
+              wss.broadcastToGame(ws.gameId, {
+                type: "LOCATION_UPDATE",
+                payload: {
+                  ...message.payload,
+                  userId: ws.userId
+                }
+              }, ws);
             }
             break;
+
           case "GAME_UPDATE":
-            // Broadcast game state changes to all clients in the game
             if (ws.gameId) {
-              wss.broadcastToGame(ws.gameId, JSON.stringify(message));
+              // Verify user has permission to update game state
+              const user = await db.query.users.findFirst({
+                where: eq(users.id, ws.userId)
+              });
+
+              if (user?.role === 'admin') {
+                wss.broadcastToGame(ws.gameId, message);
+              } else {
+                console.log("Unauthorized game update attempt");
+                ws.send(JSON.stringify({ 
+                  type: "ERROR", 
+                  payload: { message: "Unauthorized" } 
+                }));
+              }
             }
             break;
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
+        ws.send(JSON.stringify({ 
+          type: "ERROR", 
+          payload: { message: "Invalid message format" } 
+        }));
       }
     });
 
@@ -92,8 +218,7 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on("close", () => {
       console.log("WebSocket client disconnected");
-      // Clean up any game-specific state
-      delete ws.gameId;
+      wss.leaveGame(ws);
     });
   });
 

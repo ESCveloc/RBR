@@ -6,60 +6,43 @@ import { useToast } from '@/hooks/use-toast';
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
-  const { socket, addEventListener, removeEventListener } = useWebSocket(gameId);
+  const { sendMessage, subscribeToMessage } = useWebSocket(gameId);
   const { toast } = useToast();
 
-  // Subscribe to game status updates
+  // Subscribe to game updates
   useEffect(() => {
-    if (!socket) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'GAME_UPDATE' && data.gameId === gameId) {
-          // Invalidate the game query to trigger a refetch
-          queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-        }
-      } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+    const unsubscribe = subscribeToMessage('GAME_UPDATE', (payload) => {
+      if (payload.gameId === gameId) {
+        // Update the cache with the new data directly instead of invalidating
+        queryClient.setQueryData([`/api/games/${gameId}`], (oldData: Game | undefined) => {
+          if (!oldData) return payload.game;
+          return {
+            ...oldData,
+            ...payload.game,
+            // Merge participants array, preserving optimistic updates
+            participants: payload.game.participants.map((newParticipant: GameParticipant) => {
+              const oldParticipant = oldData.participants?.find(p => p.id === newParticipant.id);
+              return oldParticipant ? { ...oldParticipant, ...newParticipant } : newParticipant;
+            })
+          };
+        });
       }
-    };
+    });
 
-    addEventListener('message', handleMessage);
-    return () => removeEventListener('message', handleMessage);
-  }, [socket, gameId, queryClient, addEventListener, removeEventListener]);
+    return () => unsubscribe();
+  }, [gameId, queryClient, subscribeToMessage]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/games/${gameId}`, {
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch game data');
-        }
-
-        const data = await response.json();
-        return data;
-      } catch (err) {
-        console.error('Error fetching game:', err);
-        throw err;
-      }
-    },
-    enabled: !!gameId,
-    retry: 3,
-    staleTime: 30000, // Cache data for 30 seconds
+    staleTime: 60000, // Cache data for 1 minute
+    cacheTime: 3600000, // Keep in cache for 1 hour
     refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
   const updateLocation = useMutation({
     mutationFn: async (location: GeolocationCoordinates) => {
+      sendMessage('LOCATION_UPDATE', { gameId, location });
+
       const response = await fetch(`/api/games/${gameId}/update-location`, {
         method: 'POST',
         headers: { 
@@ -77,34 +60,23 @@ export function useGame(gameId: number) {
       return response.json();
     },
     onMutate: async (location) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
-
-      // Snapshot the previous value
       const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
-      // Optimistically update the cache
-      if (previousGame && previousGame.participants) {
-        const userTeam = previousGame.participants.find(
-          participant => participant.team?.captainId === game?.createdBy
+      if (previousGame?.participants) {
+        const updatedParticipants = previousGame.participants.map(p => 
+          p.teamId === game?.createdBy ? { ...p, location } : p
         );
 
-        if (userTeam) {
-          queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
-            ...previousGame,
-            participants: previousGame.participants.map(p => 
-              p.teamId === userTeam.teamId
-                ? { ...p, location }
-                : p
-            )
-          });
-        }
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: updatedParticipants
+        });
       }
 
       return { previousGame };
     },
     onError: (err, newLocation, context) => {
-      // Revert the optimistic update on error
       if (context?.previousGame) {
         queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
       }
@@ -132,52 +104,30 @@ export function useGame(gameId: number) {
         throw new Error(await response.text());
       }
 
-      return response.json();
+      const data = await response.json();
+      // Broadcast join event through WebSocket
+      sendMessage('GAME_JOIN', { gameId, teamId });
+      return data;
     },
-    onMutate: async (teamId) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
-
-      // Snapshot the previous value
-      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
-
-      // Optimistically update to show the team has joined
-      if (previousGame) {
-        const newParticipant: GameParticipant = {
-          id: -1, // Temporary ID
-          gameId,
-          teamId,
-          status: 'alive',
-          ready: false,
-          eliminatedAt: null,
-          location: null,
-          startingLocation: null,
-          startingLocationAssignedAt: null
+    onSuccess: (data) => {
+      queryClient.setQueryData<Game>([`/api/games/${gameId}`], (oldData) => {
+        if (!oldData) return data;
+        return {
+          ...oldData,
+          participants: [...(oldData.participants || []), data.participant]
         };
+      });
 
-        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
-          ...previousGame,
-          participants: [...(previousGame.participants || []), newParticipant]
-        });
-      }
-
-      return { previousGame };
+      toast({
+        title: "Success",
+        description: "Successfully joined the game",
+      });
     },
-    onError: (err, teamId, context) => {
-      // Revert the optimistic update on error
-      if (context?.previousGame) {
-        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
-      }
+    onError: (err) => {
       toast({
         title: "Error joining game",
         description: err.message,
         variant: "destructive"
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Successfully joined the game",
       });
     }
   });

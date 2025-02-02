@@ -1,18 +1,23 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/hooks/use-user';
 
 type WebSocketMessage = {
   type: string;
   payload: any;
+  entity?: string;
+  id?: number;
 };
 
 export function useWebSocket(gameId?: number) {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
+  const { user } = useUser();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
+  const messageCallbacksRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -22,43 +27,46 @@ export function useWebSocket(gameId?: number) {
     }
   }, []);
 
+  const subscribeToMessage = useCallback((type: string, callback: (payload: any) => void) => {
+    if (!messageCallbacksRef.current.has(type)) {
+      messageCallbacksRef.current.set(type, new Set());
+    }
+    messageCallbacksRef.current.get(type)?.add(callback);
+
+    return () => {
+      messageCallbacksRef.current.get(type)?.delete(callback);
+      if (messageCallbacksRef.current.get(type)?.size === 0) {
+        messageCallbacksRef.current.delete(type);
+      }
+    };
+  }, []);
+
   const connect = useCallback(() => {
-    // Prevent multiple simultaneous connection attempts
-    if (isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
+    // Only connect if user is authenticated
+    if (!user || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
     isConnectingRef.current = true;
 
-    // Clean up any existing connection
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
 
-    // Get the current host and construct the WebSocket URL
     const host = window.location.host;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${host}`;
-    console.log('Connecting to WebSocket:', wsUrl);
 
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      const cleanup = () => {
-        ws.removeEventListener('open', handleOpen);
-        ws.removeEventListener('message', handleMessage);
-        ws.removeEventListener('error', handleError);
-        ws.removeEventListener('close', handleClose);
-      };
-
       const handleOpen = () => {
         console.log('WebSocket connected successfully');
         isConnectingRef.current = false;
-        reconnectAttemptRef.current = 0; // Reset reconnect attempts on successful connection
+        reconnectAttemptRef.current = 0;
 
-        // Join game room if gameId is provided
         if (gameId) {
           sendMessage('JOIN_GAME', { gameId });
         }
@@ -69,19 +77,26 @@ export function useWebSocket(gameId?: number) {
           const message: WebSocketMessage = JSON.parse(event.data);
           console.log('Received WebSocket message:', message);
 
+          if (message.type === 'ERROR') {
+            toast({
+              title: "WebSocket Error",
+              description: message.payload.message,
+              variant: "destructive"
+            });
+            return;
+          }
+
+          messageCallbacksRef.current.get(message.type)?.forEach(callback => {
+            callback(message.payload);
+          });
+
           switch (message.type) {
-            case 'LOCATION_UPDATE':
-              // Handle location updates through React Query cache updates
-              break;
             case 'TEAM_ELIMINATED':
               toast({
                 title: "Team Eliminated",
                 description: `Team ${message.payload.teamName} has been eliminated!`,
                 variant: "destructive"
               });
-              break;
-            case 'GAME_UPDATE':
-              // No need for toast here as React Query will handle the UI update
               break;
           }
         } catch (error) {
@@ -96,16 +111,13 @@ export function useWebSocket(gameId?: number) {
 
       const handleClose = () => {
         console.log('WebSocket connection closed');
-        cleanup();
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        // Attempt to reconnect if not at max attempts
-        if (reconnectAttemptRef.current < maxReconnectAttempts) {
+        if (user && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Attempting to reconnect in ${delay}ms`);
 
-          // Clear any existing reconnect timeout
           if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
           }
@@ -121,11 +133,17 @@ export function useWebSocket(gameId?: number) {
         }
       };
 
-      // Add event listeners
       ws.addEventListener('open', handleOpen);
       ws.addEventListener('message', handleMessage);
       ws.addEventListener('error', handleError);
       ws.addEventListener('close', handleClose);
+
+      return () => {
+        ws.removeEventListener('open', handleOpen);
+        ws.removeEventListener('message', handleMessage);
+        ws.removeEventListener('error', handleError);
+        ws.removeEventListener('close', handleClose);
+      };
 
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
@@ -137,44 +155,28 @@ export function useWebSocket(gameId?: number) {
         variant: "destructive"
       });
     }
-  }, [gameId, toast, sendMessage]);
+  }, [gameId, user, toast, sendMessage]);
 
   useEffect(() => {
     connect();
 
-    // Cleanup function
     return () => {
-      // Clear any pending reconnection attempts
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
-      // Close and cleanup the WebSocket connection
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
-      // Reset state
       reconnectAttemptRef.current = 0;
       isConnectingRef.current = false;
+      messageCallbacksRef.current.clear();
     };
   }, [connect]);
-
-  const addListener = useCallback((event: keyof WebSocketEventMap, handler: (event: MessageEvent) => void) => {
-    if (wsRef.current) {
-      wsRef.current.addEventListener(event, handler as EventListener);
-    }
-  }, []);
-
-  const removeListener = useCallback((event: keyof WebSocketEventMap, handler: (event: MessageEvent) => void) => {
-    if (wsRef.current) {
-      wsRef.current.removeEventListener(event, handler as EventListener);
-    }
-  }, []);
 
   return {
     socket: wsRef.current,
     sendMessage,
-    addEventListener: addListener,
-    removeEventListener: removeListener
+    subscribeToMessage
   };
 }
