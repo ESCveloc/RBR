@@ -7,9 +7,14 @@ type WebSocketMessage = {
   payload: any;
 };
 
-type MessageHandler = (payload: any) => void;
+interface WebSocketInterface {
+  socket: WebSocket | null;
+  sendMessage: (type: string, payload: any) => void;
+  subscribeToMessage: (type: string, handler: (payload: any) => void) => () => void;
+  isConnected: boolean;
+}
 
-export function useWebSocket(gameId?: number) {
+export function useWebSocket(gameId?: number): WebSocketInterface {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
   const { user, isLoading: isUserLoading } = useUser();
@@ -17,7 +22,7 @@ export function useWebSocket(gameId?: number) {
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
-  const messageHandlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
+  const messageHandlersRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
 
   const connect = useCallback(() => {
     if (!user || isUserLoading || isConnectingRef.current) {
@@ -26,6 +31,11 @@ export function useWebSocket(gameId?: number) {
         isLoading: isUserLoading,
         isConnecting: isConnectingRef.current
       });
+      return;
+    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected');
       return;
     }
 
@@ -62,11 +72,11 @@ export function useWebSocket(gameId?: number) {
 
         if (gameId) {
           console.log('Joining game room:', gameId);
-          sendMessage('JOIN_GAME', { gameId });
+          ws.send(JSON.stringify({ type: 'JOIN_GAME', payload: { gameId } }));
         }
       };
 
-      ws.onmessage = (event: MessageEvent) => {
+      ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           console.log('Received WebSocket message:', message);
@@ -84,7 +94,13 @@ export function useWebSocket(gameId?: number) {
           // Call all registered handlers for this message type
           const handlers = messageHandlersRef.current.get(message.type);
           if (handlers) {
-            handlers.forEach(handler => handler(message.payload));
+            handlers.forEach(handler => {
+              try {
+                handler(message.payload);
+              } catch (err) {
+                console.error('Error in message handler:', err);
+              }
+            });
           }
         } catch (error) {
           console.error('WebSocket message parsing error:', error);
@@ -138,21 +154,21 @@ export function useWebSocket(gameId?: number) {
   }, [gameId, user, isUserLoading, toast]);
 
   const sendMessage = useCallback((type: string, payload: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type, payload }));
-    } else {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket not connected, message not sent:', { type, payload });
+      return;
     }
+
+    wsRef.current.send(JSON.stringify({ type, payload }));
   }, []);
 
-  const subscribeToMessage = useCallback((type: string, handler: MessageHandler) => {
+  const subscribeToMessage = useCallback((type: string, handler: (payload: any) => void) => {
     if (!messageHandlersRef.current.has(type)) {
       messageHandlersRef.current.set(type, new Set());
     }
     const handlers = messageHandlersRef.current.get(type)!;
     handlers.add(handler);
 
-    // Return unsubscribe function
     return () => {
       const handlers = messageHandlersRef.current.get(type);
       if (handlers) {
