@@ -5,8 +5,6 @@ import { useUser } from '@/hooks/use-user';
 type WebSocketMessage = {
   type: string;
   payload: any;
-  entity?: string;
-  id?: number;
 };
 
 export function useWebSocket(gameId?: number) {
@@ -42,12 +40,10 @@ export function useWebSocket(gameId?: number) {
   }, []);
 
   const connect = useCallback(() => {
-    // Only connect if user is authenticated, not loading, and not already connecting
     if (!user || isUserLoading || isConnectingRef.current) {
       return;
     }
 
-    // If there's an existing connection, close it first
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -55,12 +51,12 @@ export function useWebSocket(gameId?: number) {
 
     isConnectingRef.current = true;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
-
-    console.log('Attempting WebSocket connection to:', wsUrl);
-
     try {
+      // Use relative WebSocket URL
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}`;
+      console.log('Attempting WebSocket connection to:', wsUrl);
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -69,7 +65,6 @@ export function useWebSocket(gameId?: number) {
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
-        // Join game room if gameId is provided
         if (gameId) {
           sendMessage('JOIN_GAME', { gameId });
         }
@@ -88,7 +83,6 @@ export function useWebSocket(gameId?: number) {
             return;
           }
 
-          // Execute all registered callbacks for this message type
           messageCallbacksRef.current.get(message.type)?.forEach(callback => {
             callback(message.payload);
           });
@@ -101,6 +95,11 @@ export function useWebSocket(gameId?: number) {
       ws.addEventListener('error', (error) => {
         console.error('WebSocket connection error:', error);
         isConnectingRef.current = false;
+
+        // Close the connection on error to trigger reconnect
+        if (wsRef.current) {
+          wsRef.current.close();
+        }
       });
 
       ws.addEventListener('close', () => {
@@ -108,7 +107,6 @@ export function useWebSocket(gameId?: number) {
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        // Only attempt reconnection if user is still authenticated and not loading
         if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Attempting to reconnect in ${delay}ms`);
@@ -139,7 +137,6 @@ export function useWebSocket(gameId?: number) {
   }, [gameId, user, isUserLoading, toast, sendMessage]);
 
   useEffect(() => {
-    // Only attempt connection when auth state is stable
     if (!isUserLoading && user) {
       connect();
     }
