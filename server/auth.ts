@@ -11,32 +11,6 @@ import { eq } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
-// Crypto implementation with proper error handling
-const crypto = {
-  hash: async (password: string): Promise<string> => {
-    const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return `${buf.toString("hex")}.${salt}`;
-  },
-  compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
-    try {
-      const [hashedPassword, salt] = storedPassword.split(".");
-      if (!hashedPassword || !salt) {
-        console.error("Invalid stored password format");
-        return false;
-      }
-
-      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
-      const suppliedPasswordBuf = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
-
-      return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
-    } catch (error) {
-      console.error("Password comparison error:", error);
-      return false;
-    }
-  }
-};
-
 // Extend Express User type
 declare global {
   namespace Express {
@@ -48,7 +22,9 @@ declare global {
 export async function verify(sessionId: string): Promise<User | null> {
   try {
     const MemoryStore = createMemoryStore(session);
-    const store = new MemoryStore();
+    const store = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    });
 
     // Parse session ID from cookie format
     const sid = sessionId.replace('s:', '').split('.')[0];
@@ -87,7 +63,6 @@ export async function verify(sessionId: string): Promise<User | null> {
   }
 }
 
-
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
 
@@ -117,8 +92,16 @@ export function setupAuth(app: Express) {
         return done(null, false, { message: "Invalid username or password" });
       }
 
-      console.log("Found user, verifying password...");
-      const isValid = await crypto.compare(password, user.password);
+      const [hashedPassword, salt] = user.password.split(".");
+      if (!hashedPassword || !salt) {
+        console.error("Invalid stored password format");
+        return done(null, false, { message: "Invalid username or password" });
+      }
+
+      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
+      const suppliedPasswordBuf = (await scryptAsync(password, salt, 64)) as Buffer;
+
+      const isValid = timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
       console.log(`Password validation result: ${isValid}`);
 
       if (!isValid) {
@@ -247,3 +230,28 @@ export function setupAuth(app: Express) {
     });
   });
 }
+// Crypto implementation with proper error handling
+const crypto = {
+  hash: async (password: string): Promise<string> => {
+    const salt = randomBytes(16).toString("hex");
+    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${buf.toString("hex")}.${salt}`;
+  },
+  compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
+    try {
+      const [hashedPassword, salt] = storedPassword.split(".");
+      if (!hashedPassword || !salt) {
+        console.error("Invalid stored password format");
+        return false;
+      }
+
+      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
+      const suppliedPasswordBuf = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
+
+      return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
+    } catch (error) {
+      console.error("Password comparison error:", error);
+      return false;
+    }
+  }
+};

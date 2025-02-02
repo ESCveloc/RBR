@@ -12,7 +12,7 @@ type WebSocketMessage = {
 export function useWebSocket(gameId?: number) {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, isLoading: isUserLoading } = useUser();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
@@ -42,8 +42,8 @@ export function useWebSocket(gameId?: number) {
   }, []);
 
   const connect = useCallback(() => {
-    // Only connect if user is authenticated
-    if (!user || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
+    // Only connect if user is authenticated and not already connecting
+    if (!user || isUserLoading || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
@@ -58,6 +58,8 @@ export function useWebSocket(gameId?: number) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${host}`;
 
+    console.log('Attempting WebSocket connection to:', wsUrl);
+
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -67,6 +69,7 @@ export function useWebSocket(gameId?: number) {
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
+        // Join game room if gameId is provided
         if (gameId) {
           sendMessage('JOIN_GAME', { gameId });
         }
@@ -86,10 +89,12 @@ export function useWebSocket(gameId?: number) {
             return;
           }
 
+          // Execute all registered callbacks for this message type
           messageCallbacksRef.current.get(message.type)?.forEach(callback => {
             callback(message.payload);
           });
 
+          // Handle system messages
           switch (message.type) {
             case 'TEAM_ELIMINATED':
               toast({
@@ -114,7 +119,8 @@ export function useWebSocket(gameId?: number) {
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        if (user && reconnectAttemptRef.current < maxReconnectAttempts) {
+        // Only attempt reconnection if user is still authenticated
+        if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Attempting to reconnect in ${delay}ms`);
 
@@ -124,10 +130,10 @@ export function useWebSocket(gameId?: number) {
 
           reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(connect, delay);
-        } else {
+        } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
           toast({
             title: "Connection Error",
-            description: "Failed to connect to game server after multiple attempts",
+            description: "Failed to connect to game server after multiple attempts. Please refresh the page.",
             variant: "destructive"
           });
         }
@@ -155,10 +161,13 @@ export function useWebSocket(gameId?: number) {
         variant: "destructive"
       });
     }
-  }, [gameId, user, toast, sendMessage]);
+  }, [gameId, user, isUserLoading, toast, sendMessage]);
 
   useEffect(() => {
-    connect();
+    // Only attempt connection when auth state is stable and user is logged in
+    if (user && !isUserLoading) {
+      connect();
+    }
 
     return () => {
       if (reconnectTimeoutRef.current) {
@@ -172,7 +181,7 @@ export function useWebSocket(gameId?: number) {
       isConnectingRef.current = false;
       messageCallbacksRef.current.clear();
     };
-  }, [connect]);
+  }, [connect, user, isUserLoading]);
 
   return {
     socket: wsRef.current,

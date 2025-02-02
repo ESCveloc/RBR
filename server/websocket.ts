@@ -62,6 +62,7 @@ class GameWebSocketServer extends WebSocketServer {
     }
 
     this.gameRooms.get(gameId)?.clients.add(client);
+    console.log(`Client ${client.userId} joined game ${gameId}`);
   }
 
   leaveGame(client: CustomWebSocket) {
@@ -69,8 +70,10 @@ class GameWebSocketServer extends WebSocketServer {
       const room = this.gameRooms.get(client.gameId);
       if (room) {
         room.clients.delete(client);
+        console.log(`Client ${client.userId} left game ${client.gameId}`);
         if (room.clients.size === 0) {
           this.gameRooms.delete(client.gameId);
+          console.log(`Game room ${client.gameId} closed - no more clients`);
         }
       }
       client.gameId = undefined;
@@ -79,7 +82,10 @@ class GameWebSocketServer extends WebSocketServer {
 
   broadcastToGame(gameId: number, data: any, excludeClient?: CustomWebSocket) {
     const room = this.gameRooms.get(gameId);
-    if (!room) return;
+    if (!room) {
+      console.log(`Attempted to broadcast to non-existent game room ${gameId}`);
+      return;
+    }
 
     const now = Date.now();
     const lastUpdate = room.lastUpdate;
@@ -90,11 +96,15 @@ class GameWebSocketServer extends WebSocketServer {
     }
 
     const message = JSON.stringify(data);
+    let broadcastCount = 0;
     room.clients.forEach(client => {
       if (client !== excludeClient && client.readyState === WebSocket.OPEN) {
         client.send(message);
+        broadcastCount++;
       }
     });
+
+    console.log(`Broadcasted to ${broadcastCount} clients in game ${gameId}`);
 
     room.lastUpdate = {
       timestamp: now,
@@ -143,12 +153,14 @@ export function setupWebSocketServer(server: Server) {
   });
 
   wss.on("connection", (ws: CustomWebSocket, req: IncomingMessage) => {
+    console.log("New WebSocket connection established");
     ws.isAlive = true;
 
     // Attach user data from the verified session
     const user = (req as any).user;
     if (user) {
       ws.userId = user.id;
+      console.log(`WebSocket authenticated for user ${user.id}`);
     }
 
     ws.on('pong', () => {
