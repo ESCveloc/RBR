@@ -18,19 +18,20 @@ declare global {
   }
 }
 
+// Create a single shared session store instance
+const MemoryStore = createMemoryStore(session);
+export const sessionStore = new MemoryStore({
+  checkPeriod: 86400000 // prune expired entries every 24h
+});
+
 // Add verify function for WebSocket authentication
 export async function verify(sessionId: string): Promise<User | null> {
   try {
-    const MemoryStore = createMemoryStore(session);
-    const store = new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    });
-
     // Parse session ID from cookie format
     const sid = sessionId.replace('s:', '').split('.')[0];
 
     return new Promise((resolve) => {
-      store.get(sid, async (err: any, session: any) => {
+      sessionStore.get(sid, async (err: any, session: any) => {
         if (err || !session?.passport?.user) {
           console.log("Session verification failed:", err || "No user in session");
           resolve(null);
@@ -64,14 +65,16 @@ export async function verify(sessionId: string): Promise<User | null> {
 }
 
 export function setupAuth(app: Express) {
-  const MemoryStore = createMemoryStore(session);
-
   app.use(session({
     secret: process.env.REPL_ID || "battle-royale-secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }, // 24 hours
-    store: new MemoryStore({ checkPeriod: 86400000 })
+    cookie: { 
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true
+    },
+    store: sessionStore
   }));
 
   app.use(passport.initialize());
@@ -132,57 +135,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Let's recreate the user with proper password hashing
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-
-      if (!username || !password) {
-        return res.status(400).send("Username and password are required");
-      }
-
-      // Check existing user
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .limit(1);
-
-      if (existingUser) {
-        return res.status(400).json({ error: "Username already exists" });
-      }
-
-      // Create user with properly hashed password
-      const hashedPassword = await crypto.hash(password);
-      const [user] = await db
-        .insert(users)
-        .values({
-          username,
-          password: hashedPassword,
-          role: "user",
-        })
-        .returning();
-
-      // Auto login after registration
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ error: "Login failed after registration" });
-        }
-        res.json({ 
-          message: "Registration successful",
-          user: {
-            id: user.id,
-            username: user.username,
-            role: user.role
-          }
-        });
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ error: "Registration failed" });
-    }
-  });
-
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false, info: IVerifyOptions) => {
       if (err) {
@@ -230,28 +182,12 @@ export function setupAuth(app: Express) {
     });
   });
 }
+
 // Crypto implementation with proper error handling
 const crypto = {
   hash: async (password: string): Promise<string> => {
     const salt = randomBytes(16).toString("hex");
     const buf = (await scryptAsync(password, salt, 64)) as Buffer;
     return `${buf.toString("hex")}.${salt}`;
-  },
-  compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
-    try {
-      const [hashedPassword, salt] = storedPassword.split(".");
-      if (!hashedPassword || !salt) {
-        console.error("Invalid stored password format");
-        return false;
-      }
-
-      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
-      const suppliedPasswordBuf = (await scryptAsync(suppliedPassword, salt, 64)) as Buffer;
-
-      return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
-    } catch (error) {
-      console.error("Password comparison error:", error);
-      return false;
-    }
   }
 };

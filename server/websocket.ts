@@ -29,12 +29,14 @@ class GameWebSocketServer extends WebSocketServer {
   constructor(options: any) {
     super(options);
     this.setupHeartbeat();
+    console.log("GameWebSocketServer initialized");
   }
 
   private setupHeartbeat() {
     setInterval(() => {
       this.clients.forEach((client: CustomWebSocket) => {
         if (!client.isAlive) {
+          console.log(`Terminating inactive client: ${client.userId}`);
           client.terminate();
           return;
         }
@@ -59,6 +61,7 @@ class GameWebSocketServer extends WebSocketServer {
           data: null
         }
       });
+      console.log(`Created new game room: ${gameId}`);
     }
 
     this.gameRooms.get(gameId)?.clients.add(client);
@@ -143,6 +146,7 @@ export function setupWebSocketServer(server: Server) {
           return done(false, 401, "Invalid session");
         }
 
+        console.log(`WebSocket connection authenticated for user ${user.id}`);
         (req as any).user = user;
         return done(true);
       } catch (error) {
