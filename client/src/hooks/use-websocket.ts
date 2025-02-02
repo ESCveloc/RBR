@@ -42,21 +42,21 @@ export function useWebSocket(gameId?: number) {
   }, []);
 
   const connect = useCallback(() => {
-    // Only connect if user is authenticated and not already connecting
-    if (!user || isUserLoading || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
+    // Only connect if user is authenticated, not loading, and not already connecting
+    if (!user || isUserLoading || isConnectingRef.current) {
       return;
     }
 
-    isConnectingRef.current = true;
-
+    // If there's an existing connection, close it first
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
 
-    const host = window.location.host;
+    isConnectingRef.current = true;
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${host}`;
+    const wsUrl = `${protocol}//${window.location.host}`;
 
     console.log('Attempting WebSocket connection to:', wsUrl);
 
@@ -64,7 +64,7 @@ export function useWebSocket(gameId?: number) {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      const handleOpen = () => {
+      ws.addEventListener('open', () => {
         console.log('WebSocket connected successfully');
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
@@ -73,12 +73,11 @@ export function useWebSocket(gameId?: number) {
         if (gameId) {
           sendMessage('JOIN_GAME', { gameId });
         }
-      };
+      });
 
-      const handleMessage = (event: MessageEvent) => {
+      ws.addEventListener('message', (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('Received WebSocket message:', message);
 
           if (message.type === 'ERROR') {
             toast({
@@ -94,32 +93,22 @@ export function useWebSocket(gameId?: number) {
             callback(message.payload);
           });
 
-          // Handle system messages
-          switch (message.type) {
-            case 'TEAM_ELIMINATED':
-              toast({
-                title: "Team Eliminated",
-                description: `Team ${message.payload.teamName} has been eliminated!`,
-                variant: "destructive"
-              });
-              break;
-          }
         } catch (error) {
           console.error('WebSocket message parsing error:', error);
         }
-      };
+      });
 
-      const handleError = (error: Event) => {
+      ws.addEventListener('error', (error) => {
         console.error('WebSocket connection error:', error);
         isConnectingRef.current = false;
-      };
+      });
 
-      const handleClose = () => {
+      ws.addEventListener('close', () => {
         console.log('WebSocket connection closed');
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        // Only attempt reconnection if user is still authenticated
+        // Only attempt reconnection if user is still authenticated and not loading
         if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Attempting to reconnect in ${delay}ms`);
@@ -137,24 +126,10 @@ export function useWebSocket(gameId?: number) {
             variant: "destructive"
           });
         }
-      };
-
-      ws.addEventListener('open', handleOpen);
-      ws.addEventListener('message', handleMessage);
-      ws.addEventListener('error', handleError);
-      ws.addEventListener('close', handleClose);
-
-      return () => {
-        ws.removeEventListener('open', handleOpen);
-        ws.removeEventListener('message', handleMessage);
-        ws.removeEventListener('error', handleError);
-        ws.removeEventListener('close', handleClose);
-      };
-
+      });
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       isConnectingRef.current = false;
-      wsRef.current = null;
       toast({
         title: "Connection Error",
         description: "Failed to establish WebSocket connection",
@@ -164,8 +139,8 @@ export function useWebSocket(gameId?: number) {
   }, [gameId, user, isUserLoading, toast, sendMessage]);
 
   useEffect(() => {
-    // Only attempt connection when auth state is stable and user is logged in
-    if (user && !isUserLoading) {
+    // Only attempt connection when auth state is stable
+    if (!isUserLoading && user) {
       connect();
     }
 
@@ -186,6 +161,7 @@ export function useWebSocket(gameId?: number) {
   return {
     socket: wsRef.current,
     sendMessage,
-    subscribeToMessage
+    subscribeToMessage,
+    isConnected: wsRef.current?.readyState === WebSocket.OPEN
   };
 }
