@@ -7,6 +7,8 @@ type WebSocketMessage = {
   payload: any;
 };
 
+type MessageHandler = (payload: any) => void;
+
 export function useWebSocket(gameId?: number) {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
@@ -15,7 +17,7 @@ export function useWebSocket(gameId?: number) {
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
-  const messageCallbacksRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
+  const messageHandlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
 
   const connect = useCallback(() => {
     if (!user || isUserLoading || isConnectingRef.current) {
@@ -51,7 +53,7 @@ export function useWebSocket(gameId?: number) {
         }
       }, 5000);
 
-      ws.addEventListener('open', () => {
+      ws.onopen = () => {
         clearTimeout(connectionTimeout);
         console.log('WebSocket connection established successfully');
         wsRef.current = ws;
@@ -62,12 +64,12 @@ export function useWebSocket(gameId?: number) {
           console.log('Joining game room:', gameId);
           sendMessage('JOIN_GAME', { gameId });
         }
-      });
+      };
 
-      ws.addEventListener('message', (event) => {
+      ws.onmessage = (event: MessageEvent) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('Received WebSocket message:', message.type);
+          console.log('Received WebSocket message:', message);
 
           if (message.type === 'ERROR') {
             console.error('WebSocket error message:', message.payload);
@@ -79,15 +81,17 @@ export function useWebSocket(gameId?: number) {
             return;
           }
 
-          messageCallbacksRef.current.get(message.type)?.forEach(callback => {
-            callback(message.payload);
-          });
+          // Call all registered handlers for this message type
+          const handlers = messageHandlersRef.current.get(message.type);
+          if (handlers) {
+            handlers.forEach(handler => handler(message.payload));
+          }
         } catch (error) {
           console.error('WebSocket message parsing error:', error);
         }
-      });
+      };
 
-      ws.addEventListener('error', (error) => {
+      ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
         console.error('WebSocket error:', error);
         isConnectingRef.current = false;
@@ -96,9 +100,9 @@ export function useWebSocket(gameId?: number) {
           wsRef.current.close();
           wsRef.current = null;
         }
-      });
+      };
 
-      ws.addEventListener('close', (event) => {
+      ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
         console.log('WebSocket connection closed:', event.code, event.reason);
         wsRef.current = null;
@@ -121,7 +125,7 @@ export function useWebSocket(gameId?: number) {
             variant: "destructive"
           });
         }
-      });
+      };
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
       isConnectingRef.current = false;
@@ -141,16 +145,21 @@ export function useWebSocket(gameId?: number) {
     }
   }, []);
 
-  const subscribeToMessage = useCallback((type: string, callback: (payload: any) => void) => {
-    if (!messageCallbacksRef.current.has(type)) {
-      messageCallbacksRef.current.set(type, new Set());
+  const subscribeToMessage = useCallback((type: string, handler: MessageHandler) => {
+    if (!messageHandlersRef.current.has(type)) {
+      messageHandlersRef.current.set(type, new Set());
     }
-    messageCallbacksRef.current.get(type)?.add(callback);
+    const handlers = messageHandlersRef.current.get(type)!;
+    handlers.add(handler);
 
+    // Return unsubscribe function
     return () => {
-      messageCallbacksRef.current.get(type)?.delete(callback);
-      if (messageCallbacksRef.current.get(type)?.size === 0) {
-        messageCallbacksRef.current.delete(type);
+      const handlers = messageHandlersRef.current.get(type);
+      if (handlers) {
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          messageHandlersRef.current.delete(type);
+        }
       }
     };
   }, []);
@@ -170,7 +179,7 @@ export function useWebSocket(gameId?: number) {
       }
       reconnectAttemptRef.current = 0;
       isConnectingRef.current = false;
-      messageCallbacksRef.current.clear();
+      messageHandlersRef.current.clear();
     };
   }, [connect, user, isUserLoading]);
 

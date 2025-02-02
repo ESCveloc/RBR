@@ -49,45 +49,56 @@ class GameWebSocketServer extends WebSocketServer {
     });
   }
 
-  async broadcastGameUpdate(gameId: number, type: string, data: any) {
+  async broadcast(gameId: number, message: any) {
     const room = this.gameRooms.get(gameId);
     if (!room) return;
 
-    const [game] = await db
-      .select()
-      .from(games)
-      .where(eq(games.id, gameId))
-      .limit(1);
-
-    if (!game) return;
-
-    const participants = await db
-      .select({
-        id: gameParticipants.id,
-        gameId: gameParticipants.gameId,
-        teamId: gameParticipants.teamId,
-        status: gameParticipants.status,
-        location: gameParticipants.location,
-        team: teams
-      })
-      .from(gameParticipants)
-      .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
-      .where(eq(gameParticipants.gameId, gameId));
-
-    const message = JSON.stringify({
-      type,
-      payload: {
-        gameId,
-        game: { ...game, participants },
-        ...data
-      }
-    });
+    const messageStr = JSON.stringify(message);
 
     room.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+        client.send(messageStr);
       }
     });
+  }
+
+  async broadcastGameUpdate(gameId: number, type: string, data: any) {
+    try {
+      const room = this.gameRooms.get(gameId);
+      if (!room) return;
+
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) return;
+
+      const participants = await db
+        .select({
+          id: gameParticipants.id,
+          gameId: gameParticipants.gameId,
+          teamId: gameParticipants.teamId,
+          status: gameParticipants.status,
+          location: gameParticipants.location,
+          team: teams
+        })
+        .from(gameParticipants)
+        .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
+        .where(eq(gameParticipants.gameId, gameId));
+
+      await this.broadcast(gameId, {
+        type,
+        payload: {
+          gameId,
+          game: { ...game, participants },
+          ...data
+        }
+      });
+    } catch (error) {
+      console.error("Error broadcasting game update:", error);
+    }
   }
 
   joinGame(client: CustomWebSocket, gameId: number) {
@@ -173,17 +184,21 @@ export function setupWebSocketServer(server: Server) {
     if (user) {
       ws.userId = user.id;
 
-      // Get user's team information
-      const [userTeam] = await db
-        .select({
-          teamId: teamMembers.teamId
-        })
-        .from(teamMembers)
-        .where(eq(teamMembers.userId, user.id))
-        .limit(1);
+      try {
+        // Get user's team information
+        const [userTeam] = await db
+          .select({
+            teamId: teamMembers.teamId
+          })
+          .from(teamMembers)
+          .where(eq(teamMembers.userId, user.id))
+          .limit(1);
 
-      if (userTeam) {
-        ws.teamId = userTeam.teamId;
+        if (userTeam) {
+          ws.teamId = userTeam.teamId;
+        }
+      } catch (error) {
+        console.error("Error fetching user team:", error);
       }
     }
 
