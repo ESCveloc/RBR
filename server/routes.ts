@@ -881,6 +881,136 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Failed to leave game");
     }
   });
+
+  app.post("/api/games/:gameId/assign-position", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId } = req.body;
+
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
+      }
+
+      // Get game details and verify status
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      if (game.status !== "pending") {
+        return res.status(400).send("Positions can only be assigned before the game starts");
+      }
+
+      // Verify team is participating in the game
+      const [participant] = await db
+        .select()
+        .from(gameParticipants)
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1);
+
+      if (!participant) {
+        return res.status(404).send("Team is not participating in this game");
+      }
+
+      if (participant.startingLocation) {
+        return res.status(400).send("Team already has a starting position");
+      }
+
+      // Get all current participants with their positions
+      const participants = await db
+        .select()
+        .from(gameParticipants)
+        .where(eq(gameParticipants.gameId, gameId));
+
+      // Calculate available positions (0-9 for 10 positions)
+      const takenPositions = new Set(
+        participants
+          .filter(p => p.startingLocation !== null)
+          .map(p => p.startingLocation.position)
+      );
+
+      const availablePositions = Array.from(
+        { length: game.maxTeams },
+        (_, i) => i
+      ).filter(pos => !takenPositions.has(pos));
+
+      if (availablePositions.length === 0) {
+        return res.status(400).send("No available positions");
+      }
+
+      // Randomly select a position
+      const randomPosition = availablePositions[
+        Math.floor(Math.random() * availablePositions.length)      ];
+
+      // Calculate position coordinates
+      const coordinates = game.boundaries.geometry.coordinates[0];
+      const center = coordinates.reduce(
+        (acc, [lng, lat]) => ({
+          lat: acc.lat + lat / coordinates.length,
+          lng: acc.lng + lng / coordinates.length
+        }),
+        { lat: 0, lng: 0 }
+      );
+
+      // Calculate radius from center to farthest point
+      const radius = Math.max(...coordinates.map(([lng, lat]) => {
+        const latDiff = center.lat - lat;
+        const lngDiff = center.lng - lng;
+        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      }));
+
+      // Calculate position coordinates with a slight inward offset for safety
+      const angle = (randomPosition / game.maxTeams) * 2 * Math.PI;
+      const safetyFactor = 0.9; // Keep points slightly inside the boundary
+      const x = center.lng + (radius * safetyFactor * Math.cos(angle));
+      const y = center.lat + (radius * safetyFactor * Math.sin(angle));
+
+      // Update participant with new starting location
+      const [updatedParticipant] = await db
+        .update(gameParticipants)
+        .set({
+          startingLocation: {
+            position: randomPosition,
+            coordinates: { lat: y, lng: x }
+          },
+          startingLocationAssignedAt: new Date()
+        })
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .returning();
+
+      // Broadcast the update to all connected clients
+      wss.broadcast(gameId, {
+        type: 'GAME_STATE_UPDATE',
+        gameId,
+        participant: updatedParticipant
+      });
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error("Assign position error:", error);
+      res.status(500).send("Failed to assign position");
+    }
+  });
+
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated()) {

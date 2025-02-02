@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, LogOut } from "lucide-react";
+import { Users, LogOut, MapPin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -54,7 +54,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
 
       const result = await response.json();
 
-      // Ensure we return the correct ready state
       return {
         ...result,
         ready: newReadyState,
@@ -83,7 +82,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       return { previousGame, newReadyState };
     },
     onError: (error, variables, context) => {
-      // Revert to previous state on error
       queryClient.setQueryData([`/api/games/${gameId}`], context?.previousGame);
 
       toast({
@@ -93,7 +91,6 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       });
     },
     onSuccess: (updatedParticipant) => {
-      // Update cache with server response
       queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
         if (!oldData) return oldData;
 
@@ -110,6 +107,39 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
       toast({
         title: "Status Updated",
         description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
+      });
+    }
+  });
+
+  const assignPosition = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId) return;
+
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: participant.teamId }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
     }
   });
@@ -193,6 +223,8 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
   // Team card in game context
   if (participant?.team) {
     const isReady = !!participant.ready;
+    const hasStartingPosition = participant.startingLocation !== null;
+
     return (
       <Card
         key={`participant-${participant.teamId}`}
@@ -207,9 +239,16 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
                 </div>
                 <div>
                   <h3 className="font-semibold">{participant.team.name}</h3>
-                  <span className="text-xs text-muted-foreground">
-                    {getTeamMembersCount()} members
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      {getTeamMembersCount()} members
+                    </span>
+                    {hasStartingPosition && (
+                      <span className="text-xs text-muted-foreground">
+                        • Starting Position {participant.startingLocation.position + 1}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -229,30 +268,49 @@ export function TeamCard({ gameId, participant, team, canAssignPosition }: TeamC
               </span>
             </div>
 
-            {isCaptain && participant.status !== "eliminated" && (
+            {participant.status !== "eliminated" && (
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex items-center gap-2">
-                  <Switch
-                    checked={isReady}
-                    onCheckedChange={() => {
-                      if (!toggleReady.isPending) {
-                        toggleReady.mutate();
-                      }
-                    }}
-                    disabled={toggleReady.isPending}
-                  />
-                  <span className="text-sm text-muted-foreground">Ready</span>
+                  {isCaptain && (
+                    <>
+                      <Switch
+                        checked={isReady}
+                        onCheckedChange={() => {
+                          if (!toggleReady.isPending) {
+                            toggleReady.mutate();
+                          }
+                        }}
+                        disabled={toggleReady.isPending}
+                      />
+                      <span className="text-sm text-muted-foreground">Ready</span>
+                    </>
+                  )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => leaveGame.mutate()}
-                  disabled={leaveGame.isPending}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Leave
-                </Button>
+                <div className="flex items-center gap-2">
+                  {canAssignPosition && !hasStartingPosition && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => assignPosition.mutate()}
+                      disabled={assignPosition.isPending}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Assign Position
+                    </Button>
+                  )}
+                  {isCaptain && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => leaveGame.mutate()}
+                      disabled={leaveGame.isPending}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Leave
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
