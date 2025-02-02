@@ -182,24 +182,27 @@ export default function Admin() {
     },
   });
 
-  const ws = useWebSocket();
+  const { socket, isConnected, subscribeToMessage } = useWebSocket();
 
   // Subscribe to real-time game updates
   useEffect(() => {
-    if (!ws) return;
+    if (!isConnected || !socket) return;
 
-    const unsubscribe = ws.subscribeToMessage('GAME_UPDATE', (data) => {
+    console.log('Setting up WebSocket subscription in Admin');
+    const unsubscribe = subscribeToMessage('GAME_UPDATE', (data) => {
       try {
-        if (data.type === 'GAME_UPDATE') {
-          queryClient.invalidateQueries({ queryKey: ["/api/games"] });
-        }
+        console.log('Received game update:', data);
+        queryClient.invalidateQueries({ queryKey: ["/api/games"] });
       } catch (err) {
         console.error('Error handling WebSocket message:', err);
       }
     });
 
-    return () => unsubscribe();
-  }, [ws, queryClient]);
+    return () => {
+      console.log('Cleaning up WebSocket subscription in Admin');
+      unsubscribe();
+    };
+  }, [socket, isConnected, subscribeToMessage, queryClient]);
 
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({

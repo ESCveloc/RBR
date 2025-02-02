@@ -25,7 +25,7 @@ export default function Game() {
 
   // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
-  const { socket } = useWebSocket(gameId);
+  const { socket, isConnected, subscribeToMessage } = useWebSocket(gameId);
 
   // Simple admin check
   const isAdmin = user?.role === 'admin';
@@ -35,10 +35,12 @@ export default function Game() {
 
   // Subscribe to real-time game updates
   useEffect(() => {
-    if (!socket || !gameId) return;
+    if (!isConnected || !socket || !gameId) return;
 
-    const unsubscribe = socket.subscribeToMessage('GAME_UPDATE', (data) => {
+    console.log('Setting up WebSocket subscription in Game page for game:', gameId);
+    const unsubscribe = subscribeToMessage('GAME_UPDATE', (data) => {
       try {
+        console.log('Received game update:', data);
         if (data.gameId === gameId) {
           queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
         }
@@ -47,8 +49,11 @@ export default function Game() {
       }
     });
 
-    return () => unsubscribe();
-  }, [socket, gameId, queryClient]);
+    return () => {
+      console.log('Cleaning up WebSocket subscription in Game page');
+      unsubscribe();
+    };
+  }, [socket, isConnected, gameId, subscribeToMessage, queryClient]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
