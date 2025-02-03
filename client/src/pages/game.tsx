@@ -286,37 +286,17 @@ export default function Game() {
             <CardContent>
               <div className="space-y-4">
                 {game.participants && game.participants.length > 0 ? (
-                  game.participants.map((participant) => {
-                    // Ensure the participant object has the correct structure
-                    const enhancedParticipant = {
-                      ...participant,
-                      team: participant.team || {
-                        id: 0,
-                        name: 'Unknown Team',
-                        createdAt: new Date(),
-                        active: true,
-                        description: null,
-                        captainId: 0,
-                        wins: 0,
-                        losses: 0,
-                        tags: null,
-                        teamMembers: [],
-                        member_count: 0
-                      }
-                    };
-
-                    return (
-                      <TeamCard
-                        key={participant.id}
-                        gameId={game.id}
-                        participant={enhancedParticipant}
-                        canAssignPosition={isAdmin && game.status === 'pending'}
-                        showMembers={true}
-                        showStatus={true}
-                        showLocation={game.status === 'active'}
-                      />
-                    );
-                  })
+                  game.participants.map((participant) => (
+                    <TeamCard
+                      key={participant.id}
+                      gameId={game.id}
+                      participant={participant}
+                      canAssignPosition={isAdmin && game.status === 'pending'}
+                      showMembers={true}
+                      showStatus={true}
+                      showLocation={game.status === 'active'}
+                    />
+                  ))
                 ) : (
                   <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
                 )}

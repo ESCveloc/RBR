@@ -44,21 +44,19 @@ export function TeamCard({
 
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
-  const isReady = !!participant?.ready;
+  const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
 
   const toggleReady = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
 
-      const newReadyState = !participant.ready;
-
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           teamId: participant.teamId,
-          ready: newReadyState
+          ready: !isReady
         }),
         credentials: 'include'
       });
@@ -67,31 +65,13 @@ export function TeamCard({
         throw new Error(await response.text());
       }
 
-      const result = await response.json();
-
-      return {
-        ...result,
-        ready: newReadyState,
-        teamId: participant.teamId
-      };
+      return response.json();
     },
-    onSuccess: (updatedParticipant) => {
-      queryClient.setQueryData([`/api/games/${gameId}`], (oldData: any) => {
-        if (!oldData) return oldData;
-
-        return {
-          ...oldData,
-          participants: oldData.participants?.map((p: any) =>
-            p.teamId === updatedParticipant.teamId
-              ? { ...p, ready: updatedParticipant.ready }
-              : p
-          )
-        };
-      });
-
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Status Updated",
-        description: `Team is now ${updatedParticipant.ready ? "ready" : "not ready"} for the game.`,
+        description: `Team is now ${!isReady ? "ready" : "not ready"} for the game.`,
       });
     },
     onError: (error: Error) => {
@@ -168,60 +148,10 @@ export function TeamCard({
     },
   });
 
-  const getTeamMembersCount = () => {
-    if (team?.member_count !== undefined) {
-      return team.member_count;
-    }
-    if (participant?.team?.member_count !== undefined) {
-      return participant.team.member_count;
-    }
-    return currentTeam?.teamMembers?.length || 0;
-  };
-
-  // Team card outside game context
-  if (team) {
-    return (
-      <Link href={`/team/${team.id}`}>
-        <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">{team.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className={cn(
-                      team.active ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
-                    )}>
-                      {team.active ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      W/L: {team.wins || 0}/{team.losses || 0}
-                    </span>
-                    {showMembers && (
-                      <span className="text-xs text-muted-foreground">
-                        • {getTeamMembersCount()} members
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-    );
-  }
-
   // Team card in game context
   if (participant?.team) {
     return (
-      <Card key={`participant-${participant.teamId}`} className={cn(
-        "hover:bg-accent/50 transition-colors",
-        participant.status === "eliminated" && "opacity-50"
-      )}>
+      <Card className="hover:bg-accent/50 transition-colors">
         <CardContent className="p-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -234,7 +164,7 @@ export function TeamCard({
                   <div className="flex items-center gap-2">
                     {showMembers && (
                       <span className="text-xs text-muted-foreground">
-                        {getTeamMembersCount()} members
+                        {participant.team.teamMembers.length} members
                       </span>
                     )}
                     {showStatus && (
@@ -311,6 +241,43 @@ export function TeamCard({
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Team card outside game context (e.g., in team list)
+  if (team) {
+    return (
+      <Link href={`/team/${team.id}`}>
+        <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{team.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className={cn(
+                      team.active ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
+                    )}>
+                      {team.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      W/L: {team.wins || 0}/{team.losses || 0}
+                    </span>
+                    {showMembers && (
+                      <span className="text-xs text-muted-foreground">
+                        • {team.teamMembers.length} members
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
     );
   }
 
