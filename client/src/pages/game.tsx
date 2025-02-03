@@ -43,7 +43,7 @@ export default function Game() {
     }
   }, [isConnected, socket, gameId, joinGame]);
 
-  // Subscribe to real-time game updates with proper cleanup
+  // Subscribe to real-time game updates
   useEffect(() => {
     if (!isConnected || !socket || !gameId) return;
 
@@ -60,7 +60,6 @@ export default function Game() {
       }
     });
 
-    // Proper cleanup of subscription
     return () => {
       console.log('Cleaning up WebSocket subscription in Game page');
       if (unsubscribe) {
@@ -75,18 +74,6 @@ export default function Game() {
     refetchInterval: false,
     placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
   });
-
-  // Debug logging
-  useEffect(() => {
-    console.log('Game Component Debug:', {
-      user,
-      isAdmin,
-      gameStatus: game?.status,
-      gameId,
-      game,
-      error
-    });
-  }, [user, isAdmin, game, gameId, error]);
 
   const updateGameStatus = useMutation({
     mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
@@ -111,17 +98,12 @@ export default function Game() {
         throw new Error(errorText || "Failed to update game status");
       }
 
-      const data = await response.json();
-      return data;
+      return response.json();
     },
     onMutate: async ({ status }) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
-
-      // Snapshot the previous game state
       const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
-      // Optimistically update the game status
       if (previousGame) {
         queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
           ...previousGame,
@@ -132,7 +114,6 @@ export default function Game() {
       return { previousGame };
     },
     onError: (error: Error, variables, context) => {
-      // Revert to previous state on error
       if (context?.previousGame) {
         queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
       }
@@ -151,7 +132,6 @@ export default function Game() {
     }
   });
 
-  // Handle invalid route match
   if (!match || !gameId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -303,7 +283,8 @@ export default function Game() {
                 Teams
               </CardTitle>
             </CardHeader>
-              <CardContent className="space-y-2">
+            <CardContent>
+              <div className="space-y-4">
                 {game.participants && game.participants.length > 0 ? (
                   game.participants.map((participant) => {
                     // Ensure the participant object has the correct structure
@@ -339,7 +320,8 @@ export default function Game() {
                 ) : (
                   <p className="text-sm text-muted-foreground">No teams have joined yet.</p>
                 )}
-              </CardContent>
+              </div>
+            </CardContent>
           </Card>
         </div>
       </main>
