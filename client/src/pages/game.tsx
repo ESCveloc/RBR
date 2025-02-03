@@ -16,6 +16,7 @@ import { useUser } from "@/hooks/use-user";
 import { SelectTeam } from "@/components/game/select-team";
 import { useWebSocket } from "@/hooks/use-websocket";
 import type { Game } from "@db/schema";
+import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -206,18 +207,9 @@ export default function Game() {
 
           <div className="flex items-center gap-3">
             <div className={`rounded-full px-3 py-1 text-sm font-medium ${
-              game.status === 'active'
-                ? 'bg-green-500/10 text-green-500'
-                : game.status === 'pending'
-                ? 'bg-yellow-500/10 text-yellow-500'
-                : game.status === 'completed'
-                ? 'bg-purple-500/15 text-purple-700'
-                : 'bg-red-500/10 text-red-500'
+              getGameStatusColor(game.status)
             }`}>
-              {game.status === 'active' ? 'In Progress' :
-               game.status === 'pending' ? 'Starting Soon' :
-               game.status === 'completed' ? 'Completed' :
-               game.status === 'cancelled' ? 'Cancelled' : 'Unknown'}
+              {getGameStatusText(game.status)}
             </div>
 
             {isAdmin && (

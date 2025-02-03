@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
 import { useTeams } from "@/hooks/use-teams";
 import { useWebSocket } from '@/hooks/use-websocket';
+import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
 
 const settingsSchema = z.object({
   defaultCenter: z.object({
@@ -68,31 +69,6 @@ const formSchema = z.object({
   boundaries: z.any().optional(),
 });
 
-function getStatusColor(status: string) {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20";
-    case "active":
-      return "bg-green-500/10 text-green-500 hover:bg-green-500/20";
-    case "completed":
-      return "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20";
-    default:
-      return "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20";
-  }
-}
-
-function getStatusText(status: string) {
-  switch (status) {
-    case "pending":
-      return "Pending";
-    case "active":
-      return "In Progress";
-    case "completed":
-      return "Ended";
-    default:
-      return status;
-  }
-}
 
 function generateDefaultBoundaries(center: { lat: number; lng: number }, radiusMiles: number) {
   const radiusMeters = radiusMiles * 1609.34;
@@ -127,6 +103,7 @@ export default function Admin() {
   const [, setLocation] = useLocation();
   const { user } = useUser();
   const { teams, isLoading: teamsLoading } = useTeams();
+    const { socket, isConnected, subscribeToMessage } = useWebSocket();
 
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -182,7 +159,6 @@ export default function Admin() {
     },
   });
 
-  const { socket, isConnected, subscribeToMessage } = useWebSocket();
 
   // Subscribe to real-time game updates
   useEffect(() => {
@@ -504,65 +480,61 @@ export default function Admin() {
                 </Form>
               </CardContent>
             </Card>
-
             <Card>
-              <CardHeader>
-                <CardTitle>Active Games</CardTitle>
-                <CardDescription>Manage ongoing games</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {games?.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No games available. Create a new game to get started.
-                    </div>
-                  ) : (
-                    games?.filter(game => game.status === "pending" || game.status === "active")
-                      .map((game) => (
-                        <Card key={game.id}>
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-center">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold">{game.name}</h3>
-                                  <Badge
-                                    variant="secondary"
-                                    className={cn(
-                                      "capitalize",
-                                      getStatusColor(game.status)
-                                    )}
-                                  >
-                                    {getStatusText(game.status)}
-                                  </Badge>
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-sm text-muted-foreground">
-                                    Length: {game.gameLengthMinutes} minutes
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
-                                  </p>
-                                  {game.startTime && (
+                <CardHeader>
+                  <CardTitle>Active Games</CardTitle>
+                  <CardDescription>Manage ongoing games</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {games?.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No games available. Create a new game to get started.
+                      </div>
+                    ) : (
+                      games?.filter(game => game.status === "pending" || game.status === "active")
+                        .map((game) => (
+                          <Card key={game.id}>
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-center">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold">{game.name}</h3>
+                                    <Badge
+                                      variant="secondary"
+                                      className={cn(getGameStatusColor(game.status))}
+                                    >
+                                      {getGameStatusText(game.status)}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">
-                                      Starts: {new Date(game.startTime).toLocaleString()}
+                                      Length: {game.gameLengthMinutes} minutes
                                     </p>
-                                  )}
+                                    <p className="text-sm text-muted-foreground">
+                                      Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
+                                    </p>
+                                    {game.startTime && (
+                                      <p className="text-sm text-muted-foreground">
+                                        Starts: {new Date(game.startTime).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setLocation(`/game/${game.id}`)}
+                                >
+                                  View
+                                </Button>
                               </div>
-                              <Button
-                                variant="outline"
-                                onClick={() => setLocation(`/game/${game.id}`)}
-                              >
-                                View
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                            </CardContent>
+                          </Card>
+                        ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
           </div>
         </TabsContent>
 
