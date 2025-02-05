@@ -63,42 +63,6 @@ export function TeamCard({
   // Generate positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
-  const toggleReady = useMutation({
-    mutationFn: async () => {
-      if (!gameId || !participant?.teamId) return;
-
-      const response = await fetch(`/api/games/${gameId}/team-ready`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: participant.teamId,
-          ready: !isReady
-        }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Status Updated",
-        description: `Team is now ${!isReady ? "ready" : "not ready"} for the game.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
   const assignPosition = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId || !selectedPosition) return;
@@ -125,6 +89,42 @@ export function TeamCard({
       toast({
         title: "Success",
         description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const toggleReady = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId) return;
+
+      const response = await fetch(`/api/games/${gameId}/team-ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId: participant.teamId,
+          ready: !isReady
+        }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Status Updated",
+        description: `Team is now ${!isReady ? "ready" : "not ready"} for the game.`,
       });
     },
     onError: (error: Error) => {
@@ -208,14 +208,14 @@ export function TeamCard({
                         participant.status === "eliminated"
                           ? 'bg-red-500/10 text-red-500'
                           : isReady
-                          ? 'bg-green-500/10 text-green-500'
-                          : 'bg-gray-500/10 text-gray-500'
+                            ? 'bg-green-500/10 text-green-500'
+                            : 'bg-gray-500/10 text-gray-500'
                       )}>
                         {participant.status === "eliminated"
                           ? "Eliminated"
                           : isReady
-                          ? "Ready"
-                          : "Not Ready"
+                            ? "Ready"
+                            : "Not Ready"
                         }
                       </Badge>
                     )}
@@ -232,7 +232,7 @@ export function TeamCard({
             {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
-                  {(canAssignPosition || isAdmin) && (
+                  {(canAssignPosition || isAdmin) && participant?.team && (
                     <Select
                       value={participant?.startingLocation?.position !== undefined
                         ? String(participant.startingLocation.position)
@@ -247,8 +247,8 @@ export function TeamCard({
                           {participant?.startingLocation?.position !== undefined
                             ? `Site ${Number(participant.startingLocation.position) + 1}`
                             : selectedPosition
-                            ? `Site ${Number(selectedPosition) + 1}`
-                            : "Select Site"}
+                              ? `Site ${Number(selectedPosition) + 1}`
+                              : "Select Site"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>

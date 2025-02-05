@@ -889,7 +889,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const gameId = parseInt(req.params.gameId);
-      const { teamId } = req.body;
+      const { teamId, force = false } = req.body;
 
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
@@ -910,6 +910,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Positions can only be assigned before the game starts");
       }
 
+      // Only admin can force reassign positions
+      if (force && req.user.role !== "admin") {
+        return res.status(403).send("Only administrators can force position reassignment");
+      }
+
       // Verify team is participating in the game
       const [participant] = await db
         .select()
@@ -926,7 +931,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
-      if (participant.startingLocation) {
+      // If team already has a position and force is false, prevent reassignment
+      if (participant.startingLocation && !force) {
         return res.status(400).send("Team already has a starting position");
       }
 
@@ -939,7 +945,7 @@ export function registerRoutes(app: Express): Server {
       // Calculate available positions (0-9 for 10 positions)
       const takenPositions = new Set(
         participants
-          .filter(p => p.startingLocation !== null)
+          .filter(p => p.startingLocation !== null && p.teamId !== teamId) // Exclude current team's position
           .map(p => p.startingLocation.position)
       );
 
@@ -954,7 +960,8 @@ export function registerRoutes(app: Express): Server {
 
       // Randomly select a position
       const randomPosition = availablePositions[
-        Math.floor(Math.random() * availablePositions.length)      ];
+        Math.floor(Math.random() * availablePositions.length)
+      ];
 
       // Calculate position coordinates
       const coordinates = game.boundaries.geometry.coordinates[0];
@@ -968,7 +975,7 @@ export function registerRoutes(app: Express): Server {
 
       // Calculate radius from center to farthest point
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
-        const latDiff = center.lat - lat;
+        const latDiff = center.lat -lat;
         const lngDiff = center.lng - lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
@@ -1241,7 +1248,8 @@ export function registerRoutes(app: Express): Server {
       );
 
       res.json({ ...game, participants: participantsWithTeamMembers });
-    } catch (error) {      console.error("Fetch game error:", error);
+    } catch (error) {
+      console.error("Fetch game error:", error);
       res.status(500).json({ message: "Failed to fetch game" });
     }
   });
