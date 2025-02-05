@@ -70,7 +70,7 @@ export default function Game() {
   });
 
   const updateGameStatus = useMutation({
-    mutationFn: async ({ status }: { status: 'active' | 'completed' | 'cancelled' }) => {
+    mutationFn: async ({ status }: { status: Game['status'] }) => {
       if (!gameId) {
         throw new Error('No game ID provided');
       }

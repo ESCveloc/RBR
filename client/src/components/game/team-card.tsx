@@ -20,8 +20,29 @@ import { cn } from "@/lib/utils";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: GameParticipant & {
-    team: Team & {
+  participant?: {
+    id: number;
+    teamId: number;
+    ready: boolean;
+    gameId: number;
+    status: "alive" | "eliminated";
+    eliminatedAt: Date | null;
+    location: GeolocationCoordinates | null;
+    startingLocation: {
+      position: number;
+      coordinates: { lat: number; lng: number; };
+    } | null;
+    startingLocationAssignedAt: Date | null;
+    team: {
+      id: number;
+      name: string;
+      description: string | null;
+      captainId: number;
+      active: boolean;
+      wins: number;
+      losses: number;
+      tags: string[] | null;
+      createdAt: Date;
       teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
       member_count?: number;
     };

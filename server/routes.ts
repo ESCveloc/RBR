@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
-import { eq, ilike, or, and, sql, exists, neq } from "drizzle-orm";
+import { eq, ilike, or, and, sql, exists, ne } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -944,7 +944,7 @@ export function registerRoutes(app: Express): Server {
           and(
             eq(gameParticipants.gameId, gameId),
             sql`gameParticipants.starting_location->>'position' = ${String(position)}`,
-            neq(gameParticipants.teamId, teamId)
+            ne(gameParticipants.teamId, teamId)
           )
         )
         .limit(1)
