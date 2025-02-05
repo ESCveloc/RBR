@@ -34,10 +34,11 @@ const getZoneStyle = (index: number) => ({
   dashArray: index === 0 ? undefined : '5, 10',
 });
 
-function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
+function generateStartingPoints(center: L.LatLng, radius: number, count: number = 12) {
   const points: L.LatLng[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * 2 * Math.PI;
+    // Start from 12 o'clock (-90 degrees) and go clockwise
+    const angle = ((i / count) * 2 * Math.PI) - (Math.PI / 2);
     const x = center.lng + (radius * Math.cos(angle)) / (111111 * Math.cos(center.lat * Math.PI / 180));
     const y = center.lat + (radius * Math.sin(angle)) / 111111;
     points.push(L.latLng(y, x));
