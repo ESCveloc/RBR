@@ -38,8 +38,8 @@ const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
   const points: L.LatLng[] = [];
-  // Start from 0 degrees (12 o'clock) and go clockwise
-  const startAngle = 0; // 0 degrees is 12 o'clock
+  // Start at top (90 degrees) and go clockwise
+  const startAngle = Math.PI / 2;
   for (let i = 0; i < count; i++) {
     // Go clockwise (negative angle)
     const angle = startAngle - (i * 2 * Math.PI / count);
@@ -65,17 +65,11 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
+      // Convert to 1-based position for consistent display
+      const siteNumber = index + 1;
       const assignedTeam = game.participants?.find(
-        p => p.startingLocation?.position === index
+        p => p.startingLocation?.position === siteNumber
       );
-
-      // Create the site marker circle
-      const marker = L.circleMarker(point, {
-        ...STARTING_POINT_STYLE,
-        fillColor: assignedTeam ? '#f97316' : '#fff',
-        fillOpacity: assignedTeam ? 0.8 : 0.8,
-        radius: 15
-      });
 
       // Create a custom label for the site number
       const iconHtml = `
@@ -91,7 +85,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
           color: ${assignedTeam ? 'white' : 'black'};
           z-index: 1000;
           text-shadow: 0px 0px 2px rgba(255,255,255,0.5);
-        ">${index + 1}</div>`; // Display 1-based position number
+        ">${siteNumber}</div>`;
 
       const icon = L.divIcon({
         html: iconHtml,
@@ -103,10 +97,18 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
       // Add the number label
       L.marker(point, { icon, interactive: false }).addTo(zonesLayer);
 
+      // Create the site marker circle
+      const marker = L.circleMarker(point, {
+        ...STARTING_POINT_STYLE,
+        fillColor: assignedTeam ? '#f97316' : '#fff',
+        fillOpacity: assignedTeam ? 0.8 : 0.8,
+        radius: 15
+      });
+
       if (assignedTeam) {
-        marker.bindTooltip(`Site ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
+        marker.bindTooltip(`Site ${siteNumber}: ${assignedTeam.team?.name || 'Team'}`);
       } else {
-        marker.bindTooltip(`Site ${index + 1}: Unassigned`);
+        marker.bindTooltip(`Site ${siteNumber}: Unassigned`);
       }
 
       marker.addTo(zonesLayer);

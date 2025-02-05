@@ -47,7 +47,7 @@ export function TeamCard({
 }: TeamCardProps) {
   const [selectedPosition, setSelectedPosition] = useState<string>(
     participant?.startingLocation?.position !== undefined
-      ? String(participant.startingLocation.position + 1)
+      ? String(participant.startingLocation.position + 1)  // Convert 0-based to 1-based for display
       : ""
   );
   const { toast } = useToast();
@@ -75,8 +75,8 @@ export function TeamCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId: participant.teamId,
-          force: isAdmin, // Add force parameter for admin users
-          position: positionIndex
+          force: isAdmin,
+          position: positionIndex  // Send 0-based index to server
         }),
         credentials: 'include'
       });
@@ -90,7 +90,9 @@ export function TeamCard({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       // Update the selected position to match the new assignment (convert to 1-based UI position)
-      setSelectedPosition(String(data.startingLocation.position + 1));
+      if (data.startingLocation) {
+        setSelectedPosition(String(data.startingLocation.position + 1));
+      }
       toast({
         title: "Success",
         description: "Starting position assigned.",
@@ -239,9 +241,7 @@ export function TeamCard({
                 <div>
                   {(canAssignPosition || isAdmin) && participant?.team && (
                     <Select
-                      value={participant?.startingLocation?.position !== undefined
-                        ? String(participant.startingLocation.position + 1) // Convert to 1-based UI position
-                        : selectedPosition}
+                      value={selectedPosition}
                       onValueChange={(value) => {
                         setSelectedPosition(value);
                         assignPosition.mutate();
@@ -249,11 +249,7 @@ export function TeamCard({
                     >
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Site">
-                          {participant?.startingLocation?.position !== undefined
-                            ? `Site ${participant.startingLocation.position + 1}`
-                            : selectedPosition
-                              ? `Site ${selectedPosition}`
-                              : "Select Site"}
+                          {selectedPosition ? `Site ${selectedPosition}` : "Select Site"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>

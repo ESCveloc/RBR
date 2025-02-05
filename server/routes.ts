@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
-import { eq, ilike, or, and, sql, exists } from "drizzle-orm";
+import { eq, ilike, or, and, sql, exists, neq } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -889,7 +889,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const gameId = parseInt(req.params.gameId);
-      const { teamId, force = false } = req.body;
+      const { teamId, force = false, position } = req.body;
 
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
@@ -936,32 +936,23 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Team already has a starting position");
       }
 
-      // Get all current participants with their positions
-      const participants = await db
+      // Check if the requested position is already taken by another team
+      const existingPosition = await db
         .select()
         .from(gameParticipants)
-        .where(eq(gameParticipants.gameId, gameId));
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            sql`gameParticipants.starting_location->>'position' = ${String(position)}`,
+            neq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1)
+        .then(results => results[0]);
 
-      // Calculate available positions (0-9 for 10 positions)
-      const takenPositions = new Set(
-        participants
-          .filter(p => p.startingLocation !== null && p.teamId !== teamId) // Exclude current team's position
-          .map(p => p.startingLocation.position)
-      );
-
-      const availablePositions = Array.from(
-        { length: game.maxTeams },
-        (_, i) => i
-      ).filter(pos => !takenPositions.has(pos));
-
-      if (availablePositions.length === 0) {
-        return res.status(400).send("No available positions");
+      if (existingPosition && !force) {
+        return res.status(400).send("Position already taken by another team");
       }
-
-      // Randomly select a position
-      const randomPosition = availablePositions[
-        Math.floor(Math.random() * availablePositions.length)
-      ];
 
       // Calculate position coordinates
       const coordinates = game.boundaries.geometry.coordinates[0];
@@ -973,15 +964,16 @@ export function registerRoutes(app: Express): Server {
         { lat: 0, lng: 0 }
       );
 
-      // Calculate radius from center to farthest point
+      // Calculate radius and angle for the selected position
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
-        const latDiff = center.lat -lat;
+        const latDiff = center.lat - lat;
         const lngDiff = center.lng - lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
-      // Calculate position coordinates with a slight inward offset for safety
-      const angle = (randomPosition / game.maxTeams) * 2 * Math.PI;
+      // Convert position to angle (subtract 1 to convert 1-based position to 0-based index)
+      // Adjust starting angle to match map display (start from top, go clockwise)
+      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points slightly inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
@@ -991,7 +983,7 @@ export function registerRoutes(app: Express): Server {
         .update(gameParticipants)
         .set({
           startingLocation: {
-            position: randomPosition,
+            position: position,  // Store position as-is to maintain consistency with UI
             coordinates: { lat: y, lng: x }
           },
           startingLocationAssignedAt: new Date()
@@ -1003,13 +995,6 @@ export function registerRoutes(app: Express): Server {
           )
         )
         .returning();
-
-      // Broadcast the update to all connected clients
-      wss.broadcast(gameId, {
-        type: 'GAME_STATE_UPDATE',
-        gameId,
-        participant: updatedParticipant
-      });
 
       res.json(updatedParticipant);
     } catch (error) {
