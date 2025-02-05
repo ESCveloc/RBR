@@ -102,12 +102,6 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
 
 const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
-const POSITION_LABEL_OPTIONS = {
-  permanent: true,
-  offset: [0, -8],
-  className: 'bg-background text-foreground px-2 py-1 rounded-full text-xs font-medium shadow-sm border border-border'
-};
-
 class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
     const div = L.DomUtil.create('div', 'info legend');
