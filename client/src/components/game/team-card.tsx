@@ -52,6 +52,8 @@ export function TeamCard({
 
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
+  const isAdmin = user?.role === 'admin';
+  const canModify = isCaptain || isAdmin;
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
 
@@ -78,7 +80,7 @@ export function TeamCard({
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Status Updated",
@@ -152,7 +154,7 @@ export function TeamCard({
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Left Game",
-        description: "Your team has left the game.",
+        description: "Team has left the game.",
       });
     },
     onError: (error: Error) => {
@@ -178,7 +180,7 @@ export function TeamCard({
                 <div>
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
-                    {isCaptain && (
+                    {canModify && (
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={isReady}
@@ -250,7 +252,7 @@ export function TeamCard({
                   )}
                 </div>
 
-                {isCaptain && (
+                {canModify && (
                   <Button
                     variant="outline"
                     size="sm"

@@ -71,10 +71,12 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     cookie: { 
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true
+      secure: false, // Allow non-HTTPS in development
+      httpOnly: true,
+      sameSite: 'lax'
     },
-    store: sessionStore
+    store: sessionStore,
+    name: 'battle.sid' // Custom session name
   }));
 
   app.use(passport.initialize());
