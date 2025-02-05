@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Trophy, Users, Settings, Plus } from "lucide-react";
+import { Loader2, Trophy, Users, Settings, Plus, Power } from "lucide-react"; // Added Power import
 import type { Game } from "@db/schema";
 import type { Feature, Polygon } from "geojson";
 import {
@@ -103,7 +103,7 @@ export default function Admin() {
   const [, setLocation] = useLocation();
   const { user } = useUser();
   const { teams, isLoading: teamsLoading } = useTeams();
-    const { socket, isConnected, subscribeToMessage } = useWebSocket();
+  const { socket, isConnected, subscribeToMessage } = useWebSocket();
 
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -315,12 +315,26 @@ export default function Admin() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <Link href="/?view=player">
-          <Button variant="outline" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Player Dashboard
+        <div className="flex items-center gap-2">
+          <Link href="/?view=player">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Player Dashboard
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={() => {
+              if (user?.logout) {
+                user.logout();
+              }
+            }}
+          >
+            <Power className="h-4 w-4" />
+            Logout
           </Button>
-        </Link>
+        </div>
       </div>
 
       <Tabs defaultValue="games" className="space-y-4">
@@ -481,60 +495,60 @@ export default function Admin() {
               </CardContent>
             </Card>
             <Card>
-                <CardHeader>
-                  <CardTitle>Active Games</CardTitle>
-                  <CardDescription>Manage ongoing games</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {games?.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No games available. Create a new game to get started.
-                      </div>
-                    ) : (
-                      games?.filter(game => game.status === "pending" || game.status === "active")
-                        .map((game) => (
-                          <Card key={game.id}>
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-center">
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <h3 className="font-semibold">{game.name}</h3>
-                                    <Badge
-                                      variant="secondary"
-                                      className={cn(getGameStatusColor(game.status))}
-                                    >
-                                      {getGameStatusText(game.status)}
-                                    </Badge>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">
-                                      Length: {game.gameLengthMinutes} minutes
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
-                                    </p>
-                                    {game.startTime && (
-                                      <p className="text-sm text-muted-foreground">
-                                        Starts: {new Date(game.startTime).toLocaleString()}
-                                      </p>
-                                    )}
-                                  </div>
+              <CardHeader>
+                <CardTitle>Active Games</CardTitle>
+                <CardDescription>Manage ongoing games</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {games?.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No games available. Create a new game to get started.
+                    </div>
+                  ) : (
+                    games?.filter(game => game.status === "pending" || game.status === "active")
+                      .map((game) => (
+                        <Card key={game.id}>
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-center">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{game.name}</h3>
+                                  <Badge
+                                    variant="secondary"
+                                    className={cn(getGameStatusColor(game.status))}
+                                  >
+                                    {getGameStatusText(game.status)}
+                                  </Badge>
                                 </div>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => setLocation(`/game/${game.id}`)}
-                                >
-                                  View
-                                </Button>
+                                <div className="space-y-1">
+                                  <p className="text-sm text-muted-foreground">
+                                    Length: {game.gameLengthMinutes} minutes
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Teams: {game.maxTeams} (max {game.playersPerTeam} players each)
+                                  </p>
+                                  {game.startTime && (
+                                    <p className="text-sm text-muted-foreground">
+                                      Starts: {new Date(game.startTime).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                              <Button
+                                variant="outline"
+                                onClick={() => setLocation(`/game/${game.id}`)}
+                              >
+                                View
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
