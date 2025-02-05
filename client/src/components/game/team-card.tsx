@@ -5,6 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, LogOut, MapPin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
@@ -38,6 +45,7 @@ export function TeamCard({
   showStatus = false,
   showLocation = false 
 }: TeamCardProps) {
+  const [selectedPosition, setSelectedPosition] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -46,6 +54,9 @@ export function TeamCard({
   const isCaptain = currentTeam?.captainId === user?.id;
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
+
+  // Generate positions array [1..10]
+  const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const toggleReady = useMutation({
     mutationFn: async () => {
@@ -92,7 +103,8 @@ export function TeamCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           teamId: participant.teamId,
-          force: true 
+          force: true,
+          position: selectedPosition ? parseInt(selectedPosition) : undefined
         }),
         credentials: 'include'
       });
@@ -109,6 +121,7 @@ export function TeamCard({
         title: "Success",
         description: "Starting position assigned.",
       });
+      setSelectedPosition("");
     },
     onError: (error: Error) => {
       toast({
@@ -214,17 +227,31 @@ export function TeamCard({
                 )}
 
                 <div className="flex items-center gap-2 ml-auto">
-                  {canAssignPosition && !hasStartingPosition && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => assignPosition.mutate()}
-                      disabled={assignPosition.isPending}
-                      className="bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Assign Position
-                    </Button>
+                  {canAssignPosition && (
+                    <div className="flex items-center gap-2">
+                      <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Select Position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map((pos) => (
+                            <SelectItem key={pos} value={String(pos - 1)}>
+                              Position {pos}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => assignPosition.mutate()}
+                        disabled={assignPosition.isPending || !selectedPosition}
+                        className="bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Assign
+                      </Button>
+                    </div>
                   )}
                   {isCaptain && (
                     <Button

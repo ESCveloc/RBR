@@ -18,7 +18,6 @@ interface SelectTeamProps {
 
 export function SelectTeam({ gameId }: SelectTeamProps) {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [selectedPosition, setSelectedPosition] = useState<string>("");
   const { teams = [], isLoading: isLoadingTeams } = useTeams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -30,44 +29,26 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
-      // First, join the game
-      const joinResponse = await fetch(`/api/games/${gameId}/join`, {
+      const response = await fetch(`/api/games/${gameId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
         credentials: 'include'
       });
 
-      if (!joinResponse.ok) {
-        throw new Error(await joinResponse.text());
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
 
-      // After joining, assign to specific position if selected
-      const positionResponse = await fetch(`/api/games/${gameId}/assign-position`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          teamId: parseInt(selectedTeamId),
-          force: true,
-          position: selectedPosition ? parseInt(selectedPosition) : undefined
-        }),
-        credentials: 'include'
-      });
-
-      if (!positionResponse.ok) {
-        throw new Error(await positionResponse.text());
-      }
-
-      return positionResponse.json();
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Team Assigned",
-        description: "The team has been successfully assigned to the game with a starting position.",
+        description: "The team has been successfully assigned to the game.",
       });
       setSelectedTeamId("");
-      setSelectedPosition("");
     },
     onError: (error: Error) => {
       toast({
@@ -85,9 +66,6 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
       </div>
     );
   }
-
-  // Generate positions array [1..10]
-  const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-4">
@@ -111,19 +89,6 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
                 No active teams available
               </SelectItem>
             )}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-          <SelectTrigger>
-            <SelectValue placeholder="Position (optional)" />
-          </SelectTrigger>
-          <SelectContent>
-            {positions.map((pos) => (
-              <SelectItem key={pos} value={String(pos - 1)}>
-                Position {pos}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
 
