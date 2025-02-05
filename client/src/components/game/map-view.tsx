@@ -15,7 +15,7 @@ const ZONE_COLORS = [
 ];
 
 const STARTING_POINT_STYLE = {
-  radius: 12,
+  radius: 8,
   color: '#000',
   weight: 2,
   opacity: 1,
@@ -34,12 +34,12 @@ const getZoneStyle = (index: number) => ({
   dashArray: index === 0 ? undefined : '5, 10',
 });
 
-function generateStartingPoints(center: L.LatLng, radius: number, count: number = 12) {
+const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
+
+function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
   const points: L.LatLng[] = [];
   for (let i = 0; i < count; i++) {
-    // Calculate angle to start at 12 o'clock (top) with position 1
-    // and continue clockwise
-    const angle = ((i / count) * 2 * Math.PI) - (Math.PI / 2);
+    const angle = (i / count) * 2 * Math.PI;
     const x = center.lng + (radius * Math.cos(angle)) / (111111 * Math.cos(center.lat * Math.PI / 180));
     const y = center.lat + (radius * Math.sin(angle)) / 111111;
     points.push(L.latLng(y, x));
@@ -50,12 +50,11 @@ function generateStartingPoints(center: L.LatLng, radius: number, count: number 
 function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?: Game) {
   const zonesLayer = L.layerGroup().addTo(map);
 
-  // Add zone circles
-  ZONE_COLORS.forEach((zoneColor, index) => {
+  SHRINK_MULTIPLIERS.forEach((multiplier, index) => {
     L.circle(center, {
-      radius: initialRadius * SHRINK_MULTIPLIERS[index],
-      color: zoneColor.color,
-      fillColor: zoneColor.color,
+      radius: initialRadius * multiplier,
+      color: ZONE_COLORS[index].color,
+      fillColor: ZONE_COLORS[index].color,
       ...getZoneStyle(index)
     }).addTo(zonesLayer);
   });
@@ -63,45 +62,29 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
-      // Create marker for the position
-      const marker = L.circleMarker(point, STARTING_POINT_STYLE);
+      const marker = L.circleMarker(point, {
+        ...STARTING_POINT_STYLE,
+      });
 
-      // Find if position is assigned to a team
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === index
       );
 
-      // Style marker based on assignment status
       if (assignedTeam) {
         marker.setStyle({
-          fillColor: '#4ade80', // Green color for assigned positions
+          fillColor: '#4ade80',
         });
+        marker.bindTooltip(`Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
+      } else {
+        marker.bindTooltip(`Position ${index + 1}: Unassigned`);
       }
 
       marker.addTo(zonesLayer);
-
-      // Create position number marker
-      const icon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black;">${index + 1}</div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
-      });
-
-      L.marker(point, { icon }).addTo(zonesLayer);
-
-      // Add hover popup with detailed information
-      const popupContent = assignedTeam
-        ? `Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`
-        : `Position ${index + 1}: Available`;
-      marker.bindPopup(popupContent);
     });
   }
 
   return zonesLayer;
 }
-
-const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
 class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
