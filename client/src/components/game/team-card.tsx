@@ -20,13 +20,13 @@ import { cn } from "@/lib/utils";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: GameParticipant & { 
-    team: Team & { 
+  participant?: GameParticipant & {
+    team: Team & {
       teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
       member_count?: number;
-    } 
+    };
   };
-  team?: Team & { 
+  team?: Team & {
     teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
     member_count?: number;
   };
@@ -36,16 +36,20 @@ interface TeamCardProps {
   showLocation?: boolean;
 }
 
-export function TeamCard({ 
-  gameId, 
-  participant, 
-  team, 
+export function TeamCard({
+  gameId,
+  participant,
+  team,
   canAssignPosition,
   showMembers = false,
   showStatus = false,
-  showLocation = false 
+  showLocation = false
 }: TeamCardProps) {
-  const [selectedPosition, setSelectedPosition] = useState<string>("");
+  const [selectedPosition, setSelectedPosition] = useState<string>(
+    participant?.startingLocation?.position !== undefined
+      ? String(participant.startingLocation.position)
+      : ""
+  );
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -67,7 +71,7 @@ export function TeamCard({
       const response = await fetch(`/api/games/${gameId}/team-ready`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           teamId: participant.teamId,
           ready: !isReady
         }),
@@ -103,7 +107,7 @@ export function TeamCard({
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           teamId: participant.teamId,
           force: true,
           position: parseInt(selectedPosition)
@@ -180,7 +184,7 @@ export function TeamCard({
                 <div>
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
-                    {canModify && (
+                    {(canModify || isAdmin) && (
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={isReady}
@@ -209,8 +213,8 @@ export function TeamCard({
                           ? 'bg-green-500/10 text-green-500'
                           : 'bg-gray-500/10 text-gray-500'
                       )}>
-                        {participant.status === "eliminated" 
-                          ? "Eliminated" 
+                        {participant.status === "eliminated"
+                          ? "Eliminated"
                           : isReady
                           ? "Ready"
                           : "Not Ready"
@@ -230,16 +234,24 @@ export function TeamCard({
             {participant.status !== "eliminated" && (
               <div className="flex items-center justify-between border-t pt-3">
                 <div className="flex items-center gap-2">
-                  {canAssignPosition && (
-                    <Select 
-                      value={selectedPosition} 
+                  {(canAssignPosition || isAdmin) && (
+                    <Select
+                      value={participant?.startingLocation?.position !== undefined
+                        ? String(participant.startingLocation.position)
+                        : selectedPosition}
                       onValueChange={(value) => {
                         setSelectedPosition(value);
                         assignPosition.mutate();
                       }}
                     >
                       <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Select Position" />
+                        <SelectValue placeholder="Select Position">
+                          {participant?.startingLocation?.position !== undefined
+                            ? `Position ${participant.startingLocation.position + 1}`
+                            : selectedPosition
+                            ? `Position ${Number(selectedPosition) + 1}`
+                            : "Select Position"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => (
@@ -252,7 +264,7 @@ export function TeamCard({
                   )}
                 </div>
 
-                {canModify && (
+                {(canModify || isAdmin) && (
                   <Button
                     variant="outline"
                     size="sm"
