@@ -154,7 +154,7 @@ export function setupWebSocketServer(server: Server) {
         }
 
         const cookies = parse(req.headers.cookie);
-        const sessionId = cookies['connect.sid'];
+        const sessionId = cookies['battle.sid']; // Changed from connect.sid to battle.sid
         if (!sessionId) {
           console.log("WebSocket connection rejected: No session ID");
           return done(false, 401, "No session ID");

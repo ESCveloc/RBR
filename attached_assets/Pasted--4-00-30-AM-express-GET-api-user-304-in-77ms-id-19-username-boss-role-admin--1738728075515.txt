@@ -1,0 +1,79 @@
+  }
+]
+4:00:30 AM [express] GET /api/user 304 in 77ms :: {"id":19,"username":"boss","role":"admin"}
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+4:00:30 AM [express] GET /api/admin/settings 304 in 149ms :: {"defaultCenter":{"lat":35.8462,"lng":-…
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+4:00:30 AM [express] GET /api/admin/users 304 in 226ms :: [{"id":1,"username":"Ickarss","role":"user…
+Teams with member counts: [
+  {
+    teams: {
+      id: 2,
+      name: 'testies',
+      description: null,
+      captainId: 19,
+      active: true,
+      createdAt: 2025-01-26T16:12:41.292Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 2
+  },
+  {
+    teams: {
+      id: 3,
+      name: 'testies_3',
+      description: null,
+      captainId: 1,
+      active: true,
+      createdAt: 2025-01-28T23:54:49.548Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 3
+  },
+  {
+    teams: {
+      id: 5,
+      name: 'iadlest',
+      description: null,
+      captainId: 19,
+      active: true,
+      createdAt: 2025-01-30T08:19:51.183Z,
+      wins: 0,
+      losses: 0,
+      tags: []
+    },
+    team_members: 1
+  }
+]
+4:00:30 AM [express] GET /api/teams 200 in 231ms :: [{"teams":{"id":2,"name":"testies","description"…
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+4:00:30 AM [express] GET /api/games 304 in 696ms :: [{"id":1,"name":"test","status":"completed","sta…
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+4:00:33 AM [express] GET /api/games/9 304 in 384ms :: {"id":9,"name":"Zones","status":"pending","sta…
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No user in session
+WebSocket connection rejected: Invalid session
+Session verification failed: No u
