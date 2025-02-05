@@ -53,11 +53,11 @@ function generateStartingPoints(center: L.LatLng, radius: number, count: number 
 function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?: Game) {
   const zonesLayer = L.layerGroup().addTo(map);
 
-  SHRINK_MULTIPLIERS.forEach((multiplier, index) => {
+  ZONE_COLORS.forEach((zone, index) => {
     L.circle(center, {
-      radius: initialRadius * multiplier,
-      color: ZONE_COLORS[index].color,
-      fillColor: ZONE_COLORS[index].color,
+      radius: initialRadius * SHRINK_MULTIPLIERS[index],
+      color: zone.color,
+      fillColor: zone.color,
       ...getZoneStyle(index)
     }).addTo(zonesLayer);
   });
@@ -65,8 +65,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
-      // Convert to 1-based position for consistent display
-      const siteNumber = index + 1;
+      const siteNumber = index + 1; // Convert to 1-based position for display
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === siteNumber
       );

@@ -937,6 +937,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Check if the requested position is already taken by another team
+      // Note: We store positions as 1-based in the database
       const existingPosition = await db
         .select()
         .from(gameParticipants)
@@ -971,19 +972,19 @@ export function registerRoutes(app: Express): Server {
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
-      // Convert position to angle (subtract 1 to convert 1-based position to 0-based index)
-      // Adjust starting angle to match map display (start from top, go clockwise)
-      const angle = (-1 * (position) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
+      // Convert position to angle (positions are 1-based)      // Adjust starting angle to match map display (start from top, go clockwise)
+      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points slightly inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
       // Update participant with new starting location
+      // Store position as 1-based in the database
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({
           startingLocation: {
-            position: position,
+            position: position,  // Store as 1-based position
             coordinates: { lat: y, lng: x }
           },
           startingLocationAssignedAt: new Date()
