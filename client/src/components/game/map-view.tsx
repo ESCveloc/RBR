@@ -38,8 +38,8 @@ const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
   const points: L.LatLng[] = [];
-  // Start from -90 degrees (position 3 in the old system) and go clockwise
-  const startAngle = -Math.PI / 2; // -90 degrees
+  // Start from 0 degrees (12 o'clock) and go clockwise
+  const startAngle = 0; // 0 degrees is 12 o'clock
   for (let i = 0; i < count; i++) {
     // Go clockwise (negative angle)
     const angle = startAngle - (i * 2 * Math.PI / count);
