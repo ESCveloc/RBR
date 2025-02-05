@@ -102,7 +102,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
 
       if (assignedTeam) {
         marker.setStyle({
-          fillColor: '#4ade80',
+          fillColor: '#f97316', // Changed from '#4ade80' (green) to '#f97316' (orange)
         });
         marker.bindTooltip(`Site ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
       } else {

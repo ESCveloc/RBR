@@ -4,7 +4,7 @@ import { cn } from "./utils";
 export function getGameStatusColor(status: string) {
   switch (status) {
     case "pending":
-      return "bg-yellow-500/10 text-yellow-500";
+      return "bg-yellow-500/20 text-yellow-600"; // Made yellow color more prominent
     case "active":
       return "bg-green-500/10 text-green-500";
     case "completed":
