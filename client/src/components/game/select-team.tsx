@@ -81,7 +81,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
                   key={team.id} 
                   value={String(team.id)}
                 >
-                  {team.name} ({team.teamMembers?.length || 0} members)
+                  {team.name} ({team.member_count || team.teamMembers?.length || 0} members)
                 </SelectItem>
               ))
             ) : (
