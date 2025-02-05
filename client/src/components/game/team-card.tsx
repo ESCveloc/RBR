@@ -221,7 +221,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Position {Number(participant.startingLocation.position) + 1}
+                        • Position {participant.startingLocation.position + 1}
                       </span>
                     )}
                   </div>
