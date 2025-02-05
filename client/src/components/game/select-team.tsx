@@ -18,6 +18,7 @@ interface SelectTeamProps {
 
 export function SelectTeam({ gameId }: SelectTeamProps) {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [selectedPosition, setSelectedPosition] = useState<string>("");
   const { teams = [], isLoading: isLoadingTeams } = useTeams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,13 +42,14 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
         throw new Error(await joinResponse.text());
       }
 
-      // After joining, automatically assign position
+      // After joining, assign to specific position if selected
       const positionResponse = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           teamId: parseInt(selectedTeamId),
-          force: false // Don't force when auto-assigning
+          force: true,
+          position: selectedPosition ? parseInt(selectedPosition) : undefined
         }),
         credentials: 'include'
       });
@@ -65,6 +67,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
         description: "The team has been successfully assigned to the game with a starting position.",
       });
       setSelectedTeamId("");
+      setSelectedPosition("");
     },
     onError: (error: Error) => {
       toast({
@@ -82,6 +85,9 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
       </div>
     );
   }
+
+  // Generate positions array [1..10]
+  const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-4">
@@ -107,6 +113,20 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
             )}
           </SelectContent>
         </Select>
+
+        <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+          <SelectTrigger>
+            <SelectValue placeholder="Position (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            {positions.map((pos) => (
+              <SelectItem key={pos} value={String(pos - 1)}>
+                Position {pos}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Button
           onClick={() => assignTeam.mutate()}
           disabled={!selectedTeamId || assignTeam.isPending}
