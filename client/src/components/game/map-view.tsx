@@ -53,6 +53,7 @@ function generateStartingPoints(center: L.LatLng, radius: number, count: number 
 function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?: Game) {
   const zonesLayer = L.layerGroup().addTo(map);
 
+  // Draw zone circles
   ZONE_COLORS.forEach((zone, index) => {
     L.circle(center, {
       radius: initialRadius * SHRINK_MULTIPLIERS[index],
@@ -65,10 +66,18 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
-      const siteNumber = index + 1; // Convert to 1-based position for display
+      const siteNumber = index + 1; // Use 1-based position
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === siteNumber
       );
+
+      // Create the site marker circle
+      const marker = L.circleMarker(point, {
+        ...STARTING_POINT_STYLE,
+        fillColor: assignedTeam ? '#f97316' : '#fff',
+        fillOpacity: assignedTeam ? 0.8 : 0.8,
+        radius: 15
+      });
 
       // Create a custom label for the site number
       const iconHtml = `
@@ -95,14 +104,6 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
 
       // Add the number label
       L.marker(point, { icon, interactive: false }).addTo(zonesLayer);
-
-      // Create the site marker circle
-      const marker = L.circleMarker(point, {
-        ...STARTING_POINT_STYLE,
-        fillColor: assignedTeam ? '#f97316' : '#fff',
-        fillOpacity: assignedTeam ? 0.8 : 0.8,
-        radius: 15
-      });
 
       if (assignedTeam) {
         marker.bindTooltip(`Site ${siteNumber}: ${assignedTeam.team?.name || 'Team'}`);

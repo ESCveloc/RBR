@@ -882,6 +882,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the position assignment endpoint
   app.post("/api/games/:gameId/assign-position", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -937,7 +938,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Check if the requested position is already taken by another team
-      // Note: We store positions as 1-based in the database
       const existingPosition = await db
         .select()
         .from(gameParticipants)
@@ -955,7 +955,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Position already taken by another team");
       }
 
-      // Calculate position coordinates
+      // Calculate position coordinates based on 1-based position
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -965,26 +965,24 @@ export function registerRoutes(app: Express): Server {
         { lat: 0, lng: 0 }
       );
 
-      // Calculate radius and angle for the selected position
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
         const latDiff = center.lat - lat;
         const lngDiff = center.lng - lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
-      // Convert position to angle (positions are 1-based)      // Adjust starting angle to match map display (start from top, go clockwise)
+      // Convert 1-based position to angle
       const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
-      const safetyFactor = 0.9; // Keep points slightly inside the boundary
+      const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
-      // Update participant with new starting location
-      // Store position as 1-based in the database
+      // Update participant with new starting location (store as 1-based position)
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({
           startingLocation: {
-            position: position,  // Store as 1-based position
+            position: position,
             coordinates: { lat: y, lng: x }
           },
           startingLocationAssignedAt: new Date()

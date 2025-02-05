@@ -67,8 +67,8 @@ export function TeamCard({
   showLocation = false
 }: TeamCardProps) {
   const [selectedPosition, setSelectedPosition] = useState<string>(
-    participant?.startingLocation?.position !== undefined
-      ? String(participant.startingLocation.position + 1)  // Convert 0-based to 1-based for display
+    participant?.startingLocation?.position
+      ? String(participant.startingLocation.position)
       : ""
   );
   const { toast } = useToast();
@@ -88,16 +88,13 @@ export function TeamCard({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId || !selectedPosition) return;
 
-      // Convert from 1-based UI position to 0-based backend position
-      const positionIndex = parseInt(selectedPosition) - 1;
-
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId: participant.teamId,
           force: isAdmin,
-          position: positionIndex  // Send 0-based index to server
+          position: parseInt(selectedPosition)  // Send 1-based position
         }),
         credentials: 'include'
       });
@@ -110,9 +107,8 @@ export function TeamCard({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      // Update the selected position to match the new assignment (convert to 1-based UI position)
       if (data.startingLocation) {
-        setSelectedPosition(String(data.startingLocation.position + 1));
+        setSelectedPosition(String(data.startingLocation.position));
       }
       toast({
         title: "Success",
@@ -249,7 +245,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Site {participant.startingLocation.position + 1}
+                        • Site {participant.startingLocation.position}
                       </span>
                     )}
                   </div>
