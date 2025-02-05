@@ -36,6 +36,12 @@ interface TeamCardProps {
   showLocation?: boolean;
 }
 
+// Helper function to convert internal position (0-9) to display position (1-10)
+function getDisplayPosition(position: number): number {
+  const displayPosition = ((position + 8) % 10) + 1; // +8 is equivalent to -2 in modulo 10
+  return displayPosition;
+}
+
 export function TeamCard({
   gameId,
   participant,
@@ -221,7 +227,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Position {Number(participant.startingLocation.position) + 1}
+                        • Position {getDisplayPosition(participant.startingLocation.position)}
                       </span>
                     )}
                   </div>
@@ -245,16 +251,16 @@ export function TeamCard({
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Position">
                           {participant?.startingLocation?.position !== undefined
-                            ? `Position ${Number(participant.startingLocation.position) + 1}`
+                            ? `Position ${getDisplayPosition(participant.startingLocation.position)}`
                             : selectedPosition
-                            ? `Position ${Number(selectedPosition) + 1}`
+                            ? `Position ${getDisplayPosition(parseInt(selectedPosition))}`
                             : "Select Position"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => (
-                          <SelectItem key={pos} value={String(pos - 1)}>
-                            Position {pos}
+                          <SelectItem key={pos -1} value={String(pos - 1)}>
+                            Position {getDisplayPosition(pos - 1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
