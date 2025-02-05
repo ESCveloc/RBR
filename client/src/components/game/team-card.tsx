@@ -181,11 +181,11 @@ export function TeamCard({
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
                     {(canModify || isAdmin) && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-[120px]">
                         <Switch
                           checked={isReady}
                           onCheckedChange={() => {
@@ -232,8 +232,8 @@ export function TeamCard({
             </div>
 
             {participant.status !== "eliminated" && (
-              <div className="flex items-center justify-between border-t pt-3">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between border-t mt-4 pt-4">
+                <div className="flex items-center gap-4">
                   {(canAssignPosition || isAdmin) && (
                     <Select
                       value={participant?.startingLocation?.position !== undefined
@@ -244,7 +244,7 @@ export function TeamCard({
                         assignPosition.mutate();
                       }}
                     >
-                      <SelectTrigger className="w-[140px]">
+                      <SelectTrigger className="w-[180px] h-10">
                         <SelectValue placeholder="Select Position">
                           {participant?.startingLocation?.position !== undefined
                             ? `Position ${participant.startingLocation.position + 1}`
@@ -267,10 +267,10 @@ export function TeamCard({
                 {(canModify || isAdmin) && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={() => leaveGame.mutate()}
                     disabled={leaveGame.isPending}
-                    className="bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                    className="min-w-[120px] h-10 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
                     Leave
