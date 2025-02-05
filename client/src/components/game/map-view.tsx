@@ -37,9 +37,9 @@ const getZoneStyle = (index: number) => ({
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 12) {
   const points: L.LatLng[] = [];
   for (let i = 0; i < count; i++) {
-    // Adjust index to start from position 1 at top (12 o'clock)
-    // and continue clockwise (i=0 should be position 1 at top)
-    const angle = (((i - 3) / count) * 2 * Math.PI);
+    // Calculate angle to start at 12 o'clock (top) with position 1
+    // and continue clockwise
+    const angle = ((i / count) * 2 * Math.PI) - (Math.PI / 2);
     const x = center.lng + (radius * Math.cos(angle)) / (111111 * Math.cos(center.lat * Math.PI / 180));
     const y = center.lat + (radius * Math.sin(angle)) / 111111;
     points.push(L.latLng(y, x));
