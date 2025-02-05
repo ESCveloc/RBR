@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import type { GameParticipant, Team } from "@db/schema";
+import type { GameParticipant, Team, Game } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, LogOut } from "lucide-react";
@@ -81,7 +81,14 @@ export function TeamCard({
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
 
-  // Generate positions array [1..10] for the clockwise pattern
+  // Get taken positions from the game data
+  const game = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+  const takenPositions = game?.participants
+    ?.filter(p => p.teamId !== participant?.teamId)
+    ?.map(p => p.startingLocation?.position)
+    ?.filter(Boolean) || [];
+
+  // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const assignPosition = useMutation({
@@ -94,7 +101,7 @@ export function TeamCard({
         body: JSON.stringify({
           teamId: participant.teamId,
           force: isAdmin,
-          position: parseInt(selectedPosition)  // Send 1-based position
+          position: parseInt(selectedPosition)
         }),
         credentials: 'include'
       });
@@ -270,11 +277,22 @@ export function TeamCard({
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {positions.map((pos) => (
-                          <SelectItem key={pos} value={String(pos)}>
-                            Site {pos}
-                          </SelectItem>
-                        ))}
+                        {positions.map((pos) => {
+                          const isTaken = takenPositions.includes(pos);
+                          return (
+                            <SelectItem
+                              key={pos}
+                              value={String(pos)}
+                              disabled={isTaken && !isAdmin}
+                              className={cn(
+                                isTaken && "opacity-50",
+                                isTaken && !isAdmin && "cursor-not-allowed"
+                              )}
+                            >
+                              Site {pos} {isTaken && "(Taken)"}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}

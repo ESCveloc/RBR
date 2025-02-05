@@ -934,7 +934,12 @@ export function registerRoutes(app: Express): Server {
 
       // If team already has a position and force is false, prevent reassignment
       if (participant.startingLocation && !force) {
-        return res.status(400).send("Team already has a starting position");
+        return res.status(400).send("Team already has a starting position. Contact an administrator to change it.");
+      }
+
+      // Check if the position is valid
+      if (position < 1 || position > game.maxTeams) {
+        return res.status(400).send(`Invalid position. Must be between 1 and ${game.maxTeams}`);
       }
 
       // Check if the requested position is already taken by another team
@@ -952,7 +957,7 @@ export function registerRoutes(app: Express): Server {
         .then(results => results[0]);
 
       if (existingPosition && !force) {
-        return res.status(400).send("Position already taken by another team");
+        return res.status(400).send("This position is already taken by another team. Please select a different position.");
       }
 
       // Calculate position coordinates based on 1-based position
@@ -967,7 +972,7 @@ export function registerRoutes(app: Express): Server {
 
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
         const latDiff = center.lat - lat;
-        const lngDiff = center.lng - lng;
+        const lngDiff = center.lng- lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
@@ -977,7 +982,7 @@ export function registerRoutes(app: Express): Server {
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
-      // Update participant with new starting location (store as 1-based position)
+      // Update participant with new starting location
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({
@@ -994,6 +999,15 @@ export function registerRoutes(app: Express): Server {
           )
         )
         .returning();
+
+      // Notify other clients about the update
+      const wsServer = global.gameWebSocketServer;
+      if (wsServer) {
+        wsServer.broadcastToGame(gameId, {
+          type: 'GAME_UPDATE',
+          gameId: gameId
+        });
+      }
 
       res.json(updatedParticipant);
     } catch (error) {
@@ -1436,6 +1450,7 @@ export function registerRoutes(app: Express): Server {
 
 declare global {
   var gameSettings: any;
+  var gameWebSocketServer: any; // Declare gameWebSocketServer
   namespace Express {
     interface User {
       id: number;
