@@ -83,11 +83,12 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
           justify-content: center; 
           font-weight: bold; 
           font-size: 14px;
-          color: black;
-          background-color: white;
+          color: ${assignedTeam ? 'white' : 'black'};
+          background-color: ${assignedTeam ? '#f97316' : 'white'};
           border-radius: 50%;
           border: 1px solid black;
           box-shadow: 0 0 2px rgba(0,0,0,0.2);
+          z-index: 1000;
         ">${index + 1}</div>`;
 
       const icon = L.divIcon({
@@ -102,7 +103,9 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
 
       if (assignedTeam) {
         marker.setStyle({
-          fillColor: '#f97316', // Changed from '#4ade80' (green) to '#f97316' (orange)
+          fillColor: '#f97316',
+          fillOpacity: 0.6,
+          radius: 12, // Slightly larger radius for better visibility
         });
         marker.bindTooltip(`Site ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
       } else {
