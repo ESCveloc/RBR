@@ -77,6 +77,8 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         });
       }
 
+      marker.addTo(zonesLayer);
+
       // Create position number marker
       const icon = L.divIcon({
         className: 'custom-div-icon',
@@ -92,8 +94,6 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         ? `Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`
         : `Position ${index + 1}: Available`;
       marker.bindPopup(popupContent);
-
-      marker.addTo(zonesLayer);
     });
   }
 
