@@ -15,7 +15,7 @@ const ZONE_COLORS = [
 ];
 
 const STARTING_POINT_STYLE = {
-  radius: 8,
+  radius: 12,
   color: '#000',
   weight: 2,
   opacity: 1,
@@ -65,30 +65,32 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
-      const marker = L.circleMarker(point, {
-        ...STARTING_POINT_STYLE,
-      });
-
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === index
       );
 
-      // Create a custom icon div with the site number
+      // Create the site marker circle
+      const marker = L.circleMarker(point, {
+        ...STARTING_POINT_STYLE,
+        fillColor: assignedTeam ? '#f97316' : '#fff',
+        fillOpacity: assignedTeam ? 0.8 : 0.8,
+        radius: 15
+      });
+
+      // Create a custom label for the site number
       const iconHtml = `
         <div style="
-          width: 20px; 
-          height: 20px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          font-weight: bold; 
+          position: relative;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
           font-size: 14px;
           color: ${assignedTeam ? 'white' : 'black'};
-          background-color: ${assignedTeam ? '#f97316' : 'white'};
-          border-radius: 50%;
-          border: 1px solid black;
-          box-shadow: 0 0 2px rgba(0,0,0,0.2);
           z-index: 1000;
+          text-shadow: 0px 0px 2px rgba(255,255,255,0.5);
         ">${index + 1}</div>`;
 
       const icon = L.divIcon({
@@ -98,15 +100,10 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         iconAnchor: [10, 10]
       });
 
-      // Add the number marker
-      L.marker(point, { icon }).addTo(zonesLayer);
+      // Add the number label
+      L.marker(point, { icon, interactive: false }).addTo(zonesLayer);
 
       if (assignedTeam) {
-        marker.setStyle({
-          fillColor: '#f97316',
-          fillOpacity: 0.6,
-          radius: 12, // Slightly larger radius for better visibility
-        });
         marker.bindTooltip(`Site ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
       } else {
         marker.bindTooltip(`Site ${index + 1}: Unassigned`);
