@@ -91,7 +91,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
           color: ${assignedTeam ? 'white' : 'black'};
           z-index: 1000;
           text-shadow: 0px 0px 2px rgba(255,255,255,0.5);
-        ">${index + 1}</div>`;
+        ">${index + 1}</div>`; // Display 1-based position number
 
       const icon = L.divIcon({
         html: iconHtml,

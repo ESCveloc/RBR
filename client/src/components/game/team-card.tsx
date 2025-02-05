@@ -47,7 +47,7 @@ export function TeamCard({
 }: TeamCardProps) {
   const [selectedPosition, setSelectedPosition] = useState<string>(
     participant?.startingLocation?.position !== undefined
-      ? String(participant.startingLocation.position)
+      ? String(participant.startingLocation.position + 1)
       : ""
   );
   const { toast } = useToast();
@@ -67,13 +67,16 @@ export function TeamCard({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId || !selectedPosition) return;
 
+      // Convert from 1-based UI position to 0-based backend position
+      const positionIndex = parseInt(selectedPosition) - 1;
+
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId: participant.teamId,
           force: isAdmin, // Add force parameter for admin users
-          position: parseInt(selectedPosition)
+          position: positionIndex
         }),
         credentials: 'include'
       });
@@ -86,8 +89,8 @@ export function TeamCard({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      // Update the selected position to match the new assignment
-      setSelectedPosition(String(data.startingLocation.position));
+      // Update the selected position to match the new assignment (convert to 1-based UI position)
+      setSelectedPosition(String(data.startingLocation.position + 1));
       toast({
         title: "Success",
         description: "Starting position assigned.",
@@ -237,7 +240,7 @@ export function TeamCard({
                   {(canAssignPosition || isAdmin) && participant?.team && (
                     <Select
                       value={participant?.startingLocation?.position !== undefined
-                        ? String(participant.startingLocation.position)
+                        ? String(participant.startingLocation.position + 1) // Convert to 1-based UI position
                         : selectedPosition}
                       onValueChange={(value) => {
                         setSelectedPosition(value);
@@ -247,15 +250,15 @@ export function TeamCard({
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Site">
                           {participant?.startingLocation?.position !== undefined
-                            ? `Site ${Number(participant.startingLocation.position) + 1}`
+                            ? `Site ${participant.startingLocation.position + 1}`
                             : selectedPosition
-                              ? `Site ${Number(selectedPosition) + 1}`
+                              ? `Site ${selectedPosition}`
                               : "Select Site"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => (
-                          <SelectItem key={pos} value={String(pos - 1)}>
+                          <SelectItem key={pos} value={String(pos)}>
                             Site {pos}
                           </SelectItem>
                         ))}
