@@ -60,7 +60,7 @@ export function TeamCard({
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
 
-  // Generate positions array [1..10]
+  // Generate positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const toggleReady = useMutation({
@@ -221,7 +221,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Position {participant.startingLocation.position + 1}
+                        • Position {Number(participant.startingLocation.position) + 1}
                       </span>
                     )}
                   </div>
@@ -234,7 +234,9 @@ export function TeamCard({
                 <div>
                   {(canAssignPosition || isAdmin) && (
                     <Select
-                      value={selectedPosition}
+                      value={participant?.startingLocation?.position !== undefined
+                        ? String(participant.startingLocation.position)
+                        : selectedPosition}
                       onValueChange={(value) => {
                         setSelectedPosition(value);
                         assignPosition.mutate();
@@ -243,7 +245,7 @@ export function TeamCard({
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Position">
                           {participant?.startingLocation?.position !== undefined
-                            ? `Position ${participant.startingLocation.position + 1}`
+                            ? `Position ${Number(participant.startingLocation.position) + 1}`
                             : selectedPosition
                             ? `Position ${Number(selectedPosition) + 1}`
                             : "Select Position"}
