@@ -73,13 +73,25 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         p => p.startingLocation?.position === index
       );
 
+      // Create a custom icon div with the site number
+      const iconHtml = `<div style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${index + 1}</div>`;
+      const icon = L.divIcon({
+        html: iconHtml,
+        className: 'custom-div-icon',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+
+      // Add the number marker
+      L.marker(point, { icon }).addTo(zonesLayer);
+
       if (assignedTeam) {
         marker.setStyle({
           fillColor: '#4ade80',
         });
-        marker.bindTooltip(`Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
+        marker.bindTooltip(`Site ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
       } else {
-        marker.bindTooltip(`Position ${index + 1}: Unassigned`);
+        marker.bindTooltip(`Site ${index + 1}: Unassigned`);
       }
 
       marker.addTo(zonesLayer);

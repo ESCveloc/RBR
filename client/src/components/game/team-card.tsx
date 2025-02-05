@@ -221,7 +221,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Position {participant.startingLocation.position + 1}
+                        • Site {participant.startingLocation.position + 1}
                       </span>
                     )}
                   </div>
@@ -243,18 +243,18 @@ export function TeamCard({
                       }}
                     >
                       <SelectTrigger className="w-full max-w-[160px]">
-                        <SelectValue placeholder="Select Position">
+                        <SelectValue placeholder="Select Site">
                           {participant?.startingLocation?.position !== undefined
-                            ? `Position ${Number(participant.startingLocation.position) + 1}`
+                            ? `Site ${Number(participant.startingLocation.position) + 1}`
                             : selectedPosition
-                            ? `Position ${Number(selectedPosition) + 1}`
-                            : "Select Position"}
+                            ? `Site ${Number(selectedPosition) + 1}`
+                            : "Select Site"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => (
                           <SelectItem key={pos} value={String(pos - 1)}>
-                            Position {pos}
+                            Site {pos}
                           </SelectItem>
                         ))}
                       </SelectContent>
