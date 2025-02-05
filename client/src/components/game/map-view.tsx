@@ -34,6 +34,12 @@ const getZoneStyle = (index: number) => ({
   dashArray: index === 0 ? undefined : '5, 10',
 });
 
+const POSITION_LABEL_OPTIONS = {
+  permanent: true,
+  offset: [0, -8],
+  className: 'bg-background text-foreground px-2 py-1 rounded-full text-xs font-medium shadow-sm border border-border'
+};
+
 const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
 
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
@@ -50,6 +56,7 @@ function generateStartingPoints(center: L.LatLng, radius: number, count: number 
 function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?: Game) {
   const zonesLayer = L.layerGroup().addTo(map);
 
+  // Add zone circles
   SHRINK_MULTIPLIERS.forEach((multiplier, index) => {
     L.circle(center, {
       radius: initialRadius * multiplier,
@@ -62,22 +69,33 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   if (game?.status === 'pending') {
     const startingPoints = generateStartingPoints(center, initialRadius);
     startingPoints.forEach((point, index) => {
-      const marker = L.circleMarker(point, {
-        ...STARTING_POINT_STYLE,
-      });
+      // Create marker for the position
+      const marker = L.circleMarker(point, STARTING_POINT_STYLE);
 
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === index
       );
 
+      // Style marker based on assignment status
       if (assignedTeam) {
         marker.setStyle({
-          fillColor: '#4ade80',
+          fillColor: '#4ade80', // Green color for assigned positions
         });
-        marker.bindTooltip(`Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
-      } else {
-        marker.bindTooltip(`Position ${index + 1}: Unassigned`);
       }
+
+      // Create a permanent label showing the position number
+      const labelContent = `${index + 1}`;
+      const label = L.tooltip({
+        ...POSITION_LABEL_OPTIONS,
+      });
+      label.setContent(labelContent);
+      marker.bindTooltip(label);
+
+      // Add hover popup with detailed information
+      const popupContent = assignedTeam 
+        ? `Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`
+        : `Position ${index + 1}: Available`;
+      marker.bindPopup(popupContent);
 
       marker.addTo(zonesLayer);
     });
