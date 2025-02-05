@@ -20,29 +20,8 @@ import { cn } from "@/lib/utils";
 
 interface TeamCardProps {
   gameId?: number;
-  participant?: {
-    id: number;
-    teamId: number;
-    ready: boolean;
-    gameId: number;
-    status: "alive" | "eliminated";
-    eliminatedAt: Date | null;
-    location: GeolocationCoordinates | null;
-    startingLocation: {
-      position: number;
-      coordinates: { lat: number; lng: number; };
-    } | null;
-    startingLocationAssignedAt: Date | null;
-    team: {
-      id: number;
-      name: string;
-      description: string | null;
-      captainId: number;
-      active: boolean;
-      wins: number;
-      losses: number;
-      tags: string[] | null;
-      createdAt: Date;
+  participant?: GameParticipant & {
+    team: Team & {
       teamMembers: Array<{ id: number; userId: number; joinedAt: string }>;
       member_count?: number;
     };
@@ -130,6 +109,20 @@ export function TeamCard({
       });
     }
   });
+
+  const handlePositionChange = (value: string) => {
+    const newPosition = parseInt(value);
+    if (takenPositions.includes(newPosition) && !isAdmin) {
+      toast({
+        title: "Position Taken",
+        description: "This position is already taken by another team. Please select a different position.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setSelectedPosition(value);
+    assignPosition.mutate();
+  };
 
   const toggleReady = useMutation({
     mutationFn: async () => {
@@ -266,10 +259,7 @@ export function TeamCard({
                   {(canAssignPosition || isAdmin) && participant?.team && (
                     <Select
                       value={selectedPosition}
-                      onValueChange={(value) => {
-                        setSelectedPosition(value);
-                        assignPosition.mutate();
-                      }}
+                      onValueChange={handlePositionChange}
                     >
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Site">
