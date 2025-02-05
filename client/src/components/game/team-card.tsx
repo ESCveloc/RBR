@@ -57,7 +57,6 @@ export function TeamCard({
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
   const isAdmin = user?.role === 'admin';
-  const canModify = isCaptain || isAdmin;
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
 
@@ -127,7 +126,6 @@ export function TeamCard({
         title: "Success",
         description: "Starting position assigned.",
       });
-      setSelectedPosition("");
     },
     onError: (error: Error) => {
       toast({
@@ -184,7 +182,7 @@ export function TeamCard({
                 <div className="space-y-1">
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
-                    {(canModify || isAdmin) && (
+                    {isAdmin && (
                       <div className="flex items-center gap-2 min-w-[120px]">
                         <Switch
                           checked={isReady}
@@ -232,19 +230,17 @@ export function TeamCard({
             </div>
 
             {participant.status !== "eliminated" && (
-              <div className="flex items-center justify-between border-t mt-4 pt-4">
-                <div className="flex items-center gap-4">
+              <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
+                <div>
                   {(canAssignPosition || isAdmin) && (
                     <Select
-                      value={participant?.startingLocation?.position !== undefined
-                        ? String(participant.startingLocation.position)
-                        : selectedPosition}
+                      value={selectedPosition}
                       onValueChange={(value) => {
                         setSelectedPosition(value);
                         assignPosition.mutate();
                       }}
                     >
-                      <SelectTrigger className="w-[180px] h-10">
+                      <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Position">
                           {participant?.startingLocation?.position !== undefined
                             ? `Position ${participant.startingLocation.position + 1}`
@@ -264,17 +260,19 @@ export function TeamCard({
                   )}
                 </div>
 
-                {(canModify || isAdmin) && (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => leaveGame.mutate()}
-                    disabled={leaveGame.isPending}
-                    className="min-w-[120px] h-10 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Leave
-                  </Button>
+                {isAdmin && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => leaveGame.mutate()}
+                      disabled={leaveGame.isPending}
+                      className="w-full max-w-[160px] bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Leave
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
