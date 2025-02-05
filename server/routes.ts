@@ -943,7 +943,7 @@ export function registerRoutes(app: Express): Server {
         .where(
           and(
             eq(gameParticipants.gameId, gameId),
-            sql`gameParticipants.starting_location->>'position' = ${String(position)}`,
+            sql`game_participants.starting_location->>'position' = ${String(position)}`,
             ne(gameParticipants.teamId, teamId)
           )
         )
@@ -973,7 +973,7 @@ export function registerRoutes(app: Express): Server {
 
       // Convert position to angle (subtract 1 to convert 1-based position to 0-based index)
       // Adjust starting angle to match map display (start from top, go clockwise)
-      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
+      const angle = (-1 * (position) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points slightly inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
@@ -983,7 +983,7 @@ export function registerRoutes(app: Express): Server {
         .update(gameParticipants)
         .set({
           startingLocation: {
-            position: position,  // Store position as-is to maintain consistency with UI
+            position: position,
             coordinates: { lat: y, lng: x }
           },
           startingLocationAssignedAt: new Date()
