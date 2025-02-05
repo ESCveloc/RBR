@@ -36,16 +36,6 @@ interface TeamCardProps {
   showLocation?: boolean;
 }
 
-// Helper function to convert internal position (0-9) to display position (1-10)
-function getDisplayPosition(position: number): number {
-  // For position 3, return 1
-  if (position === 3) return 1;
-  // For positions 4-9, return 2-7
-  if (position > 3) return position - 2;
-  // For positions 0-2, return 8-10
-  return position + 8;
-}
-
 export function TeamCard({
   gameId,
   participant,
@@ -231,7 +221,7 @@ export function TeamCard({
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
-                        • Position {getDisplayPosition(participant.startingLocation.position)}
+                        • Position {Number(participant.startingLocation.position) + 1}
                       </span>
                     )}
                   </div>
@@ -255,16 +245,16 @@ export function TeamCard({
                       <SelectTrigger className="w-full max-w-[160px]">
                         <SelectValue placeholder="Select Position">
                           {participant?.startingLocation?.position !== undefined
-                            ? `Position ${getDisplayPosition(participant.startingLocation.position)}`
+                            ? `Position ${Number(participant.startingLocation.position) + 1}`
                             : selectedPosition
-                            ? `Position ${getDisplayPosition(parseInt(selectedPosition))}`
+                            ? `Position ${Number(selectedPosition) + 1}`
                             : "Select Position"}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => (
-                          <SelectItem key={pos -1} value={String(pos - 1)}>
-                            Position {getDisplayPosition(pos - 1)}
+                          <SelectItem key={pos} value={String(pos - 1)}>
+                            Position {pos}
                           </SelectItem>
                         ))}
                       </SelectContent>

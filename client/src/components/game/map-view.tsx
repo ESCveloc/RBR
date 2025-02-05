@@ -14,16 +14,6 @@ const ZONE_COLORS = [
   { color: '#ef4444', name: 'Final Zone' }
 ];
 
-// Helper function to convert internal position (0-9) to display position (1-10)
-function getDisplayPosition(position: number): number {
-  // For position 3, return 1
-  if (position === 3) return 1;
-  // For positions 4-9, return 2-7
-  if (position > 3) return position - 2;
-  // For positions 0-2, return 8-10
-  return position + 8;
-}
-
 const STARTING_POINT_STYLE = {
   radius: 8,
   color: '#000',
@@ -84,9 +74,9 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         marker.setStyle({
           fillColor: '#4ade80',
         });
-        marker.bindTooltip(`Position ${getDisplayPosition(index)}: ${assignedTeam.team?.name || 'Team'}`);
+        marker.bindTooltip(`Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`);
       } else {
-        marker.bindTooltip(`Position ${getDisplayPosition(index)}: Unassigned`);
+        marker.bindTooltip(`Position ${index + 1}: Unassigned`);
       }
 
       marker.addTo(zonesLayer);
