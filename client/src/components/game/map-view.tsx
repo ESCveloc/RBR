@@ -74,12 +74,27 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
       );
 
       // Create a custom icon div with the site number
-      const iconHtml = `<div style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${index + 1}</div>`;
+      const iconHtml = `
+        <div style="
+          width: 20px; 
+          height: 20px; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          font-weight: bold; 
+          font-size: 14px;
+          color: black;
+          background-color: white;
+          border-radius: 50%;
+          border: 1px solid black;
+          box-shadow: 0 0 2px rgba(0,0,0,0.2);
+        ">${index + 1}</div>`;
+
       const icon = L.divIcon({
         html: iconHtml,
         className: 'custom-div-icon',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       });
 
       // Add the number marker
