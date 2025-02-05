@@ -38,8 +38,12 @@ interface TeamCardProps {
 
 // Helper function to convert internal position (0-9) to display position (1-10)
 function getDisplayPosition(position: number): number {
-  const displayPosition = ((position + 8) % 10) + 1; // +8 is equivalent to -2 in modulo 10
-  return displayPosition;
+  // For position 3, return 1
+  if (position === 3) return 1;
+  // For positions 4-9, return 2-7
+  if (position > 3) return position - 2;
+  // For positions 0-2, return 8-10
+  return position + 8;
 }
 
 export function TeamCard({
