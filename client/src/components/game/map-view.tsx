@@ -37,8 +37,9 @@ const getZoneStyle = (index: number) => ({
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 12) {
   const points: L.LatLng[] = [];
   for (let i = 0; i < count; i++) {
-    // Start from 12 o'clock (-90 degrees) and go clockwise
-    const angle = ((i / count) * 2 * Math.PI) - (Math.PI / 2);
+    // Adjust index to start from position 1 at top (12 o'clock)
+    // and continue clockwise (i=0 should be position 1 at top)
+    const angle = (((i - 3) / count) * 2 * Math.PI);
     const x = center.lng + (radius * Math.cos(angle)) / (111111 * Math.cos(center.lat * Math.PI / 180));
     const y = center.lat + (radius * Math.sin(angle)) / 111111;
     points.push(L.latLng(y, x));
@@ -90,7 +91,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
       L.marker(point, { icon }).addTo(zonesLayer);
 
       // Add hover popup with detailed information
-      const popupContent = assignedTeam 
+      const popupContent = assignedTeam
         ? `Position ${index + 1}: ${assignedTeam.team?.name || 'Team'}`
         : `Position ${index + 1}: Available`;
       marker.bindPopup(popupContent);
