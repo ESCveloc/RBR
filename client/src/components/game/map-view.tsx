@@ -15,7 +15,7 @@ const ZONE_COLORS = [
 ];
 
 const STARTING_POINT_STYLE = {
-  radius: 8,
+  radius: 12,
   color: '#000',
   weight: 2,
   opacity: 1,
@@ -34,14 +34,6 @@ const getZoneStyle = (index: number) => ({
   dashArray: index === 0 ? undefined : '5, 10',
 });
 
-const POSITION_LABEL_OPTIONS = {
-  permanent: true,
-  offset: [0, -8],
-  className: 'bg-background text-foreground px-2 py-1 rounded-full text-xs font-medium shadow-sm border border-border'
-};
-
-const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
-
 function generateStartingPoints(center: L.LatLng, radius: number, count: number = 10) {
   const points: L.LatLng[] = [];
   for (let i = 0; i < count; i++) {
@@ -57,11 +49,11 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
   const zonesLayer = L.layerGroup().addTo(map);
 
   // Add zone circles
-  SHRINK_MULTIPLIERS.forEach((multiplier, index) => {
+  ZONE_COLORS.forEach((zoneColor, index) => {
     L.circle(center, {
-      radius: initialRadius * multiplier,
-      color: ZONE_COLORS[index].color,
-      fillColor: ZONE_COLORS[index].color,
+      radius: initialRadius * SHRINK_MULTIPLIERS[index],
+      color: zoneColor.color,
+      fillColor: zoneColor.color,
       ...getZoneStyle(index)
     }).addTo(zonesLayer);
   });
@@ -72,6 +64,7 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
       // Create marker for the position
       const marker = L.circleMarker(point, STARTING_POINT_STYLE);
 
+      // Find if position is assigned to a team
       const assignedTeam = game.participants?.find(
         p => p.startingLocation?.position === index
       );
@@ -83,13 +76,15 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
         });
       }
 
-      // Create a permanent label showing the position number
-      const labelContent = `${index + 1}`;
-      const label = L.tooltip({
-        ...POSITION_LABEL_OPTIONS,
+      // Create position number marker
+      const icon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black;">${index + 1}</div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       });
-      label.setContent(labelContent);
-      marker.bindTooltip(label);
+
+      L.marker(point, { icon }).addTo(zonesLayer);
 
       // Add hover popup with detailed information
       const popupContent = assignedTeam 
@@ -103,6 +98,14 @@ function createZones(map: L.Map, center: L.LatLng, initialRadius: number, game?:
 
   return zonesLayer;
 }
+
+const SHRINK_MULTIPLIERS = [1, 0.75, 0.5, 0.25];
+
+const POSITION_LABEL_OPTIONS = {
+  permanent: true,
+  offset: [0, -8],
+  className: 'bg-background text-foreground px-2 py-1 rounded-full text-xs font-medium shadow-sm border border-border'
+};
 
 class ZoneLegend extends L.Control {
   onAdd(map: L.Map) {
