@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, LogOut, MapPin } from "lucide-react";
+import { Users, LogOut } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -96,7 +96,7 @@ export function TeamCard({
 
   const assignPosition = useMutation({
     mutationFn: async () => {
-      if (!gameId || !participant?.teamId) return;
+      if (!gameId || !participant?.teamId || !selectedPosition) return;
 
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
@@ -104,7 +104,7 @@ export function TeamCard({
         body: JSON.stringify({ 
           teamId: participant.teamId,
           force: true,
-          position: selectedPosition ? parseInt(selectedPosition) : undefined
+          position: parseInt(selectedPosition)
         }),
         credentials: 'include'
       });
@@ -176,7 +176,23 @@ export function TeamCard({
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">{participant.team.name}</h3>
+                  <div className="flex items-center gap-4">
+                    <h3 className="font-semibold">{participant.team.name}</h3>
+                    {isCaptain && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={isReady}
+                          onCheckedChange={() => {
+                            if (!toggleReady.isPending) {
+                              toggleReady.mutate();
+                            }
+                          }}
+                          disabled={toggleReady.isPending}
+                        />
+                        <span className="text-sm text-muted-foreground">Ready</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {showMembers && (
                       <span className="text-xs text-muted-foreground">
@@ -211,61 +227,41 @@ export function TeamCard({
 
             {participant.status !== "eliminated" && (
               <div className="flex items-center justify-between border-t pt-3">
-                {isCaptain && (
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={isReady}
-                      onCheckedChange={() => {
-                        if (!toggleReady.isPending) {
-                          toggleReady.mutate();
-                        }
-                      }}
-                      disabled={toggleReady.isPending}
-                    />
-                    <span className="text-sm text-muted-foreground">Ready</span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex items-center gap-2">
                   {canAssignPosition && (
-                    <div className="flex items-center gap-2">
-                      <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Select Position" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {positions.map((pos) => (
-                            <SelectItem key={pos} value={String(pos - 1)}>
-                              Position {pos}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => assignPosition.mutate()}
-                        disabled={assignPosition.isPending || !selectedPosition}
-                        className="bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-                      >
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Assign
-                      </Button>
-                    </div>
-                  )}
-                  {isCaptain && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => leaveGame.mutate()}
-                      disabled={leaveGame.isPending}
-                      className="bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                    <Select 
+                      value={selectedPosition} 
+                      onValueChange={(value) => {
+                        setSelectedPosition(value);
+                        assignPosition.mutate();
+                      }}
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Leave
-                    </Button>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Select Position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map((pos) => (
+                          <SelectItem key={pos} value={String(pos - 1)}>
+                            Position {pos}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
+
+                {isCaptain && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => leaveGame.mutate()}
+                    disabled={leaveGame.isPending}
+                    className="bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave
+                  </Button>
+                )}
               </div>
             )}
           </div>
