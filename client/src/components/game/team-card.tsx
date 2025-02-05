@@ -72,7 +72,7 @@ export function TeamCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId: participant.teamId,
-          force: true,
+          force: isAdmin, // Add force parameter for admin users
           position: parseInt(selectedPosition)
         }),
         credentials: 'include'
@@ -84,8 +84,10 @@ export function TeamCard({
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      // Update the selected position to match the new assignment
+      setSelectedPosition(String(data.startingLocation.position));
       toast({
         title: "Success",
         description: "Starting position assigned.",
