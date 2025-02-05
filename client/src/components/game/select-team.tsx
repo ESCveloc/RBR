@@ -29,24 +29,40 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
-      const response = await fetch(`/api/games/${gameId}/join`, {
+      // First, join the game
+      const joinResponse = await fetch(`/api/games/${gameId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
         credentials: 'include'
       });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+      if (!joinResponse.ok) {
+        throw new Error(await joinResponse.text());
       }
 
-      return response.json();
+      // After joining, automatically assign position
+      const positionResponse = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          teamId: parseInt(selectedTeamId),
+          force: false // Don't force when auto-assigning
+        }),
+        credentials: 'include'
+      });
+
+      if (!positionResponse.ok) {
+        throw new Error(await positionResponse.text());
+      }
+
+      return positionResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Team Assigned",
-        description: "The team has been successfully assigned to the game.",
+        description: "The team has been successfully assigned to the game with a starting position.",
       });
       setSelectedTeamId("");
     },

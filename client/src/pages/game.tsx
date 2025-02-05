@@ -24,18 +24,14 @@ export default function Game() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  // Only set gameId if we have a match and valid ID
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
 
   const { socket, isConnected, subscribeToMessage, joinGame } = useWebSocket();
 
-  // Simple admin check
   const isAdmin = user?.role === 'admin';
 
-  // Get the back link based on user role
   const backLink = isAdmin ? "/admin" : "/";
 
-  // Join game room when connected and game ID is available
   useEffect(() => {
     if (isConnected && socket && gameId) {
       console.log('Joining game room:', gameId);
@@ -43,7 +39,6 @@ export default function Game() {
     }
   }, [isConnected, socket, gameId, joinGame]);
 
-  // Subscribe to real-time game updates
   useEffect(() => {
     if (!isConnected || !socket || !gameId) return;
 
@@ -51,7 +46,6 @@ export default function Game() {
     const unsubscribe = subscribeToMessage('GAME_UPDATE', (data) => {
       try {
         console.log('Received game update:', data);
-        // Only update if the update is for this game
         if (data.gameId === gameId) {
           queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
         }
@@ -131,6 +125,40 @@ export default function Game() {
       });
     }
   });
+
+  const assignPosition = useMutation({
+    mutationFn: async ({ teamId, force = false }: { teamId: number; force?: boolean }) => {
+      if (!gameId) return;
+
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, force }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
 
   if (!match || !gameId) {
     return (

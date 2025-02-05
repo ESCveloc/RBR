@@ -90,7 +90,10 @@ export function TeamCard({
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: participant.teamId }),
+        body: JSON.stringify({ 
+          teamId: participant.teamId,
+          force: true 
+        }),
         credentials: 'include'
       });
 
