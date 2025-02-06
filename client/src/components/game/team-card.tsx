@@ -113,16 +113,19 @@ export function TeamCard({
     const newPosition = parseInt(value);
     const currentPosition = participant?.startingLocation?.position;
 
-    // Allow selecting if it's the team's current position or if the position is not taken
-    if (newPosition === currentPosition || !takenPositions.includes(newPosition)) {
-      setSelectedPosition(value);
-      assignPosition.mutate();
-    } else {
+    // Filter out current team's position from taken positions
+    const otherTeamPositions = takenPositions.filter(pos => pos !== currentPosition);
+
+    // Only block if position is taken by another team
+    if (otherTeamPositions.includes(newPosition)) {
       toast({
         title: "Position Taken",
         description: "This position is already taken by another team. Please select a different position.",
         variant: "destructive"
       });
+    } else {
+      setSelectedPosition(value);
+      assignPosition.mutate();
     }
   };
 
