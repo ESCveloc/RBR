@@ -213,6 +213,8 @@ export function TeamCard({
 
   // Team card in game context
   if (participant?.team) {
+    const canManageTeam = isAdmin || isCaptain; // New helper for permissions
+
     return (
       <Card className="hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
@@ -225,7 +227,7 @@ export function TeamCard({
                 <div>
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
-                    {(isAdmin || isCaptain) && (
+                    {canManageTeam && (
                       <div className="flex items-center gap-2 min-w-[120px] group">
                         <Switch
                           checked={isReady}
@@ -279,7 +281,7 @@ export function TeamCard({
             {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
-                  {(canAssignPosition || isAdmin) && participant?.team && (
+                  {canAssignPosition && participant?.team && (
                     <Select
                       value={selectedPosition}
                       onValueChange={handlePositionChange}
@@ -290,30 +292,28 @@ export function TeamCard({
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {positions.map((pos) => {
-                          return (
-                            <SelectItem
-                              key={pos}
-                              value={String(pos)}
-                              disabled={takenPositions.includes(pos) && pos !== participant?.startingLocation?.position}
-                              className={cn(
-                                takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "opacity-50",
-                                takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "cursor-not-allowed",
-                                pos === participant?.startingLocation?.position && "text-primary font-medium"
-                              )}
-                            >
-                              Site {pos}
-                              {takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && " (Taken)"}
-                              {pos === participant?.startingLocation?.position && " (Current)"}
-                            </SelectItem>
-                          );
-                        })}
+                        {positions.map((pos) => (
+                          <SelectItem
+                            key={pos}
+                            value={String(pos)}
+                            disabled={takenPositions.includes(pos) && pos !== participant?.startingLocation?.position}
+                            className={cn(
+                              "transition-none",
+                              takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "opacity-50",
+                              pos === participant?.startingLocation?.position && "text-primary font-medium"
+                            )}
+                          >
+                            Site {pos}
+                            {takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && " (Taken)"}
+                            {pos === participant?.startingLocation?.position && " (Current)"}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
                 </div>
 
-                {(isAdmin || isCaptain) && (
+                {canManageTeam && (
                   <div className="flex justify-end">
                     <Button
                       variant="outline"
