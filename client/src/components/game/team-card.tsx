@@ -59,6 +59,7 @@ export function TeamCard({
   const isAdmin = user?.role === 'admin';
   const isReady = participant?.ready || false;
   const hasStartingPosition = participant?.startingLocation !== null;
+  const canManageTeam = isAdmin || isCaptain;
 
   // Get taken positions from the game data
   const game = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
@@ -69,79 +70,6 @@ export function TeamCard({
 
   // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
-
-  const assignPosition = useMutation({
-    mutationFn: async () => {
-      if (!gameId || !participant?.teamId || !selectedPosition) return;
-
-      console.log('Assigning position:', {
-        teamId: participant.teamId,
-        position: parseInt(selectedPosition),
-        isAdmin,
-        force: isAdmin // Force flag for admin reassignments
-      });
-
-      const response = await fetch(`/api/games/${gameId}/assign-position`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          teamId: participant.teamId,
-          position: parseInt(selectedPosition),
-          isAdmin,
-          force: isAdmin // Add force flag for admin reassignments
-        }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('Position assignment error:', error);
-        throw new Error(error);
-      }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      if (data.startingLocation) {
-        setSelectedPosition(String(data.startingLocation.position));
-      }
-      toast({
-        title: "Success",
-        description: "Starting position assigned.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handlePositionChange = (value: string) => {
-    const newPosition = parseInt(value);
-    const currentPosition = participant?.startingLocation?.position;
-
-    // Filter out current team's position from taken positions
-    const otherTeamPositions = takenPositions.filter(pos => pos !== currentPosition);
-
-    // Allow admins to reassign positions regardless of current assignments
-    if (isAdmin || !otherTeamPositions.includes(newPosition)) {
-      setSelectedPosition(value);
-      assignPosition.mutate();
-    } else {
-      toast({
-        title: "Position Taken",
-        description: "This position is already taken by another team. Please select a different position.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const toggleReady = useMutation({
     mutationFn: async () => {
@@ -193,8 +121,11 @@ export function TeamCard({
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const error = await response.text();
+        console.error('Leave game error:', error);
+        throw new Error(error);
       }
+
       return response.json();
     },
     onSuccess: () => {
@@ -215,8 +146,6 @@ export function TeamCard({
 
   // Team card in game context
   if (participant?.team) {
-    const canManageTeam = isAdmin || isCaptain; // New helper for permissions
-
     return (
       <Card className="hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
