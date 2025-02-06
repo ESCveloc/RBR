@@ -76,16 +76,21 @@ export function TeamCard({
 
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           teamId: participant.teamId,
-          position: parseInt(selectedPosition)
+          position: parseInt(selectedPosition),
+          isAdmin: isAdmin 
         }),
         credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const error = await response.text();
+        throw new Error(error);
       }
 
       return response.json();
