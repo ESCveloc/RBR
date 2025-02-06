@@ -249,6 +249,7 @@ export function TeamCard({
                     )}
                     {showStatus && (
                       <Badge variant="secondary" className={cn(
+                        "transition-none",
                         participant.status === "eliminated"
                           ? 'bg-red-500/10 text-red-500'
                           : isReady
