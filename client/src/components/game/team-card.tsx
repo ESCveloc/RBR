@@ -273,20 +273,20 @@ export function TeamCard({
                       </SelectTrigger>
                       <SelectContent>
                         {positions.map((pos) => {
-                          const isTaken = takenPositions.includes(pos);
-                          const currentTeamPosition = participant?.startingLocation?.position === pos;
                           return (
                             <SelectItem
                               key={pos}
                               value={String(pos)}
-                              disabled={isTaken && !currentTeamPosition}
+                              disabled={takenPositions.includes(pos) && pos !== participant?.startingLocation?.position}
                               className={cn(
-                                isTaken && !currentTeamPosition && "opacity-50",
-                                isTaken && !currentTeamPosition && "cursor-not-allowed",
-                                currentTeamPosition && "text-primary font-medium"
+                                takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "opacity-50",
+                                takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "cursor-not-allowed",
+                                pos === participant?.startingLocation?.position && "text-primary font-medium"
                               )}
                             >
-                              Site {pos} {isTaken && !currentTeamPosition && "(Taken)"} {currentTeamPosition && "(Current)"}
+                              Site {pos}
+                              {takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && " (Taken)"}
+                              {pos === participant?.startingLocation?.position && " (Current)"}
                             </SelectItem>
                           );
                         })}
