@@ -83,7 +83,7 @@ export function TeamCard({
 
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
@@ -214,7 +214,7 @@ export function TeamCard({
   // Team card in game context
   if (participant?.team) {
     return (
-      <Card className="hover:bg-accent/50 transition-colors">
+      <Card className="hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -226,7 +226,7 @@ export function TeamCard({
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
                     {isAdmin && (
-                      <div className="flex items-center gap-2 min-w-[120px]">
+                      <div className="flex items-center gap-2 min-w-[120px] group">
                         <Switch
                           checked={isReady}
                           onCheckedChange={() => {
@@ -235,6 +235,7 @@ export function TeamCard({
                             }
                           }}
                           disabled={toggleReady.isPending}
+                          className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
                         />
                         <span className="text-sm text-muted-foreground">Ready</span>
                       </div>
@@ -316,7 +317,7 @@ export function TeamCard({
                       size="default"
                       onClick={() => leaveGame.mutate()}
                       disabled={leaveGame.isPending}
-                      className="w-full max-w-[160px] bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                      className="w-full max-w-[160px] bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors duration-200"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       Leave
@@ -335,7 +336,7 @@ export function TeamCard({
   if (team) {
     return (
       <Link href={`/team/${team.id}`}>
-        <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+        <Card className="hover:bg-white/5 transition-colors cursor-pointer">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
