@@ -88,7 +88,7 @@ export function TeamCard({
         body: JSON.stringify({
           teamId: participant.teamId,
           position: parseInt(selectedPosition),
-          force: isAdmin // Force flag for admin reassignments
+          force: isAdmin
         }),
         credentials: 'include'
       });
@@ -140,6 +140,7 @@ export function TeamCard({
       return response.json();
     },
     onSuccess: () => {
+      // Force refetch to get the latest state
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
         title: "Status Updated",
@@ -152,6 +153,8 @@ export function TeamCard({
         description: error.message,
         variant: "destructive",
       });
+      // Refetch on error to ensure UI is in sync
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
     }
   });
 
@@ -187,6 +190,8 @@ export function TeamCard({
         description: error.message,
         variant: "destructive",
       });
+      // Refetch on error to ensure UI is in sync
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
     },
   });
 
