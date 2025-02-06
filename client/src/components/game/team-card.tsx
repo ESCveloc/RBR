@@ -71,6 +71,52 @@ export function TeamCard({
   // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
+  const handlePositionChange = (value: string) => {
+    setSelectedPosition(value);
+    assignPosition.mutate();
+  };
+
+  const assignPosition = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId || !selectedPosition) return;
+
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          teamId: participant.teamId,
+          position: parseInt(selectedPosition),
+          force: isAdmin // Force flag for admin reassignments
+        }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Position assignment error:', error);
+        throw new Error(error);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const toggleReady = useMutation({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId) return;
@@ -162,11 +208,7 @@ export function TeamCard({
                       <div className="flex items-center gap-2 min-w-[120px] group">
                         <Switch
                           checked={isReady}
-                          onCheckedChange={() => {
-                            if (!toggleReady.isPending) {
-                              toggleReady.mutate();
-                            }
-                          }}
+                          onCheckedChange={() => toggleReady.mutate()}
                           disabled={toggleReady.isPending}
                           className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
                         />
