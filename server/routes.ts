@@ -770,6 +770,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update team ready status endpoint
   app.post("/api/games/:gameId/team-ready", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -783,7 +784,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
-      // Verify participant exists and user is team captain
+      // Verify participant exists
       const [participant] = await db
         .select({
           id: gameParticipants.id,
@@ -804,8 +805,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
-      if (participant.team.captainId !== req.user.id) {
-        return res.status(403).send("Only team captain can update ready status");
+      // Allow both team captain and admin to update ready status
+      if (participant.team.captainId !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).send("Only team captain or admin can update ready status");
       }
 
       // Update participant ready status
@@ -827,6 +829,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Leave game endpoint
   app.post("/api/games/:gameId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -840,7 +843,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
-      // Verify participant exists and user is team captain
+      // Verify participant exists
       const [participant] = await db
         .select({
           id: gameParticipants.id,
@@ -861,8 +864,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
-      if (participant.team.captainId !== req.user.id) {
-        return res.status(403).send("Only team captain can leave the game");
+      // Allow both team captain and admin to leave game
+      if (participant.team.captainId !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).send("Only team captain or admin can leave the game");
       }
 
       // Delete the participant
