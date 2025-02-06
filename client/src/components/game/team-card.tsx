@@ -248,14 +248,16 @@ export function TeamCard({
                       </span>
                     )}
                     {showStatus && (
-                      <Badge variant="secondary" className={cn(
-                        "transition-none",
-                        participant.status === "eliminated"
-                          ? 'bg-red-500/10 text-red-500'
-                          : isReady
-                            ? 'bg-green-500/10 text-green-500'
-                            : 'bg-gray-500/10 text-gray-500'
-                      )}>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "pointer-events-none select-none",
+                          participant.status === "eliminated"
+                            ? 'bg-red-500/10 text-red-500'
+                            : isReady
+                              ? 'bg-green-500/10 text-green-500'
+                              : 'bg-gray-500/10 text-gray-500'
+                        )}>
                         {participant.status === "eliminated"
                           ? "Eliminated"
                           : isReady
@@ -347,9 +349,12 @@ export function TeamCard({
                 <div>
                   <h3 className="font-semibold">{team.name}</h3>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className={cn(
-                      team.active ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
-                    )}>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "pointer-events-none select-none",
+                        team.active ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
+                      )}>
                       {team.active ? 'Active' : 'Inactive'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
