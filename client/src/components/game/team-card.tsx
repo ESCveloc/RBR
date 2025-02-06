@@ -74,6 +74,13 @@ export function TeamCard({
     mutationFn: async () => {
       if (!gameId || !participant?.teamId || !selectedPosition) return;
 
+      console.log('Assigning position:', {
+        teamId: participant.teamId,
+        position: parseInt(selectedPosition),
+        isAdmin,
+        force: isAdmin // Force flag for admin reassignments
+      });
+
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { 
@@ -83,13 +90,15 @@ export function TeamCard({
         body: JSON.stringify({
           teamId: participant.teamId,
           position: parseInt(selectedPosition),
-          isAdmin: isAdmin 
+          isAdmin,
+          force: isAdmin // Add force flag for admin reassignments
         }),
         credentials: 'include'
       });
 
       if (!response.ok) {
         const error = await response.text();
+        console.error('Position assignment error:', error);
         throw new Error(error);
       }
 
@@ -121,7 +130,7 @@ export function TeamCard({
     // Filter out current team's position from taken positions
     const otherTeamPositions = takenPositions.filter(pos => pos !== currentPosition);
 
-    // Allow admins to reassign positions that aren't taken by other teams
+    // Allow admins to reassign positions regardless of current assignments
     if (isAdmin || !otherTeamPositions.includes(newPosition)) {
       setSelectedPosition(value);
       assignPosition.mutate();
