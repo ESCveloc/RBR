@@ -269,17 +269,19 @@ export function TeamCard({
                       <SelectContent>
                         {positions.map((pos) => {
                           const isTaken = takenPositions.includes(pos);
+                          const currentTeamPosition = participant?.startingLocation?.position === pos;
                           return (
                             <SelectItem
                               key={pos}
                               value={String(pos)}
-                              disabled={isTaken && !isAdmin}
+                              disabled={(isTaken && !isAdmin && !currentTeamPosition)}
                               className={cn(
-                                isTaken && "opacity-50",
-                                isTaken && !isAdmin && "cursor-not-allowed"
+                                isTaken && !currentTeamPosition && "opacity-50",
+                                isTaken && !isAdmin && !currentTeamPosition && "cursor-not-allowed",
+                                currentTeamPosition && "text-primary font-medium"
                               )}
                             >
-                              Site {pos} {isTaken && "(Taken)"}
+                              Site {pos} {isTaken && !currentTeamPosition && "(Taken)"} {currentTeamPosition && "(Current)"}
                             </SelectItem>
                           );
                         })}
