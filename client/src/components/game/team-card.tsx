@@ -158,7 +158,9 @@ export function TeamCard({
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const error = await response.text();
+        console.error('Ready toggle error:', error);
+        throw new Error(error);
       }
 
       return response.json();
