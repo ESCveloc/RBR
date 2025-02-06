@@ -222,10 +222,10 @@ export function TeamCard({
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
-                <div className="space-y-1">
+                <div>
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
-                    {isAdmin && (
+                    {(isAdmin || isCaptain) && (
                       <div className="flex items-center gap-2 min-w-[120px] group">
                         <Switch
                           checked={isReady}
@@ -313,7 +313,7 @@ export function TeamCard({
                   )}
                 </div>
 
-                {isAdmin && (
+                {(isAdmin || isCaptain) && (
                   <div className="flex justify-end">
                     <Button
                       variant="outline"
