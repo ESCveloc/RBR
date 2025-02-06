@@ -121,16 +121,16 @@ export function TeamCard({
     // Filter out current team's position from taken positions
     const otherTeamPositions = takenPositions.filter(pos => pos !== currentPosition);
 
-    // Only block if position is taken by another team
-    if (otherTeamPositions.includes(newPosition)) {
+    // Allow admins to reassign positions that aren't taken by other teams
+    if (isAdmin || !otherTeamPositions.includes(newPosition)) {
+      setSelectedPosition(value);
+      assignPosition.mutate();
+    } else {
       toast({
         title: "Position Taken",
         description: "This position is already taken by another team. Please select a different position.",
         variant: "destructive"
       });
-    } else {
-      setSelectedPosition(value);
-      assignPosition.mutate();
     }
   };
 
