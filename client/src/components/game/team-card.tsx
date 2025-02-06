@@ -79,7 +79,6 @@ export function TeamCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId: participant.teamId,
-          force: isAdmin,
           position: parseInt(selectedPosition)
         }),
         credentials: 'include'
@@ -112,16 +111,19 @@ export function TeamCard({
 
   const handlePositionChange = (value: string) => {
     const newPosition = parseInt(value);
-    if (takenPositions.includes(newPosition) && !isAdmin) {
+    const currentPosition = participant?.startingLocation?.position;
+
+    // Allow selecting if it's the team's current position or if the position is not taken
+    if (newPosition === currentPosition || !takenPositions.includes(newPosition)) {
+      setSelectedPosition(value);
+      assignPosition.mutate();
+    } else {
       toast({
         title: "Position Taken",
         description: "This position is already taken by another team. Please select a different position.",
         variant: "destructive"
       });
-      return;
     }
-    setSelectedPosition(value);
-    assignPosition.mutate();
   };
 
   const toggleReady = useMutation({
@@ -274,10 +276,10 @@ export function TeamCard({
                             <SelectItem
                               key={pos}
                               value={String(pos)}
-                              disabled={(isTaken && !isAdmin && !currentTeamPosition)}
+                              disabled={isTaken && !currentTeamPosition}
                               className={cn(
                                 isTaken && !currentTeamPosition && "opacity-50",
-                                isTaken && !isAdmin && !currentTeamPosition && "cursor-not-allowed",
+                                isTaken && !currentTeamPosition && "cursor-not-allowed",
                                 currentTeamPosition && "text-primary font-medium"
                               )}
                             >
