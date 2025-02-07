@@ -53,11 +53,14 @@ export function TeamCard({
   const { user } = useUser();
   const { updateReadyStatus, updateLocation } = useGame(gameId || 0);
 
-  // If neither participant nor team is provided, don't render anything
+  // Early return if no valid team data
   if (!participant?.team && !team) return null;
 
   const currentTeam = participant?.team || team;
-  if (!currentTeam) return null;  // Additional null check for currentTeam
+  if (!currentTeam) return null;
+
+  // If we're in game context (participant exists) but no team data, return null
+  if (gameId && !participant?.team) return null;
 
   const isCaptain = currentTeam?.captainId === user?.id;
   const isAdmin = user?.role === 'admin';
@@ -72,9 +75,6 @@ export function TeamCard({
     ?.map((p: any) => p.startingLocation?.position)
     ?.filter(Boolean) || [];
 
-  console.log('Taken positions:', takenPositions);
-  console.log('Current team position:', participant?.startingLocation?.position);
-
   // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
@@ -83,12 +83,6 @@ export function TeamCard({
       console.log('No team ID available for position update');
       return;
     }
-
-    console.log('Updating position:', {
-      teamId: participant.teamId,
-      position: parseInt(value),
-      isAdmin
-    });
 
     setSelectedPosition(value);
     try {
@@ -159,21 +153,21 @@ export function TeamCard({
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate max-w-[200px] transition-colors duration-200 hover:text-primary">
-                    {participant?.team.name || team?.name}
+                    {participant.team.name}
                   </h3>
-                  {showMembers && currentTeam.teamMembers && (
+                  {showMembers && participant.team.teamMembers && (
                     <span className="text-xs text-muted-foreground mt-1">
-                      {currentTeam.teamMembers.length} members
+                      {participant.team.teamMembers.length} members
                     </span>
                   )}
-                  {showLocation && hasStartingPosition && participant?.startingLocation && (
+                  {showLocation && hasStartingPosition && participant.startingLocation && (
                     <span className="text-xs text-muted-foreground mt-1 block">
                       Site {participant.startingLocation.position}
                     </span>
                   )}
                 </div>
               </div>
-              {canManageTeam && participant && (
+              {canManageTeam && (
                 <div className="flex items-center gap-2 ml-3 transition-transform duration-200 hover:translate-x-1">
                   <Switch
                     checked={isReady}
@@ -193,7 +187,7 @@ export function TeamCard({
               )}
             </div>
 
-            {participant && participant.status !== "eliminated" && (
+            {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
                   {canAssignPosition && (
