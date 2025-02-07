@@ -82,13 +82,47 @@ export function useGame(gameId: number) {
       return response.json();
     },
     staleTime: 30000, // Cache data for 30 seconds
-    retry: 1, // Only retry once
-    refetchInterval: false // Disable polling, rely on WebSocket updates
+    retry: 1 // Only retry once
+  });
+
+  const updateGameStatus = useMutation({
+    mutationFn: async ({ status }: { status: Game['status'] }) => {
+      const response = await fetch(`/api/games/${gameId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ status }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update game status');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([`/api/games/${gameId}`], data);
+      toast({
+        title: "Success",
+        description: "Game status updated successfully"
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Error updating game status",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const updateLocation = useMutation({
     mutationFn: async ({ teamId, position, force = false }: { teamId: number; position: number; force?: boolean }) => {
-      const response = await fetch(`/api/games/${gameId}/update-location`, {
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -262,7 +296,7 @@ export function useGame(gameId: number) {
         description: "Successfully joined the game",
       });
     },
-    onError: (err:Error) => {
+    onError: (err: Error) => {
       toast({
         title: "Error joining game",
         description: err.message,
@@ -270,7 +304,6 @@ export function useGame(gameId: number) {
       });
     }
   });
-
 
   return {
     game,
@@ -280,6 +313,7 @@ export function useGame(gameId: number) {
     joinGame,
     updateReadyStatus,
     leaveGame,
-    cancelGame
+    cancelGame,
+    updateGameStatus
   };
 }

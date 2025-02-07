@@ -106,7 +106,7 @@ export default function Game() {
     );
   }
 
-  const handleStatusUpdate = (newStatus: 'active' | 'completed' | 'cancelled') => {
+  const handleStatusUpdate = (newStatus: 'pending' | 'active' | 'completed') => {
     updateGameStatus.mutate({ status: newStatus });
   };
 
@@ -151,7 +151,7 @@ export default function Game() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleStatusUpdate('cancelled')}
+                      onClick={() => handleStatusUpdate('completed')}
                       disabled={updateGameStatus.isPending}
                     >
                       <X className="h-4 w-4 mr-2" />
