@@ -148,19 +148,25 @@ export function setupWebSocketServer(server: Server) {
           return done(true);
         }
 
+        console.log('Verifying WebSocket connection...');
+
         if (!req.headers.cookie) {
           console.log("WebSocket connection rejected: No cookies");
           return done(false, 401, "No session cookie");
         }
 
         const cookies = parse(req.headers.cookie);
-        const sessionId = cookies['battle.sid']; // Changed from connect.sid to battle.sid
+        console.log('Available cookies:', Object.keys(cookies));
+
+        const sessionId = cookies['battle.sid'];
         if (!sessionId) {
-          console.log("WebSocket connection rejected: No session ID");
+          console.log("WebSocket connection rejected: No battle.sid cookie found");
           return done(false, 401, "No session ID");
         }
 
+        console.log('Attempting to verify session:', sessionId);
         const user = await verify(sessionId);
+
         if (!user) {
           console.log("WebSocket connection rejected: Invalid session");
           return done(false, 401, "Invalid session");

@@ -27,13 +27,25 @@ export const sessionStore = new MemoryStore({
 // Add verify function for WebSocket authentication
 export async function verify(sessionId: string): Promise<User | null> {
   try {
+    if (!sessionId) {
+      console.log("No session ID provided");
+      return null;
+    }
+
     // Parse session ID from cookie format
-    const sid = sessionId.replace('s:', '').split('.')[0];
+    const sid = sessionId.replace('battle.sid=s:', '').split('.')[0];
+    console.log("Attempting to verify session:", sid);
 
     return new Promise((resolve) => {
       sessionStore.get(sid, async (err: any, session: any) => {
-        if (err || !session?.passport?.user) {
-          console.log("Session verification failed:", err || "No user in session");
+        if (err) {
+          console.error("Session store error:", err);
+          resolve(null);
+          return;
+        }
+
+        if (!session?.passport?.user) {
+          console.log("No user in session or invalid session format:", session);
           resolve(null);
           return;
         }
@@ -46,11 +58,12 @@ export async function verify(sessionId: string): Promise<User | null> {
             .limit(1);
 
           if (!user) {
-            console.log("User not found for session");
+            console.log("User not found for session:", session.passport.user);
             resolve(null);
             return;
           }
 
+          console.log("Successfully verified user:", user.id);
           resolve(user);
         } catch (dbError) {
           console.error("Database error during session verification:", dbError);
