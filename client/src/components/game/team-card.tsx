@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import type { GameParticipant, Team, Game } from "@db/schema";
+import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, LogOut } from "lucide-react";
@@ -16,7 +16,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { useGame } from "@/hooks/use-game";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface TeamCardProps {
@@ -33,7 +32,6 @@ interface TeamCardProps {
   };
   canAssignPosition?: boolean;
   showMembers?: boolean;
-  showStatus?: boolean;
   showLocation?: boolean;
 }
 
@@ -43,7 +41,6 @@ export function TeamCard({
   team,
   canAssignPosition,
   showMembers = false,
-  showStatus = false,
   showLocation = false
 }: TeamCardProps) {
   const [selectedPosition, setSelectedPosition] = useState<string>(
@@ -56,6 +53,9 @@ export function TeamCard({
   const { user } = useUser();
   const { updateReadyStatus, updateLocation } = useGame(gameId || 0);
 
+  // If neither participant nor team is provided, don't render anything
+  if (!participant?.team && !team) return null;
+
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
   const isAdmin = user?.role === 'admin';
@@ -64,19 +64,21 @@ export function TeamCard({
   const canManageTeam = isAdmin || isCaptain;
 
   // Get taken positions from the game data
-  const game = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+  const game = queryClient.getQueryData<any>([`/api/games/${gameId}`]);
   const takenPositions = game?.participants
-    ?.filter(p => p.teamId !== participant?.teamId)
-    ?.map(p => p.startingLocation?.position)
+    ?.filter((p: any) => p.teamId !== participant?.teamId)
+    ?.map((p: any) => p.startingLocation?.position)
     ?.filter(Boolean) || [];
 
   // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const handlePositionChange = (value: string) => {
+    if (!participant?.teamId) return;
+
     setSelectedPosition(value);
     updateLocation.mutate({
-      teamId: participant!.teamId,
+      teamId: participant.teamId,
       position: parseInt(value),
       force: isAdmin
     });
@@ -102,9 +104,7 @@ export function TeamCard({
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('Leave game error:', error);
-        throw new Error(error);
+        throw new Error(await response.text());
       }
 
       return response.json();
@@ -137,11 +137,11 @@ export function TeamCard({
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-4">
-                    <h3 className="font-semibold">{participant.team.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold truncate">{participant.team.name}</h3>
                     {canManageTeam && (
-                      <div className="flex items-center gap-4 min-w-[180px]">
+                      <div className="flex items-center gap-4 min-w-[200px] justify-end">
                         <Switch
                           checked={isReady}
                           onCheckedChange={handleReadyToggle}
@@ -149,7 +149,7 @@ export function TeamCard({
                           className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
                         />
                         <span className={cn(
-                          "text-sm px-2 py-1 rounded",
+                          "text-sm px-3 py-1 rounded-full w-[90px] text-center",
                           isReady
                             ? "text-green-500 bg-green-500/10"
                             : "text-yellow-500 bg-yellow-500/10"
@@ -178,7 +178,7 @@ export function TeamCard({
             {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
-                  {canAssignPosition && participant?.team && (
+                  {canAssignPosition && (
                     <Select
                       value={selectedPosition}
                       onValueChange={handlePositionChange}
@@ -246,14 +246,6 @@ export function TeamCard({
                 <div>
                   <h3 className="font-semibold">{team.name}</h3>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "pointer-events-none select-none",
-                        team.active ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
-                      )}>
-                      {team.active ? 'Active' : 'Inactive'}
-                    </Badge>
                     <span className="text-xs text-muted-foreground">
                       W/L: {team.wins || 0}/{team.losses || 0}
                     </span>
