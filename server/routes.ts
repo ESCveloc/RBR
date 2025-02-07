@@ -976,7 +976,7 @@ export function registerRoutes(app: Express): Server {
 
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
         const latDiff = center.lat - lat;
-        const lngDiff = center.lng- lng;
+        const lngDiff = center.lng - lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
@@ -1377,7 +1377,24 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new endpoint for joining a game
+  // Add helper function for random position assignment
+  function getRandomAvailablePosition(game: any, participants: any[]) {
+    const maxTeams = game.maxTeams || 10;
+    const takenPositions = participants
+      .filter(p => p.startingLocation)
+      .map(p => p.startingLocation.position);
+
+    // Get all available positions
+    const availablePositions = Array.from({ length: maxTeams }, (_, i) => i + 1)
+      .filter(pos => !takenPositions.includes(pos));
+
+    if (availablePositions.length === 0) return null;
+
+    // Return a random position from available ones
+    return availablePositions[Math.floor(Math.random() * availablePositions.length)];
+  }
+
+  // Update join game endpoint
   app.post("/api/games/:gameId/join", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -1387,26 +1404,11 @@ export function registerRoutes(app: Express): Server {
       const gameId = parseInt(req.params.gameId);
       const { teamId } = req.body;
 
-      if (isNaN(gameId) || !teamId) {
-        return res.status(400).send("Invalid game ID or team ID");
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
       }
 
-      // Verify team exists and is active
-      const [team] = await db
-        .select()
-        .from(teams)
-        .where(eq(teams.id, teamId))
-        .limit(1);
-
-      if (!team) {
-        return res.status(404).send("Team not found");
-      }
-
-      if (!team.active) {
-        return res.status(400).send("Inactive teams cannot join games");
-      }
-
-      // Verify game exists and is in pending state
+      // Get game details
       const [game] = await db
         .select()
         .from(games)
@@ -1417,8 +1419,19 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Game not found");
       }
 
-      if (game.status !== "pending") {
-        return res.status(400).send("Can only join pending games");
+      // Check if team exists and user is captain or admin
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (team.captainId !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).send("Only team captain or admin can join games");
       }
 
       // Check if team is already participating
@@ -1437,17 +1450,73 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Team is already participating in this game");
       }
 
-      // Add team as participant
+      // Get all current participants
+      const participants = await db
+        .select()
+        .from(gameParticipants)
+        .where(eq(gameParticipants.gameId, gameId));
+
+      if (participants.length >= game.maxTeams) {
+        return res.status(400).send("Game is full");
+      }
+
+      // Get a random available position
+      const position = getRandomAvailablePosition(game, participants);
+      if (!position) {
+        return res.status(400).send("No available positions");
+      }
+
+      // Calculate position coordinates
+      const coordinates = game.boundaries.geometry.coordinates[0];
+      const center = coordinates.reduce(
+        (acc: { lat: number; lng: number }, [lng, lat]: number[]) => ({
+          lat: acc.lat + lat / coordinates.length,
+          lng: acc.lng + lng / coordinates.length
+        }),
+        { lat: 0, lng: 0 }
+      );
+
+      const radius = Math.max(...coordinates.map(([lng, lat]: number[]) => {
+        const latDiff = center.lat - lat;
+        const lngDiff = center.lng - lng;
+        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      }));
+
+      // Convert position to angle (clockwise from north)
+      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
+      const safetyFactor = 0.9; // Keep points inside the boundary
+      const x = center.lng + (radius * safetyFactor * Math.cos(angle));
+      const y = center.lat + (radius * safetyFactor * Math.sin(angle));
+
+      // Insert new participant with random position
       const [participant] = await db
         .insert(gameParticipants)
         .values({
           gameId,
           teamId,
-          status: "active",
+          status: "alive",
+          ready: false,
+          startingLocation: {
+            position,
+            coordinates: { lat: y, lng: x }
+          },
+          startingLocationAssignedAt: new Date()
         })
         .returning();
 
-      res.json(participant);
+      // Return full participant data with team info
+      const fullParticipant = {
+        ...participant,
+        team: {
+          ...team,
+          teamMembers: await db
+            .select()
+            .from(teamMembers)
+            .where(eq(teamMembers.teamId, teamId))
+        }
+      };
+
+      res.json({ participant: fullParticipant });
     } catch (error) {
       console.error("Join game error:", error);
       res.status(500).send("Failed to join game");
