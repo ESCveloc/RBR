@@ -50,7 +50,6 @@ export function useWebSocket(): WebSocketInterface {
 
       const ws = new WebSocket(wsUrl);
 
-      // Connection timeout
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           console.log('WebSocket connection timeout, closing connection');
@@ -81,7 +80,6 @@ export function useWebSocket(): WebSocketInterface {
             return;
           }
 
-          // Call all registered handlers for this message type
           const handlers = messageHandlersRef.current.get(message.type);
           if (handlers) {
             handlers.forEach(handler => {
