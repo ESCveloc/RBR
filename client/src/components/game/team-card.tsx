@@ -68,22 +68,40 @@ export function TeamCard({
   // Get taken positions from the game data
   const game = queryClient.getQueryData<any>([`/api/games/${gameId}`]);
   const takenPositions = game?.participants
-    ?.filter((p: any) => p.teamId !== participant?.teamId)
+    ?.filter((p: any) => p.teamId !== participant?.teamId && p.startingLocation)
     ?.map((p: any) => p.startingLocation?.position)
     ?.filter(Boolean) || [];
+
+  console.log('Taken positions:', takenPositions);
+  console.log('Current team position:', participant?.startingLocation?.position);
 
   // Generate available positions array [1..10] for the clockwise pattern
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
-  const handlePositionChange = (value: string) => {
-    if (!participant?.teamId) return;
+  const handlePositionChange = async (value: string) => {
+    if (!participant?.teamId) {
+      console.log('No team ID available for position update');
+      return;
+    }
 
-    setSelectedPosition(value);
-    updateLocation.mutate({
+    console.log('Updating position:', {
       teamId: participant.teamId,
       position: parseInt(value),
-      force: isAdmin
+      isAdmin
     });
+
+    setSelectedPosition(value);
+    try {
+      await updateLocation.mutateAsync({
+        teamId: participant.teamId,
+        position: parseInt(value),
+        force: isAdmin
+      });
+    } catch (error) {
+      console.error('Failed to update position:', error);
+      // Reset to previous position on error
+      setSelectedPosition(participant.startingLocation?.position?.toString() || "");
+    }
   };
 
   const handleReadyToggle = () => {
@@ -141,21 +159,21 @@ export function TeamCard({
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate max-w-[200px] transition-colors duration-200 hover:text-primary">
-                    {participant.team.name}
+                    {participant?.team.name || team?.name}
                   </h3>
-                  {showMembers && participant.team.teamMembers && (
+                  {showMembers && currentTeam.teamMembers && (
                     <span className="text-xs text-muted-foreground mt-1">
-                      {participant.team.teamMembers.length} members
+                      {currentTeam.teamMembers.length} members
                     </span>
                   )}
-                  {showLocation && hasStartingPosition && participant.startingLocation && (
+                  {showLocation && hasStartingPosition && participant?.startingLocation && (
                     <span className="text-xs text-muted-foreground mt-1 block">
                       Site {participant.startingLocation.position}
                     </span>
                   )}
                 </div>
               </div>
-              {canManageTeam && (
+              {canManageTeam && participant && (
                 <div className="flex items-center gap-2 ml-3 transition-transform duration-200 hover:translate-x-1">
                   <Switch
                     checked={isReady}
@@ -175,7 +193,7 @@ export function TeamCard({
               )}
             </div>
 
-            {participant.status !== "eliminated" && (
+            {participant && participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
                   {canAssignPosition && (
@@ -189,23 +207,27 @@ export function TeamCard({
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {positions.map((pos) => (
-                          <SelectItem
-                            key={pos}
-                            value={String(pos)}
-                            disabled={takenPositions.includes(pos) && pos !== participant?.startingLocation?.position}
-                            className={cn(
-                              "transition-all duration-200",
-                              takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "opacity-50",
-                              pos === participant?.startingLocation?.position && "text-primary font-medium",
-                              "hover:bg-primary/10"
-                            )}
-                          >
-                            Site {pos}
-                            {takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && " (Taken)"}
-                            {pos === participant?.startingLocation?.position && " (Current)"}
-                          </SelectItem>
-                        ))}
+                        {positions.map((pos) => {
+                          const isTaken = takenPositions.includes(pos);
+                          const isCurrentPosition = pos === participant?.startingLocation?.position;
+                          return (
+                            <SelectItem
+                              key={pos}
+                              value={String(pos)}
+                              disabled={isTaken && !isCurrentPosition}
+                              className={cn(
+                                "transition-all duration-200",
+                                isTaken && !isCurrentPosition && "opacity-50",
+                                isCurrentPosition && "text-primary font-medium",
+                                "hover:bg-primary/10"
+                              )}
+                            >
+                              Site {pos}
+                              {isTaken && !isCurrentPosition && " (Taken)"}
+                              {isCurrentPosition && " (Current)"}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}

@@ -4,6 +4,12 @@ import { useWebSocket } from './use-websocket';
 import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
+interface UpdatePositionData {
+  teamId: number;
+  position: number;
+  force?: boolean;
+}
+
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
   const { socket, sendMessage, subscribeToMessage } = useWebSocket();
@@ -31,7 +37,7 @@ export function useGame(gameId: number) {
               if (participant.teamId === payload.teamId) {
                 return {
                   ...participant,
-                  location: payload.location
+                  startingLocation: payload.startingLocation
                 };
               }
               return participant;
@@ -71,8 +77,8 @@ export function useGame(gameId: number) {
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    staleTime: 30000, // Cache data for 30 seconds
-    refetchInterval: false // Disable polling, rely on WebSocket updates
+    staleTime: 30000,
+    refetchInterval: false
   });
 
   const updateReadyStatus = useMutation({
@@ -139,16 +145,14 @@ export function useGame(gameId: number) {
   });
 
   const updateLocation = useMutation({
-    mutationFn: async (location: GeolocationCoordinates) => {
-      sendMessage('LOCATION_UPDATE', { gameId, location });
-
-      const response = await fetch(`/api/games/${gameId}/update-location`, {
+    mutationFn: async ({ teamId, position, force }: UpdatePositionData) => {
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ location }),
+        body: JSON.stringify({ teamId, position, force }),
         credentials: 'include'
       });
 
@@ -156,15 +160,30 @@ export function useGame(gameId: number) {
         throw new Error(await response.text());
       }
 
-      return response.json();
+      const data = await response.json();
+
+      // Send WebSocket update for real-time position changes
+      sendMessage('LOCATION_UPDATE', { 
+        gameId, 
+        teamId,
+        startingLocation: data.startingLocation
+      });
+
+      return data;
     },
-    onMutate: async (location) => {
+    onMutate: async ({ teamId, position }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
       const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
       if (previousGame?.participants) {
         const updatedParticipants = previousGame.participants.map(p => 
-          p.teamId === previousGame.createdBy ? { ...p, location } : p
+          p.teamId === teamId ? { 
+            ...p, 
+            startingLocation: {
+              position,
+              coordinates: p.startingLocation?.coordinates || null
+            }
+          } : p
         );
 
         queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
@@ -180,9 +199,15 @@ export function useGame(gameId: number) {
         queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
       }
       toast({
-        title: "Error updating location",
+        title: "Error updating position",
         description: err.message,
         variant: "destructive"
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: "Team position updated successfully"
       });
     }
   });
