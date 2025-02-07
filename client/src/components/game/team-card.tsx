@@ -141,14 +141,21 @@ export function TeamCard({
                   <div className="flex items-center gap-4">
                     <h3 className="font-semibold">{participant.team.name}</h3>
                     {canManageTeam && (
-                      <div className="flex items-center gap-2 min-w-[120px] group">
+                      <div className="flex items-center gap-4 min-w-[180px]">
                         <Switch
                           checked={isReady}
                           onCheckedChange={handleReadyToggle}
                           disabled={updateReadyStatus.isPending}
                           className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
                         />
-                        <span className="text-sm text-muted-foreground">Ready</span>
+                        <span className={cn(
+                          "text-sm px-2 py-1 rounded",
+                          isReady
+                            ? "text-green-500 bg-green-500/10"
+                            : "text-yellow-500 bg-yellow-500/10"
+                        )}>
+                          {isReady ? "Ready" : "Not Ready"}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -157,25 +164,6 @@ export function TeamCard({
                       <span className="text-xs text-muted-foreground">
                         {participant.team.teamMembers.length} members
                       </span>
-                    )}
-                    {showStatus && (
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "pointer-events-none select-none",
-                          participant.status === "eliminated"
-                            ? 'bg-red-500/10 text-red-500'
-                            : isReady
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-gray-500/10 text-gray-500'
-                        )}>
-                        {participant.status === "eliminated"
-                          ? "Eliminated"
-                          : isReady
-                            ? "Ready"
-                            : "Not Ready"
-                        }
-                      </Badge>
                     )}
                     {showLocation && hasStartingPosition && participant.startingLocation && (
                       <span className="text-xs text-muted-foreground">
