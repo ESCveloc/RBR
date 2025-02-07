@@ -139,41 +139,33 @@ export function useGame(gameId: number) {
   });
 
   const updateLocation = useMutation({
-    mutationFn: async ({ teamId, position, force = false }) => {
+    mutationFn: async (location: GeolocationCoordinates) => {
+      sendMessage('LOCATION_UPDATE', { gameId, location });
+
       const response = await fetch(`/api/games/${gameId}/update-location`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ teamId, position, force }),
+        body: JSON.stringify({ location }),
         credentials: 'include'
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        throw new Error(await response.text());
       }
 
       return response.json();
     },
-    onMutate: async ({ teamId, position }) => {
+    onMutate: async (location) => {
       await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
       const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
       if (previousGame?.participants) {
-        const updatedParticipants = previousGame.participants.map(p => {
-          if (p.teamId === teamId) {
-            return {
-              ...p,
-              startingLocation: {
-                ...p.startingLocation,
-                position
-              }
-            };
-          }
-          return p;
-        });
+        const updatedParticipants = previousGame.participants.map(p => 
+          p.teamId === previousGame.createdBy ? { ...p, location } : p
+        );
 
         queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
           ...previousGame,
@@ -191,13 +183,6 @@ export function useGame(gameId: number) {
         title: "Error updating location",
         description: err.message,
         variant: "destructive"
-      });
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Success",
-        description: "Location updated successfully"
       });
     }
   });
