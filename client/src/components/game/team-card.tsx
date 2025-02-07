@@ -132,32 +132,12 @@ export function TeamCard({
       <Card className="w-full hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
           <div className="space-y-3">
-            <div className="flex items-center gap-3"> {/* Changed flex-direction to row */}
-              <div>
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mb-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
-                {canManageTeam && (
-                  <div className="flex items-center gap-2"> {/* Changed to flex items-center for horizontal alignment */}
-                    <Switch
-                      checked={isReady}
-                      onCheckedChange={handleReadyToggle}
-                      disabled={updateReadyStatus.isPending}
-                      className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
-                    />
-                    <span className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      isReady
-                        ? "text-green-500 bg-green-500/10"
-                        : "text-yellow-500 bg-yellow-500/10"
-                    )}>
-                      {isReady ? "Ready" : "Not Ready"}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div>
+                <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
                   {showMembers && (
                     <span className="text-xs text-muted-foreground mt-1">
@@ -171,6 +151,24 @@ export function TeamCard({
                   )}
                 </div>
               </div>
+              {canManageTeam && (
+                <div className="flex items-center gap-2 ml-3"> {/* Added ml-3 to align with icon */}
+                  <Switch
+                    checked={isReady}
+                    onCheckedChange={handleReadyToggle}
+                    disabled={updateReadyStatus.isPending}
+                    className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+                  />
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full",
+                    isReady
+                      ? "text-green-500 bg-green-500/10"
+                      : "text-yellow-500 bg-yellow-500/10"
+                  )}>
+                    {isReady ? "Ready" : "Not Ready"}
+                  </span>
+                </div>
+              )}
             </div>
 
             {participant.status !== "eliminated" && (
@@ -207,7 +205,6 @@ export function TeamCard({
                     </Select>
                   )}
                 </div>
-
                 {canManageTeam && (
                   <div className="flex justify-end">
                     <Button
