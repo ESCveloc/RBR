@@ -77,6 +77,19 @@ export function registerRoutes(app: Express): Server {
   // Setup WebSocket server for real-time updates
   const wss = setupWebSocketServer(httpServer);
 
+  // Add session verification middleware
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/auth') || req.path === '/api/health') {
+      return next();
+    }
+
+    if (!req.isAuthenticated()) {
+      console.log('Session verification failed:', req.path);
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    next();
+  });
+
   // Admin settings endpoint
   app.put("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
@@ -961,10 +974,10 @@ export function registerRoutes(app: Express): Server {
         .then(results => results[0]);
 
       if (existingPosition && !force) {
-        return res.status(400).send("This position is already taken by another team. Please select a different position.");
+        return res.status(400).send("This position is already taken by another team. Please select a different position;.");
       }
 
-      // Calculate position coordinates based on 1-based position
+            // Calculate position coordinates based on 1-based position
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -976,7 +989,7 @@ export function registerRoutes(app: Express): Server {
 
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
         const latDiff = center.lat - lat;
-        const lngDiff = center.lng- lng;
+        const lngDiff = center.lng - lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
@@ -986,8 +999,8 @@ export function registerRoutes(app: Express): Server {
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
-      // Update participant with new starting location
-      const [updatedParticipant] = await db
+      // Update participant's position
+      const updatedParticipant = await db
         .update(gameParticipants)
         .set({
           startingLocation: {
@@ -1004,19 +1017,106 @@ export function registerRoutes(app: Express): Server {
         )
         .returning();
 
-      // Notify other clients about the update
-      const wsServer = global.gameWebSocketServer;
-      if (wsServer) {
-        wsServer.broadcastToGame(gameId, {
-          type: 'GAME_UPDATE',
-          gameId: gameId
-        });
-      }
-
-      res.json(updatedParticipant);
+      res.json(updatedParticipant[0]);
     } catch (error) {
       console.error("Assign position error:", error);
       res.status(500).send("Failed to assign position");
+    }
+  });
+
+  // Join game endpoint
+  app.post("/api/games/:gameId/join", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId } = req.body;
+
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
+      }
+
+      // Verify game exists and is accepting new teams
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      if (game.status !== "pending") {
+        return res.status(400).send("Cannot join game that has already started");
+      }
+
+      // Count current participants
+      const participantCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(gameParticipants)
+        .where(eq(gameParticipants.gameId, gameId))
+        .then(results => results[0].count);
+
+      if (participantCount >= game.maxTeams) {
+        return res.status(400).send("Game is full");
+      }
+
+      // Verify team exists and user is captain
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return res.status(404).send("Team not found");
+      }
+
+      if (!team.active) {
+        return res.status(400).send("Inactive teams cannot join games");
+      }
+
+      if (team.captainId !== req.user.id && req.user.role !== "admin") {
+        return res.status(403).send("Only team captain can join games");
+      }
+
+      // Check if team is already participating
+      const existingParticipant = await db
+        .select()
+        .from(gameParticipants)
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .limit(1)
+        .then(results => results[0]);
+
+      if (existingParticipant) {
+        return res.status(400).send("Team is already participating in this game");
+      }
+
+      // Add team to game
+      const [participant] = await db
+        .insert(gameParticipants)
+        .values({
+          gameId,
+          teamId,
+          status: "alive",
+          ready: false,
+          startingLocation: null,
+          joinedAt: new Date()
+        })
+        .returning();
+
+      res.json(participant);
+    } catch (error) {
+      console.error("Join game error:", error);
+      res.status(500).send("Failed to join game");
     }
   });
 
@@ -1372,7 +1472,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new endpoint for joining a game
+  // Join game endpoint - this is the edited version replacing the original duplicate
   app.post("/api/games/:gameId/join", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -1382,11 +1482,37 @@ export function registerRoutes(app: Express): Server {
       const gameId = parseInt(req.params.gameId);
       const { teamId } = req.body;
 
-      if (isNaN(gameId) || !teamId) {
-        return res.status(400).send("Invalid game ID or team ID");
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
       }
 
-      // Verify team exists and is active
+      // Verify game exists and is accepting new teams
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      if (game.status !== "pending") {
+        return res.status(400).send("Cannot join game that has already started");
+      }
+
+      // Count current participants
+      const participantCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(gameParticipants)
+        .where(eq(gameParticipants.gameId, gameId))
+        .then(results => results[0].count);
+
+      if (participantCount >= game.maxTeams) {
+        return res.status(400).send("Game is full");
+      }
+
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -1401,23 +1527,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Inactive teams cannot join games");
       }
 
-      // Verify game exists and is in pending state
-      const [game] = await db
-        .select()
-        .from(games)
-        .where(eq(games.id, gameId))
-        .limit(1);
-
-      if (!game) {
-        return res.status(404).send("Game not found");
-      }
-
-      if (game.status !== "pending") {
-        return res.status(400).send("Can only join pending games");
+      if (team.captainId !== req.user.id && req.user.role !== "admin") {
+        return res.status(403).send("Only team captain can join games");
       }
 
       // Check if team is already participating
-      const [existingParticipant] = await db
+      const existingParticipant = await db
         .select()
         .from(gameParticipants)
         .where(
@@ -1426,19 +1541,23 @@ export function registerRoutes(app: Express): Server {
             eq(gameParticipants.teamId, teamId)
           )
         )
-        .limit(1);
+        .limit(1)
+        .then(results => results[0]);
 
       if (existingParticipant) {
         return res.status(400).send("Team is already participating in this game");
       }
 
-      // Add team as participant
+      // Add team to game
       const [participant] = await db
         .insert(gameParticipants)
         .values({
           gameId,
           teamId,
-          status: "active",
+          status: "alive",
+          ready: false,
+          startingLocation: null,
+          joinedAt: new Date()
         })
         .returning();
 
