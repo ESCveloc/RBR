@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Trophy, Users, Settings, Plus, Power } from "lucide-react"; // Added Power import
+import { Loader2, Trophy, Users, Settings, Plus, Power } from "lucide-react";
 import type { Game } from "@db/schema";
 import type { Feature, Polygon } from "geojson";
 import {
@@ -101,7 +101,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { teams, isLoading: teamsLoading } = useTeams();
   const { socket, isConnected, subscribeToMessage } = useWebSocket();
 
@@ -325,9 +325,16 @@ export default function Admin() {
           <Button
             variant="outline"
             className="flex items-center gap-2"
-            onClick={() => {
-              if (user?.logout) {
-                user.logout();
+            onClick={async () => {
+              try {
+                await logout();
+                setLocation('/auth');
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to logout. Please try again.",
+                  variant: "destructive",
+                });
               }
             }}
           >
