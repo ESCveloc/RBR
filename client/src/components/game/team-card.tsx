@@ -57,6 +57,8 @@ export function TeamCard({
   if (!participant?.team && !team) return null;
 
   const currentTeam = participant?.team || team;
+  if (!currentTeam) return null;  // Additional null check for currentTeam
+
   const isCaptain = currentTeam?.captainId === user?.id;
   const isAdmin = user?.role === 'admin';
   const isReady = participant?.ready || false;
@@ -141,7 +143,7 @@ export function TeamCard({
                   <h3 className="font-semibold truncate max-w-[200px] transition-colors duration-200 hover:text-primary">
                     {participant.team.name}
                   </h3>
-                  {showMembers && (
+                  {showMembers && participant.team.teamMembers && (
                     <span className="text-xs text-muted-foreground mt-1">
                       {participant.team.teamMembers.length} members
                     </span>
@@ -246,7 +248,7 @@ export function TeamCard({
                   <span className="text-xs text-muted-foreground">
                     W/L: {team.wins || 0}/{team.losses || 0}
                   </span>
-                  {showMembers && (
+                  {showMembers && team.teamMembers && (
                     <span className="text-xs text-muted-foreground">
                       • {team.teamMembers.length} members
                     </span>
