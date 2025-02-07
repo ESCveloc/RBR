@@ -304,6 +304,40 @@ export function useGame(gameId: number) {
     }
   });
 
+  const cancelGame = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/games/${gameId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games`] });
+      toast({
+        title: "Success",
+        description: "Game cancelled successfully"
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Error cancelling game",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   return {
     game,
     isLoading,
@@ -311,6 +345,7 @@ export function useGame(gameId: number) {
     updateLocation,
     joinGame,
     updateReadyStatus,
-    leaveGame
+    leaveGame,
+    cancelGame  // Add cancelGame to the returned object
   };
 }
