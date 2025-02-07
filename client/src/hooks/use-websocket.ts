@@ -44,8 +44,11 @@ export function useWebSocket(): WebSocketInterface {
     console.log('Initiating WebSocket connection...');
 
     try {
+      // Get the current window location and construct the WebSocket URL
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+      const wsHost = window.location.host;
+      const wsUrl = `${wsProtocol}//${wsHost}/ws`;
+
       console.log('Connecting to WebSocket URL:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -55,6 +58,11 @@ export function useWebSocket(): WebSocketInterface {
         if (ws.readyState !== WebSocket.OPEN) {
           console.log('WebSocket connection timeout, closing connection');
           ws.close();
+          toast({
+            title: "Connection Error",
+            description: "Failed to establish WebSocket connection. Retrying...",
+            variant: "destructive"
+          });
         }
       }, 5000);
 
@@ -64,6 +72,14 @@ export function useWebSocket(): WebSocketInterface {
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
+
+        // Send authentication message
+        if (user) {
+          ws.send(JSON.stringify({
+            type: 'AUTHENTICATE',
+            payload: { userId: user.id }
+          }));
+        }
       };
 
       ws.onmessage = (event) => {
@@ -101,6 +117,11 @@ export function useWebSocket(): WebSocketInterface {
         clearTimeout(connectionTimeout);
         console.error('WebSocket error:', error);
         isConnectingRef.current = false;
+        toast({
+          title: "WebSocket Error",
+          description: "An error occurred with the connection",
+          variant: "destructive"
+        });
 
         if (wsRef.current) {
           wsRef.current.close();
@@ -149,8 +170,17 @@ export function useWebSocket(): WebSocketInterface {
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ type, payload }));
-  }, []);
+    try {
+      wsRef.current.send(JSON.stringify({ type, payload }));
+    } catch (error) {
+      console.error('Error sending WebSocket message:', error);
+      toast({
+        title: "Communication Error",
+        description: "Failed to send message",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
 
   const joinGame = useCallback((gameId: number) => {
     console.log('Attempting to join game:', gameId);
@@ -159,8 +189,13 @@ export function useWebSocket(): WebSocketInterface {
       sendMessage('JOIN_GAME', { gameId });
     } else {
       console.warn('Cannot join game: WebSocket not connected');
+      toast({
+        title: "Connection Error",
+        description: "Not connected to game server. Please try again.",
+        variant: "destructive"
+      });
     }
-  }, [sendMessage]);
+  }, [sendMessage, toast]);
 
   const subscribeToMessage = useCallback((type: string, handler: (payload: any) => void) => {
     if (!messageHandlersRef.current.has(type)) {
