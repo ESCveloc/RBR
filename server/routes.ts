@@ -1189,70 +1189,75 @@ export function registerRoutes(app: Express): Server {
       }
 
       const [game] = await db
-        .select()
+        .select({
+          id: games.id,
+          name: games.name,
+          status: games.status,
+          startTime: games.startTime,
+          endTime: games.endTime,
+          gameLengthMinutes: games.gameLengthMinutes,
+          maxTeams: games.maxTeams,
+          playersPerTeam: games.playersPerTeam,
+          boundaries: games.boundaries,
+          zoneConfigs: games.zoneConfigs,
+          createdAt: games.createdAt,
+          createdBy: games.createdBy,
+          participants: sql<any>`
+            json_agg(
+              json_build_object(
+                'id', ${gameParticipants.id},
+                'teamId', ${gameParticipants.teamId},
+                'status', ${gameParticipants.status},
+                'ready', ${gameParticipants.ready},
+                'eliminatedAt', ${gameParticipants.eliminatedAt},
+                'location', ${gameParticipants.location},
+                'startingLocation', ${gameParticipants.startingLocation},
+                'startingLocationAssignedAt', ${gameParticipants.startingLocationAssignedAt},
+                'team', json_build_object(
+                  'id', ${teams.id},
+                  'name', ${teams.name},
+                  'description', ${teams.description},
+                  'captainId', ${teams.captainId},
+                  'active', ${teams.active},
+                  'createdAt', ${teams.createdAt},
+                  'wins', ${teams.wins},
+                  'losses', ${teams.losses},
+                  'tags', ${teams.tags},
+                  'teamMembers', (
+                    SELECT json_agg(
+                      json_build_object(
+                        'id', tm.id,
+                        'userId', tm.user_id,
+                        'joinedAt', tm.joined_at
+                      )
+                    )
+                    FROM team_members tm
+                    WHERE tm.team_id = ${teams.id}
+                  )
+                )
+              )
+            )`
+        })
         .from(games)
+        .leftJoin(gameParticipants, eq(games.id, gameParticipants.gameId))
+        .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
         .where(eq(games.id, gameId))
+        .groupBy(games.id)
         .limit(1);
 
       if (!game) {
-        return res.status(404).json({ message: "Game not found" });
+        return res.status(404).send("Game not found");
       }
 
-      // Get game participants with team data and actual team members
-      const participants = await db
-        .select({
-          id: gameParticipants.id,
-          gameId: gameParticipants.gameId,
-          teamId: gameParticipants.teamId,
-          status: gameParticipants.status,
-          eliminatedAt: gameParticipants.eliminatedAt,
-          location: gameParticipants.location,
-          startingLocation: gameParticipants.startingLocation,
-          startingLocationAssignedAt: gameParticipants.startingLocationAssignedAt,
-          team: {
-            id: teams.id,
-            name: teams.name,
-            active: teams.active,
-            captainId: teams.captainId,
-            wins: teams.wins,
-            losses: teams.losses,
-          }
-        })
-        .from(gameParticipants)
-        .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
-        .where(eq(gameParticipants.gameId, gameId));
+      // Filter out null participants (from left join when no participants exist)
+      if (game.participants && game.participants[0] === null) {
+        game.participants = [];
+      }
 
-      // For each participant, get their team members
-      const participantsWithTeamMembers = await Promise.all(
-        participants.map(async (participant) => {
-          if (!participant.teamId) {
-            return participant;
-          }
-
-          // Get actual team members
-          const members = await db
-            .select({
-              id: teamMembers.id,
-              userId: teamMembers.userId,
-              joinedAt: teamMembers.joinedAt
-            })
-            .from(teamMembers)
-            .where(eq(teamMembers.teamId, participant.teamId));
-
-          return {
-            ...participant,
-            team: participant.team ? {
-              ...participant.team,
-              teamMembers: members
-            } : undefined
-          };
-        })
-      );
-
-      res.json({ ...game, participants: participantsWithTeamMembers });
+      res.json(game);
     } catch (error) {
-      console.error("Fetch game error:", error);
-      res.status(500).json({ message: "Failed to fetch game" });
+      console.error("Get game error:", error);
+      res.status(500).send("Failed to get game");
     }
   });
 
