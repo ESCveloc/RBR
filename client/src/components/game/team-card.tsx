@@ -129,48 +129,46 @@ export function TeamCard({
   // Team card in game context
   if (participant?.team) {
     return (
-      <Card className="hover:bg-white/5 transition-colors">
+      <Card className="w-full hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
+                  {canManageTeam && (
+                    <div className="flex items-center gap-4">
+                      <Switch
+                        checked={isReady}
+                        onCheckedChange={handleReadyToggle}
+                        disabled={updateReadyStatus.isPending}
+                        className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+                      />
+                      <span className={cn(
+                        "text-sm px-3 py-1 rounded-full w-[90px] text-center",
+                        isReady
+                          ? "text-green-500 bg-green-500/10"
+                          : "text-yellow-500 bg-yellow-500/10"
+                      )}>
+                        {isReady ? "Ready" : "Not Ready"}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold truncate">{participant.team.name}</h3>
-                    {canManageTeam && (
-                      <div className="flex items-center gap-4 min-w-[200px] justify-end">
-                        <Switch
-                          checked={isReady}
-                          onCheckedChange={handleReadyToggle}
-                          disabled={updateReadyStatus.isPending}
-                          className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
-                        />
-                        <span className={cn(
-                          "text-sm px-3 py-1 rounded-full w-[90px] text-center",
-                          isReady
-                            ? "text-green-500 bg-green-500/10"
-                            : "text-yellow-500 bg-yellow-500/10"
-                        )}>
-                          {isReady ? "Ready" : "Not Ready"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {showMembers && (
-                      <span className="text-xs text-muted-foreground">
-                        {participant.team.teamMembers.length} members
-                      </span>
-                    )}
-                    {showLocation && hasStartingPosition && participant.startingLocation && (
-                      <span className="text-xs text-muted-foreground">
-                        • Site {participant.startingLocation.position}
-                      </span>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 mt-1">
+                  {showMembers && (
+                    <span className="text-xs text-muted-foreground">
+                      {participant.team.teamMembers.length} members
+                    </span>
+                  )}
+                  {showLocation && hasStartingPosition && participant.startingLocation && (
+                    <span className="text-xs text-muted-foreground">
+                      • Site {participant.startingLocation.position}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -236,25 +234,23 @@ export function TeamCard({
   if (team) {
     return (
       <Link href={`/team/${team.id}`}>
-        <Card className="hover:bg-white/5 transition-colors cursor-pointer">
+        <Card className="w-full hover:bg-white/5 transition-colors cursor-pointer">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">{team.name}</h3>
-                  <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold truncate">{team.name}</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    W/L: {team.wins || 0}/{team.losses || 0}
+                  </span>
+                  {showMembers && (
                     <span className="text-xs text-muted-foreground">
-                      W/L: {team.wins || 0}/{team.losses || 0}
+                      • {team.teamMembers.length} members
                     </span>
-                    {showMembers && (
-                      <span className="text-xs text-muted-foreground">
-                        • {team.teamMembers.length} members
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
