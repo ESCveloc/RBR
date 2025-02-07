@@ -53,14 +53,18 @@ export function TeamCard({
   const { user } = useUser();
   const { updateReadyStatus, updateLocation } = useGame(gameId || 0);
 
-  // Early return if no valid team data
-  if (!participant?.team && !team) return null;
+  // If we're in game context (gameId exists), only show if there's a valid participant with team
+  if (gameId && (!participant || !participant.team)) {
+    return null;
+  }
+
+  // If we're not in game context, only show if there's a valid team
+  if (!gameId && !team) {
+    return null;
+  }
 
   const currentTeam = participant?.team || team;
   if (!currentTeam) return null;
-
-  // If we're in game context (participant exists) but no team data, return null
-  if (gameId && !participant?.team) return null;
 
   const isCaptain = currentTeam?.captainId === user?.id;
   const isAdmin = user?.role === 'admin';
