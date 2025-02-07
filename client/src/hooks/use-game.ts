@@ -6,11 +6,13 @@ import { useToast } from '@/hooks/use-toast';
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
-  const { sendMessage, subscribeToMessage } = useWebSocket(gameId);
+  const { socket, sendMessage, subscribeToMessage } = useWebSocket();
   const { toast } = useToast();
 
   // Subscribe to game updates
   useEffect(() => {
+    if (!socket) return;
+
     // Subscribe to general game state updates
     const unsubscribeGameUpdate = subscribeToMessage('GAME_STATE_UPDATE', (payload) => {
       if (payload.gameId === gameId) {
@@ -39,17 +41,101 @@ export function useGame(gameId: number) {
       }
     });
 
+    // Subscribe to ready status updates
+    const unsubscribeReadyUpdate = subscribeToMessage('TEAM_READY_UPDATE', (payload) => {
+      if (payload.gameId === gameId) {
+        queryClient.setQueryData([`/api/games/${gameId}`], (oldData: Game | undefined) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            participants: oldData.participants?.map(participant => {
+              if (participant.teamId === payload.teamId) {
+                return {
+                  ...participant,
+                  ready: payload.ready
+                };
+              }
+              return participant;
+            })
+          };
+        });
+      }
+    });
+
     return () => {
       unsubscribeGameUpdate();
       unsubscribeLocationUpdate();
+      unsubscribeReadyUpdate();
     };
-  }, [gameId, queryClient, subscribeToMessage]);
+  }, [socket, gameId, queryClient, subscribeToMessage]);
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    staleTime: 60000, // Cache data for 1 minute
-    gcTime: 3600000, // Keep in cache for 1 hour
+    staleTime: 30000, // Cache data for 30 seconds
     refetchInterval: false // Disable polling, rely on WebSocket updates
+  });
+
+  const updateReadyStatus = useMutation({
+    mutationFn: async ({ teamId, ready }: { teamId: number; ready: boolean }) => {
+      const response = await fetch(`/api/games/${gameId}/team-ready`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ teamId, ready }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const data = await response.json();
+
+      // Send WebSocket update
+      sendMessage('TEAM_READY_UPDATE', {
+        gameId,
+        teamId,
+        ready,
+        type: 'READY_STATUS_CHANGE'
+      });
+
+      return data;
+    },
+    onMutate: async ({ teamId, ready }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      if (previousGame) {
+        const updatedParticipants = previousGame.participants?.map(p =>
+          p.teamId === teamId ? { ...p, ready } : p
+        );
+
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: updatedParticipants
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      toast({
+        title: "Error updating ready status",
+        description: err.message,
+        variant: "destructive"
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Team ready status updated successfully"
+      });
+    }
   });
 
   const updateLocation = useMutation({
@@ -153,6 +239,7 @@ export function useGame(gameId: number) {
     isLoading,
     error,
     updateLocation,
-    joinGame
+    joinGame,
+    updateReadyStatus
   };
 }

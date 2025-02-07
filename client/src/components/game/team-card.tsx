@@ -15,6 +15,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
+import { useGame } from "@/hooks/use-game";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ export function TeamCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
+  const { updateReadyStatus, updateLocation } = useGame(gameId || 0);
 
   const currentTeam = participant?.team || team;
   const isCaptain = currentTeam?.captainId === user?.id;
@@ -73,90 +75,20 @@ export function TeamCard({
 
   const handlePositionChange = (value: string) => {
     setSelectedPosition(value);
-    assignPosition.mutate();
+    updateLocation.mutate({
+      teamId: participant!.teamId,
+      position: parseInt(value),
+      force: isAdmin
+    });
   };
 
-  const assignPosition = useMutation({
-    mutationFn: async () => {
-      if (!gameId || !participant?.teamId || !selectedPosition) return;
-
-      const response = await fetch(`/api/games/${gameId}/assign-position`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          teamId: participant.teamId,
-          position: parseInt(selectedPosition),
-          force: isAdmin
-        }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('Position assignment error:', error);
-        throw new Error(error);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Success",
-        description: "Starting position assigned.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const toggleReady = useMutation({
-    mutationFn: async () => {
-      if (!gameId || !participant?.teamId) return;
-
-      const response = await fetch(`/api/games/${gameId}/team-ready`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: participant.teamId,
-          ready: !isReady
-        }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('Ready toggle error:', error);
-        throw new Error(error);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      // Force refetch to get the latest state
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Status Updated",
-        description: `Team is now ${!isReady ? "ready" : "not ready"} for the game.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      // Refetch on error to ensure UI is in sync
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-    }
-  });
+  const handleReadyToggle = () => {
+    if (!gameId || !participant?.teamId) return;
+    updateReadyStatus.mutate({
+      teamId: participant.teamId,
+      ready: !isReady
+    });
+  };
 
   const leaveGame = useMutation({
     mutationFn: async () => {
@@ -190,7 +122,6 @@ export function TeamCard({
         description: error.message,
         variant: "destructive",
       });
-      // Refetch on error to ensure UI is in sync
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
     },
   });
@@ -213,8 +144,8 @@ export function TeamCard({
                       <div className="flex items-center gap-2 min-w-[120px] group">
                         <Switch
                           checked={isReady}
-                          onCheckedChange={() => toggleReady.mutate()}
-                          disabled={toggleReady.isPending}
+                          onCheckedChange={handleReadyToggle}
+                          disabled={updateReadyStatus.isPending}
                           className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
                         />
                         <span className="text-sm text-muted-foreground">Ready</span>
