@@ -129,41 +129,43 @@ export function TeamCard({
   // Team card in game context
   if (participant?.team) {
     return (
-      <Card className="w-full hover:bg-white/5 transition-colors">
+      <Card className="w-full transition-all duration-200 hover:bg-white/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]">
         <CardContent className="p-4">
           <div className="space-y-3">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 w-5 text-primary" />
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-110 hover:bg-primary/20 group">
+                  <Users className="h-5 w-5 text-primary transition-transform duration-200 group-hover:scale-110" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
+                  <h3 className="font-semibold truncate max-w-[200px] transition-colors duration-200 hover:text-primary">
+                    {participant.team.name}
+                  </h3>
                   {showMembers && (
-                    <span className="text-xs text-muted-foreground mt-1">
+                    <span className="text-xs text-muted-foreground mt-1 transition-opacity duration-200 hover:opacity-80">
                       {participant.team.teamMembers.length} members
                     </span>
                   )}
                   {showLocation && hasStartingPosition && participant.startingLocation && (
-                    <span className="text-xs text-muted-foreground mt-1 block">
+                    <span className="text-xs text-muted-foreground mt-1 block transition-opacity duration-200 hover:opacity-80">
                       Site {participant.startingLocation.position}
                     </span>
                   )}
                 </div>
               </div>
               {canManageTeam && (
-                <div className="flex items-center gap-2 ml-3"> {/* Added ml-3 to align with icon */}
+                <div className="flex items-center gap-2 ml-3 transition-transform duration-200 hover:translate-x-1">
                   <Switch
                     checked={isReady}
                     onCheckedChange={handleReadyToggle}
                     disabled={updateReadyStatus.isPending}
-                    className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+                    className="transition-all duration-200 group-hover:ring-2 group-hover:ring-primary/30 data-[state=checked]:bg-primary/90 hover:data-[state=checked]:bg-primary"
                   />
                   <span className={cn(
-                    "text-xs px-2 py-0.5 rounded-full",
+                    "text-xs px-2 py-0.5 rounded-full transition-all duration-200",
                     isReady
-                      ? "text-green-500 bg-green-500/10"
-                      : "text-yellow-500 bg-yellow-500/10"
+                      ? "text-green-500 bg-green-500/10 hover:bg-green-500/20"
+                      : "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20"
                   )}>
                     {isReady ? "Ready" : "Not Ready"}
                   </span>
@@ -179,7 +181,7 @@ export function TeamCard({
                       value={selectedPosition}
                       onValueChange={handlePositionChange}
                     >
-                      <SelectTrigger className="w-full max-w-[160px]">
+                      <SelectTrigger className="w-full max-w-[160px] transition-all duration-200 hover:border-primary focus:ring-primary">
                         <SelectValue placeholder="Select Site">
                           {selectedPosition ? `Site ${selectedPosition}` : "Select Site"}
                         </SelectValue>
@@ -191,9 +193,10 @@ export function TeamCard({
                             value={String(pos)}
                             disabled={takenPositions.includes(pos) && pos !== participant?.startingLocation?.position}
                             className={cn(
-                              "transition-none",
+                              "transition-all duration-200",
                               takenPositions.includes(pos) && pos !== participant?.startingLocation?.position && "opacity-50",
-                              pos === participant?.startingLocation?.position && "text-primary font-medium"
+                              pos === participant?.startingLocation?.position && "text-primary font-medium",
+                              "hover:bg-primary/10"
                             )}
                           >
                             Site {pos}
@@ -212,9 +215,9 @@ export function TeamCard({
                       size="default"
                       onClick={() => leaveGame.mutate()}
                       disabled={leaveGame.isPending}
-                      className="w-full max-w-[160px] bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors duration-200"
+                      className="w-full max-w-[160px] transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
+                      <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
                       Leave
                     </Button>
                   </div>
@@ -231,20 +234,20 @@ export function TeamCard({
   if (team) {
     return (
       <Link href={`/team/${team.id}`}>
-        <Card className="w-full hover:bg-white/5 transition-colors cursor-pointer">
+        <Card className="w-full transition-all duration-200 hover:bg-white/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Users className="h-5 w-5 text-primary" />
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-110 hover:bg-primary/20 group">
+                <Users className="h-5 w-5 text-primary transition-transform duration-200 group-hover:scale-110" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold truncate">{team.name}</h3>
+                <h3 className="font-semibold truncate transition-colors duration-200 hover:text-primary">{team.name}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground transition-opacity duration-200 hover:opacity-80">
                     W/L: {team.wins || 0}/{team.losses || 0}
                   </span>
                   {showMembers && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground transition-opacity duration-200 hover:opacity-80">
                       • {team.teamMembers.length} members
                     </span>
                   )}
