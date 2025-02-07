@@ -138,38 +138,40 @@ export function TeamCard({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
-                  {canManageTeam && (
-                    <div className="flex items-center gap-4">
-                      <Switch
-                        checked={isReady}
-                        onCheckedChange={handleReadyToggle}
-                        disabled={updateReadyStatus.isPending}
-                        className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
-                      />
-                      <span className={cn(
-                        "text-sm px-3 py-1 rounded-full w-[90px] text-center",
-                        isReady
-                          ? "text-green-500 bg-green-500/10"
-                          : "text-yellow-500 bg-yellow-500/10"
-                      )}>
-                        {isReady ? "Ready" : "Not Ready"}
+                  <div>
+                    <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
+                    {showMembers && (
+                      <span className="text-xs text-muted-foreground mt-1">
+                        {participant.team.teamMembers.length} members
                       </span>
+                    )}
+                  </div>
+                  {canManageTeam && (
+                    <div className="flex items-center gap-4 ml-auto">
+                      <div className="flex items-center gap-4 justify-start">
+                        <Switch
+                          checked={isReady}
+                          onCheckedChange={handleReadyToggle}
+                          disabled={updateReadyStatus.isPending}
+                          className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+                        />
+                        <span className={cn(
+                          "text-sm px-3 py-1 rounded-full w-[90px] text-center",
+                          isReady
+                            ? "text-green-500 bg-green-500/10"
+                            : "text-yellow-500 bg-yellow-500/10"
+                        )}>
+                          {isReady ? "Ready" : "Not Ready"}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  {showMembers && (
-                    <span className="text-xs text-muted-foreground">
-                      {participant.team.teamMembers.length} members
-                    </span>
-                  )}
-                  {showLocation && hasStartingPosition && participant.startingLocation && (
-                    <span className="text-xs text-muted-foreground">
-                      • Site {participant.startingLocation.position}
-                    </span>
-                  )}
-                </div>
+                {showLocation && hasStartingPosition && participant.startingLocation && (
+                  <span className="text-xs text-muted-foreground mt-1 block">
+                    Site {participant.startingLocation.position}
+                  </span>
+                )}
               </div>
             </div>
 
