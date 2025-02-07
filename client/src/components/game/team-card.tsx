@@ -132,13 +132,13 @@ export function TeamCard({
       <Card className="w-full hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
           <div className="space-y-3">
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3"> {/* Changed flex-direction to row */}
               <div>
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mb-2">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 {canManageTeam && (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-2"> {/* Changed to flex items-center for horizontal alignment */}
                     <Switch
                       checked={isReady}
                       onCheckedChange={handleReadyToggle}
