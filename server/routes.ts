@@ -18,7 +18,6 @@ const gameSchema = z.object({
   maxTeams: z.number().min(2).max(50),
   playersPerTeam: z.number().min(1).max(10),
   boundaries: z.any().optional(),
-  status: z.enum(["pending", "active", "completed", "cancelled"]).default("pending"),
   zoneConfigs: z.array(z.object({
     durationMinutes: z.number().min(5).max(60),
     radiusMultiplier: z.number().min(0.1).max(1),
@@ -830,7 +829,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the leave game endpoint to properly handle the request
+  // Leave game endpoint
   app.post("/api/games/:gameId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -977,7 +976,7 @@ export function registerRoutes(app: Express): Server {
 
       const radius = Math.max(...coordinates.map(([lng, lat]) => {
         const latDiff = center.lat - lat;
-        const lngDiff = center.lng - lng;
+        const lngDiff = center.lng- lng;
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
@@ -1044,8 +1043,7 @@ export function registerRoutes(app: Express): Server {
         gameLengthMinutes,
         maxTeams,
         playersPerTeam,
-        zoneConfigs,
-        status
+        zoneConfigs
       } = result.data;
 
       // Use default boundaries if none provided
@@ -1082,7 +1080,7 @@ export function registerRoutes(app: Express): Server {
           playersPerTeam,
           zoneConfigs: gameZoneConfigs,
           createdBy: (req.user as any).id,
-          status: status,
+          status: "pending",
         })
         .returning();
 
@@ -1550,56 +1548,6 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Update location error:", error);
       res.status(500).send("Failed to update location");
-    }
-  });
-
-  // Add cancel game endpoint
-  app.post("/api/games/:gameId/cancel", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not logged in");
-    }
-
-    if (req.user.role !== "admin") {
-      return res.status(403).send("Only administrators can cancel games");
-    }
-
-    try {
-      const gameId = parseInt(req.params.gameId);
-
-      if (isNaN(gameId)) {
-        return res.status(400).send("Invalid game ID");
-      }
-
-      // Get game details
-      const [game] = await db
-        .select()
-        .from(games)
-        .where(eq(games.id, gameId))
-        .limit(1);
-
-      if (!game) {
-        return res.status(404).send("Game not found");
-      }
-
-      // Update game status to cancelled
-      const [updatedGame] = await db
-        .update(games)
-        .set({
-          status: "cancelled",
-          endedAt: new Date()
-        })
-        .where(eq(games.id, gameId))
-        .returning();
-
-      // Remove all participants
-      await db
-        .delete(gameParticipants)
-        .where(eq(gameParticipants.gameId, gameId));
-
-      res.json(updatedGame);
-    } catch (error) {
-      console.error("Cancel game error:", error);
-      res.status(500).send("Failed to cancel game");
     }
   });
 

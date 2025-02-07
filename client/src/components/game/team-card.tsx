@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,8 +51,7 @@ export function TeamCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
-  const { updateReadyStatus, updateLocation, leaveGame } = useGame(gameId || 0);
-  const [, setLocation] = useLocation();
+  const { updateReadyStatus, updateLocation } = useGame(gameId || 0);
 
   // If neither participant nor team is provided, don't render anything
   if (!participant?.team && !team) return null;
@@ -93,18 +92,39 @@ export function TeamCard({
     });
   };
 
-  const handleLeaveGame = async () => {
-    if (!gameId || !participant?.teamId) return;
+  const leaveGame = useMutation({
+    mutationFn: async () => {
+      if (!gameId || !participant?.teamId) return;
 
-    try {
-      await leaveGame.mutateAsync(participant.teamId);
-      // Navigate to home page after successfully leaving
-      setLocation('/');
-    } catch (error) {
-      console.error("Failed to leave game:", error);
-      // Error toast is handled by the mutation
-    }
-  };
+      const response = await fetch(`/api/games/${gameId}/leave`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: participant.teamId }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Left Game",
+        description: "Team has left the game.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+    },
+  });
 
   // Team card in game context
   if (participant?.team) {
@@ -193,12 +213,12 @@ export function TeamCard({
                     <Button
                       variant="outline"
                       size="default"
-                      onClick={handleLeaveGame}
+                      onClick={() => leaveGame.mutate()}
                       disabled={leaveGame.isPending}
                       className="w-full max-w-[160px] transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
                     >
                       <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
-                      {leaveGame.isPending ? "Leaving..." : "Leave"}
+                      Leave
                     </Button>
                   </div>
                 )}

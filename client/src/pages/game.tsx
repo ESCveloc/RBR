@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,6 @@ import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { SelectTeam } from "@/components/game/select-team";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useGame } from "@/hooks/use-game";
 import type { Game } from "@db/schema";
 import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
 
@@ -24,22 +23,14 @@ export default function Game() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
-  const [, setLocation] = useLocation();
 
   const gameId = match && params?.id ? parseInt(params.id) : undefined;
 
   const { socket, isConnected, subscribeToMessage, joinGame } = useWebSocket();
 
   const isAdmin = user?.role === 'admin';
-  const backLink = isAdmin ? "/admin" : "/";
 
-  // Use the useGame hook for game data fetching and mutations
-  const {
-    game,
-    isLoading,
-    error,
-    updateGameStatus,
-  } = useGame(gameId || 0);
+  const backLink = isAdmin ? "/admin" : "/";
 
   useEffect(() => {
     if (isConnected && socket && gameId) {
@@ -70,6 +61,104 @@ export default function Game() {
       }
     };
   }, [socket, isConnected, gameId, subscribeToMessage, queryClient]);
+
+  const { data: game, isLoading, error } = useQuery<Game>({
+    queryKey: [`/api/games/${gameId}`],
+    staleTime: 30000,
+    refetchInterval: false,
+    placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
+  });
+
+  const updateGameStatus = useMutation({
+    mutationFn: async ({ status }: { status: Game['status'] }) => {
+      if (!gameId) {
+        throw new Error('No game ID provided');
+      }
+
+      console.log('Updating game status:', { gameId, status });
+
+      const response = await fetch(`/api/games/${gameId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ status }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update game status");
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ status }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      if (previousGame) {
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          status
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (error: Error, variables, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      console.error('Error updating game status:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Game status updated successfully",
+      });
+    }
+  });
+
+  const assignPosition = useMutation({
+    mutationFn: async ({ teamId, force = false }: { teamId: number; force?: boolean }) => {
+      if (!gameId) return;
+
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, force }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
 
   if (!match || !gameId) {
     return (
@@ -106,7 +195,8 @@ export default function Game() {
     );
   }
 
-  const handleStatusUpdate = (newStatus: 'pending' | 'active' | 'completed') => {
+  const handleStatusUpdate = (newStatus: 'active' | 'completed' | 'cancelled') => {
+    console.log('Attempting to update status:', { newStatus, currentStatus: game.status });
     updateGameStatus.mutate({ status: newStatus });
   };
 
@@ -151,7 +241,7 @@ export default function Game() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleStatusUpdate('completed')}
+                      onClick={() => handleStatusUpdate('cancelled')}
                       disabled={updateGameStatus.isPending}
                     >
                       <X className="h-4 w-4 mr-2" />
@@ -231,6 +321,7 @@ export default function Game() {
                       participant={participant}
                       canAssignPosition={isAdmin && game.status === 'pending'}
                       showMembers={true}
+                      showStatus={true}
                       showLocation={game.status === 'active'}
                     />
                   ))

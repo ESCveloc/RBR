@@ -71,88 +71,8 @@ export function useGame(gameId: number) {
 
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
-    queryFn: async () => {
-      const response = await fetch(`/api/games/${gameId}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to fetch game data');
-      }
-      return response.json();
-    },
     staleTime: 30000, // Cache data for 30 seconds
-    retry: 1 // Only retry once
-  });
-
-  const updateGameStatus = useMutation({
-    mutationFn: async ({ status }: { status: Game['status'] }) => {
-      const response = await fetch(`/api/games/${gameId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ status }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to update game status');
-      }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData([`/api/games/${gameId}`], data);
-      toast({
-        title: "Success",
-        description: "Game status updated successfully"
-      });
-    },
-    onError: (err: Error) => {
-      toast({
-        title: "Error updating game status",
-        description: err.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const updateLocation = useMutation({
-    mutationFn: async ({ teamId, position, force = false }: { teamId: number; position: number; force?: boolean }) => {
-      const response = await fetch(`/api/games/${gameId}/assign-position`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ teamId, position, force }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
-      }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Success",
-        description: "Location updated successfully"
-      });
-    },
-    onError: (err: Error) => {
-      toast({
-        title: "Error updating location",
-        description: err.message,
-        variant: "destructive"
-      });
-    }
+    refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
   const updateReadyStatus = useMutation({
@@ -171,33 +91,62 @@ export function useGame(gameId: number) {
         throw new Error(await response.text());
       }
 
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Success",
-        description: "Team ready status updated successfully"
+      const data = await response.json();
+
+      // Send WebSocket update
+      sendMessage('TEAM_READY_UPDATE', {
+        gameId,
+        teamId,
+        ready,
+        type: 'READY_STATUS_CHANGE'
       });
+
+      return data;
     },
-    onError: (err: Error) => {
+    onMutate: async ({ teamId, ready }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      if (previousGame) {
+        const updatedParticipants = previousGame.participants?.map(p =>
+          p.teamId === teamId ? { ...p, ready } : p
+        );
+
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: updatedParticipants
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
       toast({
         title: "Error updating ready status",
         description: err.message,
         variant: "destructive"
       });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Team ready status updated successfully"
+      });
     }
   });
 
-  const leaveGame = useMutation({
-    mutationFn: async (teamId: number) => {
-      const response = await fetch(`/api/games/${gameId}/leave`, {
+  const updateLocation = useMutation({
+    mutationFn: async ({ teamId, position, force = false }) => {
+      const response = await fetch(`/api/games/${gameId}/update-location`, {
         method: 'POST',
-        headers: {
+        headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ teamId }),
+        body: JSON.stringify({ teamId, position, force }),
         credentials: 'include'
       });
 
@@ -208,52 +157,47 @@ export function useGame(gameId: number) {
 
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games`] });
-      toast({
-        title: "Success",
-        description: "Successfully left the game"
-      });
-    },
-    onError: (err: Error) => {
-      toast({
-        title: "Error leaving game",
-        description: err.message,
-        variant: "destructive"
-      });
-    }
-  });
+    onMutate: async ({ teamId, position }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
 
-  const cancelGame = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/games/${gameId}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
+      if (previousGame?.participants) {
+        const updatedParticipants = previousGame.participants.map(p => {
+          if (p.teamId === teamId) {
+            return {
+              ...p,
+              startingLocation: {
+                ...p.startingLocation,
+                position
+              }
+            };
+          }
+          return p;
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: updatedParticipants
+        });
       }
 
-      return response.json();
+      return { previousGame };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games`] });
+    onError: (err, newLocation, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
       toast({
-        title: "Success",
-        description: "Game cancelled successfully"
-      });
-    },
-    onError: (err: Error) => {
-      toast({
-        title: "Error cancelling game",
+        title: "Error updating location",
         description: err.message,
         variant: "destructive"
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Location updated successfully"
       });
     }
   });
@@ -296,7 +240,7 @@ export function useGame(gameId: number) {
         description: "Successfully joined the game",
       });
     },
-    onError: (err: Error) => {
+    onError: (err) => {
       toast({
         title: "Error joining game",
         description: err.message,
@@ -311,9 +255,6 @@ export function useGame(gameId: number) {
     error,
     updateLocation,
     joinGame,
-    updateReadyStatus,
-    leaveGame,
-    cancelGame,
-    updateGameStatus
+    updateReadyStatus
   };
 }
