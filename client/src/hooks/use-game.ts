@@ -249,12 +249,68 @@ export function useGame(gameId: number) {
     }
   });
 
+  const leaveGame = useMutation({
+    mutationFn: async (teamId: number) => {
+      const response = await fetch(`/api/games/${gameId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ teamId }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      return response.json();
+    },
+    onMutate: async (teamId) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      if (previousGame?.participants) {
+        const updatedParticipants = previousGame.participants.filter(
+          p => p.teamId !== teamId
+        );
+
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          participants: updatedParticipants
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (err, teamId, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      toast({
+        title: "Error leaving game",
+        description: err.message,
+        variant: "destructive"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Successfully left the game"
+      });
+    }
+  });
+
   return {
     game,
     isLoading,
     error,
     updateLocation,
     joinGame,
-    updateReadyStatus
+    updateReadyStatus,
+    leaveGame
   };
 }

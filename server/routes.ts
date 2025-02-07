@@ -829,7 +829,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Leave game endpoint
+  // Update the leave game endpoint to properly handle the request
   app.post("/api/games/:gameId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
