@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ export function TeamCard({
   const queryClient = useQueryClient();
   const { user } = useUser();
   const { updateReadyStatus, updateLocation, leaveGame } = useGame(gameId || 0);
+  const [, setLocation] = useLocation();
 
   // If neither participant nor team is provided, don't render anything
   if (!participant?.team && !team) return null;
@@ -98,13 +99,12 @@ export function TeamCard({
     try {
       await leaveGame.mutateAsync(participant.teamId);
       // Navigate to home page after successfully leaving
-      window.location.href = '/';
+      setLocation('/');
     } catch (error) {
       console.error("Failed to leave game:", error);
       // Error toast is handled by the mutation
     }
   };
-
 
   // Team card in game context
   if (participant?.team) {
