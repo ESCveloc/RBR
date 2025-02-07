@@ -142,12 +142,12 @@ export function TeamCard({
                     {participant.team.name}
                   </h3>
                   {showMembers && (
-                    <span className="text-xs text-muted-foreground mt-1 transition-opacity duration-200 hover:opacity-80">
+                    <span className="text-xs text-muted-foreground mt-1">
                       {participant.team.teamMembers.length} members
                     </span>
                   )}
                   {showLocation && hasStartingPosition && participant.startingLocation && (
-                    <span className="text-xs text-muted-foreground mt-1 block transition-opacity duration-200 hover:opacity-80">
+                    <span className="text-xs text-muted-foreground mt-1 block">
                       Site {participant.startingLocation.position}
                     </span>
                   )}
@@ -162,10 +162,10 @@ export function TeamCard({
                     className="transition-all duration-200 group-hover:ring-2 group-hover:ring-primary/30 data-[state=checked]:bg-primary/90 hover:data-[state=checked]:bg-primary"
                   />
                   <span className={cn(
-                    "text-xs px-2 py-0.5 rounded-full transition-all duration-200",
+                    "text-xs px-2 py-0.5 rounded-full",
                     isReady
-                      ? "text-green-500 bg-green-500/10 hover:bg-green-500/20"
-                      : "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20"
+                      ? "text-green-500 bg-green-500/10"
+                      : "text-yellow-500 bg-yellow-500/10"
                   )}>
                     {isReady ? "Ready" : "Not Ready"}
                   </span>
@@ -234,20 +234,20 @@ export function TeamCard({
   if (team) {
     return (
       <Link href={`/team/${team.id}`}>
-        <Card className="w-full transition-all duration-200 hover:bg-white/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
+        <Card className="w-full">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-110 hover:bg-primary/20 group">
-                <Users className="h-5 w-5 text-primary transition-transform duration-200 group-hover:scale-110" />
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold truncate transition-colors duration-200 hover:text-primary">{team.name}</h3>
+                <h3 className="font-semibold truncate">{team.name}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground transition-opacity duration-200 hover:opacity-80">
+                  <span className="text-xs text-muted-foreground">
                     W/L: {team.wins || 0}/{team.losses || 0}
                   </span>
                   {showMembers && (
-                    <span className="text-xs text-muted-foreground transition-opacity duration-200 hover:opacity-80">
+                    <span className="text-xs text-muted-foreground">
                       • {team.teamMembers.length} members
                     </span>
                   )}
