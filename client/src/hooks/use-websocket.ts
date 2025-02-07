@@ -44,8 +44,8 @@ export function useWebSocket(): WebSocketInterface {
     console.log('Initiating WebSocket connection...');
 
     try {
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+      // Simplified URL construction using the current host
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
       console.log('Connecting to WebSocket URL:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -99,6 +99,12 @@ export function useWebSocket(): WebSocketInterface {
         clearTimeout(connectionTimeout);
         console.error('WebSocket error:', error);
         isConnectingRef.current = false;
+
+        toast({
+          title: "Connection Error",
+          description: "WebSocket connection error occurred. Attempting to reconnect...",
+          variant: "destructive"
+        });
 
         if (wsRef.current) {
           wsRef.current.close();

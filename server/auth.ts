@@ -33,7 +33,12 @@ export async function verify(sessionId: string): Promise<User | null> {
     }
 
     // Parse session ID from cookie format
-    const sid = sessionId.replace('battle.sid=s:', '').split('.')[0];
+    const sid = sessionId.includes('battle.sid=s:') 
+      ? sessionId.replace('battle.sid=s:', '').split('.')[0]
+      : sessionId.includes('s:') 
+        ? sessionId.replace('s:', '').split('.')[0]
+        : sessionId;
+
     console.log("Attempting to verify session:", sid);
 
     return new Promise((resolve) => {
@@ -86,7 +91,8 @@ export function setupAuth(app: Express) {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       secure: false, // Allow non-HTTPS in development
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      path: '/'
     },
     store: sessionStore,
     name: 'battle.sid' // Custom session name
