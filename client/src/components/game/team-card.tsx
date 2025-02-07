@@ -131,18 +131,40 @@ export function TeamCard({
     return (
       <Card className="w-full hover:bg-white/5 transition-colors">
         <CardContent className="p-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <div>
-                  <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
-                  {showMembers && (
-                    <span className="text-xs text-muted-foreground mt-1">
-                      {participant.team.teamMembers.length} members
-                    </span>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="font-semibold truncate max-w-[200px]">{participant.team.name}</h3>
+                    {showMembers && (
+                      <span className="text-xs text-muted-foreground mt-1">
+                        {participant.team.teamMembers.length} members
+                      </span>
+                    )}
+                  </div>
+                  {canManageTeam && (
+                    <div className="flex items-center gap-4 ml-auto">
+                      <div className="flex items-center gap-4 justify-start">
+                        <Switch
+                          checked={isReady}
+                          onCheckedChange={handleReadyToggle}
+                          disabled={updateReadyStatus.isPending}
+                          className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+                        />
+                        <span className={cn(
+                          "text-sm px-3 py-1 rounded-full w-[90px] text-center",
+                          isReady
+                            ? "text-green-500 bg-green-500/10"
+                            : "text-yellow-500 bg-yellow-500/10"
+                        )}>
+                          {isReady ? "Ready" : "Not Ready"}
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
                 {showLocation && hasStartingPosition && participant.startingLocation && (
@@ -152,25 +174,6 @@ export function TeamCard({
                 )}
               </div>
             </div>
-
-            {canManageTeam && (
-              <div className="flex items-center gap-4 mt-4">
-                <Switch
-                  checked={isReady}
-                  onCheckedChange={handleReadyToggle}
-                  disabled={updateReadyStatus.isPending}
-                  className="group-hover:ring-2 group-hover:ring-primary/30 transition-all"
-                />
-                <span className={cn(
-                  "text-sm px-3 py-1 rounded-full w-[90px] text-center",
-                  isReady
-                    ? "text-green-500 bg-green-500/10"
-                    : "text-yellow-500 bg-yellow-500/10"
-                )}>
-                  {isReady ? "Ready" : "Not Ready"}
-                </span>
-              </div>
-            )}
 
             {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
