@@ -160,6 +160,9 @@ export default function Game() {
   });
 
 
+  const userTeamInGame = game?.participants?.some(p => p.userId === user?.id);
+
+
   if (!match || !gameId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -293,13 +296,20 @@ export default function Game() {
             </CardContent>
           </Card>
 
-          {isAdmin && game.status === 'pending' && (
+          {(isAdmin || !userTeamInGame) && game.status === 'pending' && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Assign Teams</CardTitle>
+                <CardTitle className="text-lg">
+                  {isAdmin ? "Assign Teams" : "Join Game"}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <SelectTeam gameId={game.id} />
+                <SelectTeam
+                  gameId={game.id}
+                  maxTeams={game.maxTeams}
+                  playersPerTeam={game.playersPerTeam}
+                  currentTeamCount={game.participants?.length || 0}
+                />
               </CardContent>
             </Card>
           )}

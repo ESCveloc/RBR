@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useUser } from "@/hooks/use-user";
 
 interface SelectTeamProps {
   gameId: number;
@@ -25,12 +26,18 @@ export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount 
   const { teams = [], isLoading: isLoadingTeams } = useTeams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useUser();
 
-  // Filter out inactive teams
-  const activeTeams = teams.filter(team => team.active);
+  // Get teams the user can join with (either captain or member)
+  const userTeams = teams.filter(team => 
+    team.active && (
+      team.captainId === user?.id || 
+      team.teamMembers?.some(member => member.userId === user?.id)
+    )
+  );
 
   // Pre-validate teams against game rules
-  const teamsWithValidation = activeTeams.map(team => ({
+  const teamsWithValidation = userTeams.map(team => ({
     ...team,
     isValid: team.teamMembers?.length <= playersPerTeam,
     validationMessage: team.teamMembers?.length > playersPerTeam 
@@ -60,8 +67,8 @@ export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       toast({
-        title: "Team Assigned",
-        description: "The team has been successfully assigned to the game.",
+        title: "Team Joined",
+        description: "Your team has been successfully joined to the game.",
       });
       setSelectedTeamId("");
     },
@@ -82,12 +89,22 @@ export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount 
     );
   }
 
+  if (userTeams.length === 0) {
+    return (
+      <Alert>
+        <AlertDescription>
+          You need to create or join a team first before you can participate in games.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (isGameFull) {
     return (
-      <Alert variant="destructive" className="mb-4">
+      <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          This game has reached its maximum number of teams ({maxTeams}). Contact an admin if you need to join.
+          This game has reached its maximum number of teams ({maxTeams}).
         </AlertDescription>
       </Alert>
     );
@@ -103,22 +120,16 @@ export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount 
             <SelectValue placeholder="Select a team to join with" />
           </SelectTrigger>
           <SelectContent>
-            {teamsWithValidation && teamsWithValidation.length > 0 ? (
-              teamsWithValidation.map((team) => (
-                <SelectItem 
-                  key={team.id} 
-                  value={String(team.id)}
-                  className={team.isValid ? "" : "text-destructive"}
-                >
-                  {team.name} ({team.teamMembers?.length || 0} members)
-                  {team.validationMessage && ` - ${team.validationMessage}`}
-                </SelectItem>
-              ))
-            ) : (
-              <SelectItem value="" disabled>
-                No active teams available - Create a team first
+            {teamsWithValidation.map((team) => (
+              <SelectItem 
+                key={team.id} 
+                value={String(team.id)}
+                className={team.isValid ? "" : "text-destructive"}
+              >
+                {team.name} ({team.teamMembers?.length || 0} members)
+                {team.validationMessage && ` - ${team.validationMessage}`}
               </SelectItem>
-            )}
+            ))}
           </SelectContent>
         </Select>
 
@@ -139,7 +150,7 @@ export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount 
           {assignTeam.isPending ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Assigning Team...
+              Joining Game...
             </>
           ) : (
             "Join Game with Selected Team"
