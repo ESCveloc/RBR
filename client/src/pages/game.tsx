@@ -262,7 +262,7 @@ export default function Game() {
                           Cancel
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="z-[9999] relative bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                      <AlertDialogContent className="fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
                         <AlertDialogHeader>
                           <AlertDialogTitle>Cancel Game?</AlertDialogTitle>
                           <AlertDialogDescription>
