@@ -25,18 +25,27 @@ export function useWebSocket(): WebSocketInterface {
   const isConnectingRef = useRef(false);
   const messageHandlersRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
 
-  const connect = useCallback(() => {
-    if (!user || isUserLoading || isConnectingRef.current) {
-      console.log('Skipping WebSocket connection:', {
-        hasUser: !!user,
-        isLoading: isUserLoading,
-        isConnecting: isConnectingRef.current
-      });
-      return;
+  const cleanupWebSocket = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
     }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
+    }
+    reconnectAttemptRef.current = 0;
+    isConnectingRef.current = false;
+    messageHandlersRef.current.clear();
+  }, []);
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
+  const connect = useCallback(() => {
+    // Don't attempt to connect if:
+    // 1. User is not logged in
+    // 2. User data is still loading
+    // 3. Already connecting
+    // 4. Already connected
+    if (!user || isUserLoading || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
@@ -44,10 +53,7 @@ export function useWebSocket(): WebSocketInterface {
     console.log('Initiating WebSocket connection...');
 
     try {
-      // Simplified URL construction using the current host
       const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
-      console.log('Connecting to WebSocket URL:', wsUrl);
-
       const ws = new WebSocket(wsUrl);
 
       const connectionTimeout = setTimeout(() => {
@@ -100,16 +106,15 @@ export function useWebSocket(): WebSocketInterface {
         console.error('WebSocket error:', error);
         isConnectingRef.current = false;
 
-        toast({
-          title: "Connection Error",
-          description: "WebSocket connection error occurred. Attempting to reconnect...",
-          variant: "destructive"
-        });
-
-        if (wsRef.current) {
-          wsRef.current.close();
-          wsRef.current = null;
+        if (user) {  // Only show error toast if user is logged in
+          toast({
+            title: "Connection Error",
+            description: "WebSocket connection error occurred. Attempting to reconnect...",
+            variant: "destructive"
+          });
         }
+
+        cleanupWebSocket();
       };
 
       ws.onclose = (event) => {
@@ -118,17 +123,18 @@ export function useWebSocket(): WebSocketInterface {
         wsRef.current = null;
         isConnectingRef.current = false;
 
+        // Only attempt to reconnect if:
+        // 1. User is logged in
+        // 2. Not manually cleaning up
+        // 3. Haven't exceeded max attempts
         if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
 
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-          }
-
           reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(connect, delay);
-        } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+        } else if (reconnectAttemptRef.current >= maxReconnectAttempts && user) {
+          // Only show error if user is still logged in
           toast({
             title: "Connection Error",
             description: "Failed to establish WebSocket connection after multiple attempts. Please refresh the page.",
@@ -139,13 +145,15 @@ export function useWebSocket(): WebSocketInterface {
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
       isConnectingRef.current = false;
-      toast({
-        title: "Connection Error",
-        description: "Failed to establish WebSocket connection",
-        variant: "destructive"
-      });
+      if (user) {  // Only show error toast if user is logged in
+        toast({
+          title: "Connection Error",
+          description: "Failed to establish WebSocket connection",
+          variant: "destructive"
+        });
+      }
     }
-  }, [user, isUserLoading, toast]);
+  }, [user, isUserLoading, toast, cleanupWebSocket]);
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -184,24 +192,20 @@ export function useWebSocket(): WebSocketInterface {
     };
   }, []);
 
+  // Effect to handle WebSocket lifecycle based on auth state
   useEffect(() => {
-    if (!isUserLoading && user) {
-      connect();
+    if (!isUserLoading) {
+      if (user) {
+        connect();
+      } else {
+        cleanupWebSocket();
+      }
     }
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      reconnectAttemptRef.current = 0;
-      isConnectingRef.current = false;
-      messageHandlersRef.current.clear();
+      cleanupWebSocket();
     };
-  }, [connect, user, isUserLoading]);
+  }, [connect, user, isUserLoading, cleanupWebSocket]);
 
   return {
     socket: wsRef.current,
