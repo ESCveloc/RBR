@@ -1473,8 +1473,8 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Team members count:', members.length, 'Max allowed:', game.playersPerTeam);
 
-      // Check team size limit (skip for admin)
-      if (!isAdmin && members.length > game.playersPerTeam) {
+      // Check team size limit (removed admin bypass)
+      if (members.length > game.playersPerTeam) {
         return res.status(400).send(
           `Team has too many players (${members.length}). Maximum allowed is ${game.playersPerTeam}.`
         );
