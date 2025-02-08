@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, LogOut } from "lucide-react";
+import { Users, LogOut, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -12,6 +12,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
@@ -249,16 +260,39 @@ export function TeamCard({
                 </div>
                 {canManageTeam && (
                   <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="default"
-                      onClick={() => leaveGame.mutate()}
-                      disabled={leaveGame.isPending}
-                      className="w-full max-w-[160px] transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
-                    >
-                      <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
-                      Leave
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="default"
+                          disabled={leaveGame.isPending}
+                          className="w-full max-w-[160px] transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
+                        >
+                          <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
+                          Leave
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Leave Game?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to leave the game? Your team will be removed from the game and cannot rejoin unless invited back.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => leaveGame.mutate()}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {leaveGame.isPending && (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            )}
+                            Leave Game
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
               </div>
