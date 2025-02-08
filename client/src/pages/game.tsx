@@ -243,7 +243,7 @@ export default function Game() {
                       size="sm"
                       onClick={() => handleStatusUpdate('cancelled')}
                       disabled={updateGameStatus.isPending}
-                      className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 border-2 border-destructive"
+                      className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 border-2 border-primary"
                     >
                       <X className="h-4 w-4 mr-2" />
                       Cancel
