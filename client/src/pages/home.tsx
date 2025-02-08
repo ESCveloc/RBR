@@ -80,7 +80,6 @@ export default function Home() {
     );
   }
 
-
   const activeGames = games?.filter(game => 
     game.status === "active" || game.status === "pending"
   );
@@ -180,12 +179,17 @@ export default function Home() {
                                 e.preventDefault();
                                 handleJoinGame(game.id, activeTeam.id);
                               }}
-                              disabled={joinGameMutation.isPending || (game.participants?.length ?? 0) >= game.maxTeams}
+                              disabled={
+                                joinGameMutation.isPending || 
+                                ((game.participants?.length ?? 0) >= game.maxTeams && user?.role !== 'admin')
+                              }
                             >
                               {joinGameMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                               ) : null}
-                              {(game.participants?.length ?? 0) >= game.maxTeams ? "Game Full" : "Join Game"}
+                              {(game.participants?.length ?? 0) >= game.maxTeams && user?.role !== 'admin' 
+                                ? "Game Full" 
+                                : "Join Game"}
                             </Button>
                           </CardFooter>
                         )}
