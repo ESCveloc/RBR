@@ -12,6 +12,7 @@ interface CustomWebSocket extends WebSocket {
   userId?: number;
   teamId?: number;
   isAlive?: boolean;
+  pingTimeout?: NodeJS.Timeout;
 }
 
 interface GameRoom {
@@ -25,6 +26,7 @@ interface GameRoom {
 class GameWebSocketServer extends WebSocketServer {
   private gameRooms: Map<number, GameRoom> = new Map();
   private updateThrottleMs = 100;
+  private pingInterval: NodeJS.Timeout;
 
   constructor(options: any) {
     super(options);
@@ -33,19 +35,29 @@ class GameWebSocketServer extends WebSocketServer {
   }
 
   private setupHeartbeat() {
-    const interval = setInterval(() => {
-      this.clients.forEach((client: CustomWebSocket) => {
-        if (!client.isAlive) {
-          client.terminate();
-          return;
+    this.pingInterval = setInterval(() => {
+      this.clients.forEach((ws: CustomWebSocket) => {
+        if (!ws.isAlive) {
+          console.log("Terminating inactive connection");
+          if (ws.pingTimeout) {
+            clearTimeout(ws.pingTimeout);
+          }
+          return ws.terminate();
         }
-        client.isAlive = false;
-        client.ping();
+
+        ws.isAlive = false;
+        ws.ping();
+
+        // Set a timeout for the pong response
+        ws.pingTimeout = setTimeout(() => {
+          console.log("Ping timeout, terminating connection");
+          ws.terminate();
+        }, 10000); // 10 second timeout
       });
-    }, 30000);
+    }, 30000); // Send ping every 30 seconds
 
     this.on('close', () => {
-      clearInterval(interval);
+      clearInterval(this.pingInterval);
     });
   }
 
@@ -57,7 +69,11 @@ class GameWebSocketServer extends WebSocketServer {
 
     room.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(messageStr);
+        try {
+          client.send(messageStr);
+        } catch (error) {
+          console.error("Error sending message to client:", error);
+        }
       }
     });
   }
@@ -116,6 +132,7 @@ class GameWebSocketServer extends WebSocketServer {
     if (room) {
       room.clients.add(client);
       client.gameId = gameId;
+      console.log(`Client joined game ${gameId}`);
     }
   }
 
@@ -129,6 +146,7 @@ class GameWebSocketServer extends WebSocketServer {
         }
       }
       client.gameId = undefined;
+      console.log(`Client left game`);
     }
   }
 }
@@ -210,6 +228,9 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on('pong', () => {
       ws.isAlive = true;
+      if (ws.pingTimeout) {
+        clearTimeout(ws.pingTimeout);
+      }
     });
 
     ws.on('message', async (data) => {
@@ -259,6 +280,9 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on('close', () => {
       console.log('WebSocket connection closed');
+      if (ws.pingTimeout) {
+        clearTimeout(ws.pingTimeout);
+      }
       wss.leaveGame(ws);
     });
   });
