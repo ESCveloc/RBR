@@ -264,9 +264,9 @@ export function TeamCard({
                       size="default"
                       onClick={() => setSelectedPosition(participant?.startingLocation?.position?.toString() || "")}
                       disabled={updateLocation.isPending}
-                      className="w-full max-w-[160px] ml-2 transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
+                      className="w-full max-w-[160px] ml-2 transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 group"
                     >
-                      <X className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
+                      <X className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:-translate-x-1" />
                       Cancel
                     </Button>
                   </div>
