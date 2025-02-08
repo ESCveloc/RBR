@@ -1394,7 +1394,6 @@ export function registerRoutes(app: Express): Server {
     return availablePositions[Math.floor(Math.random() * availablePositions.length)];
   }
 
-  // Update join game endpoint
   app.post("/api/games/:gameId/join", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -1403,6 +1402,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const gameId = parseInt(req.params.gameId);
       const { teamId } = req.body;
+      const isAdmin = req.user.role === 'admin';
 
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
@@ -1430,12 +1430,24 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
-      if (team.captainId !== req.user.id && req.user.role !== 'admin') {
+      if (team.captainId !== req.user.id && !isAdmin) {
         return res.status(403).send("Only team captain or admin can join games");
       }
 
+      // Check team size against game settings
+      const teamMembers = await db
+        .select()
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, teamId));
+
+      if (!isAdmin && teamMembers.length > game.playersPerTeam) {
+        return res.status(400).send(
+          `Team has ${teamMembers.length} players but game allows maximum of ${game.playersPerTeam} players per team`
+        );
+      }
+
       // Check if team is already participating
-      const [existingParticipant] = await db
+      const existingParticipant = await db
         .select()
         .from(gameParticipants)
         .where(
@@ -1444,7 +1456,8 @@ export function registerRoutes(app: Express): Server {
             eq(gameParticipants.teamId, teamId)
           )
         )
-        .limit(1);
+        .limit(1)
+        .then(results => results[0]);
 
       if (existingParticipant) {
         return res.status(400).send("Team is already participating in this game");
@@ -1456,8 +1469,9 @@ export function registerRoutes(app: Express): Server {
         .from(gameParticipants)
         .where(eq(gameParticipants.gameId, gameId));
 
-      if (participants.length >= game.maxTeams) {
-        return res.status(400).send("Game is full");
+      // Check max teams limit (skip for admin)
+      if (!isAdmin && participants.length >= game.maxTeams) {
+        return res.status(400).send(`Game is full (maximum ${game.maxTeams} teams)`);
       }
 
       // Get a random available position
@@ -1509,10 +1523,7 @@ export function registerRoutes(app: Express): Server {
         ...participant,
         team: {
           ...team,
-          teamMembers: await db
-            .select()
-            .from(teamMembers)
-            .where(eq(teamMembers.teamId, teamId))
+          teamMembers
         }
       };
 
