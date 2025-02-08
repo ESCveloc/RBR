@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import type { GameParticipant, Team } from "@db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, LogOut } from "lucide-react";
+import { Users, LogOut, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -258,6 +258,16 @@ export function TeamCard({
                     >
                       <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
                       Leave
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => setSelectedPosition(participant?.startingLocation?.position?.toString() || "")}
+                      disabled={updateLocation.isPending}
+                      className="w-full max-w-[160px] ml-2 transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
+                    >
+                      <X className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:translate-x-1" />
+                      Cancel
                     </Button>
                   </div>
                 )}
