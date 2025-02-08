@@ -1441,26 +1441,13 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Found team:', team);
 
+      // Check permissions
       if (team.captainId !== req.user.id && !isAdmin) {
         console.log('Permission denied - not captain or admin:', { captainId: team.captainId, userId: req.user.id, isAdmin });
         return res.status(403).send("Only team captain or admin can join games");
       }
 
-      // Check team size against game settings
-      const teamMembers = await db
-        .select()
-        .from(teamMembers)
-        .where(eq(teamMembers.teamId, teamId));
-
-      console.log('Team members count:', teamMembers.length, 'Max allowed:', game.playersPerTeam);
-
-      if (!isAdmin && teamMembers.length > game.playersPerTeam) {
-        return res.status(400).send(
-          `Team has ${teamMembers.length} players but game allows maximum of ${game.playersPerTeam} players per team`
-        );
-      }
-
-      // Check if team is already participating
+      // Get existing participants
       const existingParticipant = await db
         .select()
         .from(gameParticipants)
@@ -1476,6 +1463,21 @@ export function registerRoutes(app: Express): Server {
       if (existingParticipant) {
         console.log('Team already participating:', { gameId, teamId });
         return res.status(400).send("Team is already participating in this game");
+      }
+
+      // Get team members count
+      const members = await db
+        .select()
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, teamId));
+
+      console.log('Team members count:', members.length, 'Max allowed:', game.playersPerTeam);
+
+      // Check team size limit (skip for admin)
+      if (!isAdmin && members.length > game.playersPerTeam) {
+        return res.status(400).send(
+          `Team has too many players (${members.length}). Maximum allowed is ${game.playersPerTeam}.`
+        );
       }
 
       // Count current participants
@@ -1518,7 +1520,7 @@ export function registerRoutes(app: Express): Server {
           ...participant,
           team: {
             ...team,
-            teamMembers
+            teamMembers: members
           }
         }
       };
