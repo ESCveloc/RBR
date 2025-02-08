@@ -17,6 +17,18 @@ import { SelectTeam } from "@/components/game/select-team";
 import { useWebSocket } from "@/hooks/use-websocket";
 import type { Game } from "@db/schema";
 import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"; // Assuming this import is correct
+
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -238,16 +250,39 @@ export default function Game() {
                         </>
                       )}
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleStatusUpdate('cancelled')}
-                      disabled={updateGameStatus.isPending}
-                      className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 border-2 border-primary"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={updateGameStatus.isPending}
+                          className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 border-2 border-primary"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel Game?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action will cancel the game. All teams will be removed and the game cannot be restarted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Go Back</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleStatusUpdate('cancelled')}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {updateGameStatus.isPending && (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            )}
+                            Cancel Game
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 )}
                 {game.status === 'active' && (
