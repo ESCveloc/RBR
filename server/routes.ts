@@ -1378,20 +1378,23 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add helper function for random position assignment
-  function getRandomAvailablePosition(game: any, participants: any[]) {
-    const maxTeams = game.maxTeams || 10;
+  async function assignRandomPosition(gameId: number, maxTeams: number): Promise<{ position: number; coordinates: null } | null> {
+    const participants = await db
+      .select()
+      .from(gameParticipants)
+      .where(eq(gameParticipants.gameId, gameId));
+
     const takenPositions = participants
       .filter(p => p.startingLocation)
       .map(p => p.startingLocation.position);
 
-    // Get all available positions
     const availablePositions = Array.from({ length: maxTeams }, (_, i) => i + 1)
       .filter(pos => !takenPositions.includes(pos));
 
     if (availablePositions.length === 0) return null;
 
-    // Return a random position from available ones
-    return availablePositions[Math.floor(Math.random() * availablePositions.length)];
+    const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+    return { position: randomPosition, coordinates: null };
   }
 
   app.post("/api/games/:gameId/join", async (req, res) => {
@@ -1403,6 +1406,8 @@ export function registerRoutes(app: Express): Server {
       const gameId = parseInt(req.params.gameId);
       const { teamId } = req.body;
       const isAdmin = req.user.role === 'admin';
+
+      console.log('Join game request:', { gameId, teamId, userId: req.user.id, isAdmin });
 
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
@@ -1416,10 +1421,13 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!game) {
+        console.log('Game not found:', gameId);
         return res.status(404).send("Game not found");
       }
 
-      // Check if team exists and user is captain or admin
+      console.log('Found game:', game);
+
+      // Get team details
       const [team] = await db
         .select()
         .from(teams)
@@ -1427,10 +1435,14 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!team) {
+        console.log('Team not found:', teamId);
         return res.status(404).send("Team not found");
       }
 
+      console.log('Found team:', team);
+
       if (team.captainId !== req.user.id && !isAdmin) {
+        console.log('Permission denied - not captain or admin:', { captainId: team.captainId, userId: req.user.id, isAdmin });
         return res.status(403).send("Only team captain or admin can join games");
       }
 
@@ -1439,6 +1451,8 @@ export function registerRoutes(app: Express): Server {
         .select()
         .from(teamMembers)
         .where(eq(teamMembers.teamId, teamId));
+
+      console.log('Team members count:', teamMembers.length, 'Max allowed:', game.playersPerTeam);
 
       if (!isAdmin && teamMembers.length > game.playersPerTeam) {
         return res.status(400).send(
@@ -1460,77 +1474,59 @@ export function registerRoutes(app: Express): Server {
         .then(results => results[0]);
 
       if (existingParticipant) {
+        console.log('Team already participating:', { gameId, teamId });
         return res.status(400).send("Team is already participating in this game");
       }
 
-      // Get all current participants
+      // Count current participants
       const participants = await db
         .select()
         .from(gameParticipants)
         .where(eq(gameParticipants.gameId, gameId));
+
+      console.log('Current participant count:', participants.length, 'Max teams:', game.maxTeams);
 
       // Check max teams limit (skip for admin)
       if (!isAdmin && participants.length >= game.maxTeams) {
         return res.status(400).send(`Game is full (maximum ${game.maxTeams} teams)`);
       }
 
-      // Get a random available position
-      const position = getRandomAvailablePosition(game, participants);
-      if (!position) {
-        return res.status(400).send("No available positions");
-      }
+      // Get available positions and assign one
+      const assignedPosition = await assignRandomPosition(gameId, game.maxTeams);
+      console.log('Assigned position:', assignedPosition);
 
-      // Calculate position coordinates
-      const coordinates = game.boundaries.geometry.coordinates[0];
-      const center = coordinates.reduce(
-        (acc: { lat: number; lng: number }, [lng, lat]: number[]) => ({
-          lat: acc.lat + lat / coordinates.length,
-          lng: acc.lng + lng / coordinates.length
-        }),
-        { lat: 0, lng: 0 }
-      );
-
-      const radius = Math.max(...coordinates.map(([lng, lat]: number[]) => {
-        const latDiff = center.lat - lat;
-        const lngDiff = center.lng - lng;
-        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-      }));
-
-      // Convert position to angle (clockwise from north)
-      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
-      const safetyFactor = 0.9; // Keep points inside the boundary
-      const x = center.lng + (radius * safetyFactor * Math.cos(angle));
-      const y = center.lat + (radius * safetyFactor * Math.sin(angle));
-
-      // Insert new participant with random position
+      // Create participant
       const [participant] = await db
         .insert(gameParticipants)
         .values({
           gameId,
           teamId,
-          status: "alive",
           ready: false,
-          startingLocation: {
-            position,
-            coordinates: { lat: y, lng: x }
-          },
-          startingLocationAssignedAt: new Date()
+          status: "alive",
+          startingLocation: assignedPosition ? {
+            position: assignedPosition.position,
+            coordinates: null // Will be calculated when game starts
+          } : null
         })
         .returning();
 
+      console.log('Created participant:', participant);
+
       // Return full participant data with team info
-      const fullParticipant = {
-        ...participant,
-        team: {
-          ...team,
-          teamMembers
+      const response = {
+        participant: {
+          ...participant,
+          team: {
+            ...team,
+            teamMembers
+          }
         }
       };
 
-      res.json({ participant: fullParticipant });
+      res.json(response);
     } catch (error) {
-      console.error("Join game error:", error);
-      res.status(500).send("Failed to join game");
+      console.error('Error joining game:', error);
+      res.status(500).send(error instanceof Error ? error.message : "Failed to join game");
     }
   });
 
