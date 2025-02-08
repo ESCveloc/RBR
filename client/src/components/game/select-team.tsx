@@ -10,13 +10,17 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SelectTeamProps {
   gameId: number;
+  maxTeams: number;
+  playersPerTeam: number;
+  currentTeamCount: number;
 }
 
-export function SelectTeam({ gameId }: SelectTeamProps) {
+export function SelectTeam({ gameId, maxTeams, playersPerTeam, currentTeamCount }: SelectTeamProps) {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const { teams = [], isLoading: isLoadingTeams } = useTeams();
   const { toast } = useToast();
@@ -24,6 +28,17 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
 
   // Filter out inactive teams
   const activeTeams = teams.filter(team => team.active);
+
+  // Pre-validate teams against game rules
+  const teamsWithValidation = activeTeams.map(team => ({
+    ...team,
+    isValid: team.teamMembers?.length <= playersPerTeam,
+    validationMessage: team.teamMembers?.length > playersPerTeam 
+      ? `Too many players (has ${team.teamMembers?.length}, max ${playersPerTeam})`
+      : null
+  }));
+
+  const isGameFull = currentTeamCount >= maxTeams;
 
   const assignTeam = useMutation({
     mutationFn: async () => {
@@ -67,39 +82,67 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     );
   }
 
+  if (isGameFull) {
+    return (
+      <Alert variant="destructive" className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          This game has reached its maximum number of teams ({maxTeams}). Contact an admin if you need to join.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const selectedTeam = teamsWithValidation.find(t => t.id.toString() === selectedTeamId);
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-4">
         <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a team" />
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a team to join with" />
           </SelectTrigger>
           <SelectContent>
-            {activeTeams && activeTeams.length > 0 ? (
-              activeTeams.map((team) => (
+            {teamsWithValidation && teamsWithValidation.length > 0 ? (
+              teamsWithValidation.map((team) => (
                 <SelectItem 
                   key={team.id} 
                   value={String(team.id)}
+                  className={team.isValid ? "" : "text-destructive"}
                 >
-                  {team.name} ({team.member_count || team.teamMembers?.length || 0} members)
+                  {team.name} ({team.teamMembers?.length || 0} members)
+                  {team.validationMessage && ` - ${team.validationMessage}`}
                 </SelectItem>
               ))
             ) : (
               <SelectItem value="" disabled>
-                No active teams available
+                No active teams available - Create a team first
               </SelectItem>
             )}
           </SelectContent>
         </Select>
 
+        {selectedTeam && !selectedTeam.isValid && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {selectedTeam.validationMessage}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Button
           onClick={() => assignTeam.mutate()}
-          disabled={!selectedTeamId || assignTeam.isPending}
+          disabled={!selectedTeamId || assignTeam.isPending || (selectedTeam && !selectedTeam.isValid)}
+          className="w-full"
         >
           {assignTeam.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Assigning Team...
+            </>
           ) : (
-            "Assign"
+            "Join Game with Selected Team"
           )}
         </Button>
       </div>
