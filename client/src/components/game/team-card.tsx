@@ -72,8 +72,14 @@ export function TeamCard({
   const hasStartingPosition = participant?.startingLocation !== null;
   const canManageTeam = isAdmin || isCaptain;
 
-  // Get taken positions from the game data
+  // Get game data for player limits
   const game = queryClient.getQueryData<any>([`/api/games/${gameId}`]);
+  const maxPlayers = game?.playersPerTeam || 0;
+  const currentTeamSize = participant?.team?.teamMembers?.length || team?.teamMembers?.length || 0;
+  const isOverPlayerLimit = maxPlayers > 0 && currentTeamSize > maxPlayers;
+
+
+  // Get taken positions from the game data
   const takenPositions = game?.participants
     ?.filter((p: any) => p.teamId !== participant?.teamId && p.startingLocation)
     ?.map((p: any) => p.startingLocation?.position)
@@ -160,9 +166,20 @@ export function TeamCard({
                     {participant.team.name}
                   </h3>
                   {showMembers && participant.team.teamMembers && (
-                    <span className="text-xs text-muted-foreground mt-1">
-                      {participant.team.teamMembers.length} members
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={cn(
+                        "text-xs",
+                        isOverPlayerLimit ? "text-red-500" : "text-muted-foreground"
+                      )}>
+                        {participant.team.teamMembers.length} members
+                        {maxPlayers > 0 && ` (max ${maxPlayers})`}
+                      </span>
+                      {isOverPlayerLimit && (
+                        <span className="text-xs text-red-500">
+                          ⚠️ Exceeds game player limit
+                        </span>
+                      )}
+                    </div>
                   )}
                   {showLocation && hasStartingPosition && participant.startingLocation && (
                     <span className="text-xs text-muted-foreground mt-1 block">

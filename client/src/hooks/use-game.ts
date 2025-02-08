@@ -225,7 +225,8 @@ export function useGame(gameId: number) {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        throw new Error(errorText);
       }
 
       const data = await response.json();
@@ -250,10 +251,18 @@ export function useGame(gameId: number) {
         description: "Successfully joined the game",
       });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
+      let errorMessage = err.message;
+      // Enhance error messages for specific cases
+      if (errorMessage.includes("playersPerTeam")) {
+        errorMessage = "Your team has too many players for this game. Remove some players or contact an admin.";
+      } else if (errorMessage.includes("maxTeams")) {
+        errorMessage = "This game has reached its maximum number of teams. Contact an admin if you need to join.";
+      }
+
       toast({
         title: "Error joining game",
-        description: err.message,
+        description: errorMessage,
         variant: "destructive"
       });
     }
