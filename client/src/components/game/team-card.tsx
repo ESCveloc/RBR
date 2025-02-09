@@ -96,6 +96,9 @@ export function TeamCard({
     ?.map((p: any) => p.startingLocation?.position)
     ?.filter(Boolean) || [];
 
+  // Define steps for position selection, based on typical game sizes
+  const positionSteps = [1, 10, 25, 50, 75, 100];
+
   const handlePositionChange = async (value: string) => {
     if (!participant?.teamId) {
       console.log('No team ID available for position update');
@@ -106,8 +109,8 @@ export function TeamCard({
     try {
       // Parse and validate the position
       const position = parseInt(value);
-      if (isNaN(position) || position < 1 || position > 1000) {
-        throw new Error("Position must be between 1 and 1000");
+      if (isNaN(position) || position < 1 || position > 100) {
+        throw new Error("Position must be between 1 and 100");
       }
 
       // Always include isAdmin flag in the mutation
@@ -117,9 +120,12 @@ export function TeamCard({
         force: isAdmin // Pass the admin force parameter
       });
 
+      // After successful update, invalidate the game query to refresh the UI
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+
       toast({
         title: "Success",
-        description: "Position updated successfully",
+        description: "Starting position assigned successfully",
       });
     } catch (error) {
       console.error('Failed to update position:', error);
@@ -252,13 +258,13 @@ export function TeamCard({
                           <Input
                             type="number"
                             min={1}
-                            max={1000}
+                            max={100}
                             value={selectedPosition}
                             onChange={(e) => handlePositionChange(e.target.value)}
-                            placeholder="Enter position (1-1000)"
+                            placeholder="Enter position (1-100)"
                             className="mb-2"
                           />
-                          {[1, 100, 250, 500, 750, 1000].map((pos) => (
+                          {positionSteps.map((pos) => (
                             <SelectItem
                               key={pos}
                               value={String(pos)}
@@ -276,7 +282,7 @@ export function TeamCard({
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        {isAdmin ? "Admin can assign any position (1-1000)" : "Select or enter a position"}
+                        {isAdmin ? "Admin can assign any position (1-100)" : "Select or enter a position"}
                       </p>
                     </div>
                   )}
