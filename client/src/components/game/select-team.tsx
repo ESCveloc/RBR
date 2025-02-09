@@ -37,6 +37,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
+      // Remove the game full check for admins, they can always add teams
       if (isGameFull && !isAdmin) {
         throw new Error("Game has reached maximum number of teams");
       }
@@ -44,7 +45,11 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
       const response = await fetch(`/api/games/${gameId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
+        body: JSON.stringify({ 
+          teamId: parseInt(selectedTeamId),
+          // Add force parameter for admin override
+          force: isAdmin 
+        }),
         credentials: 'include'
       });
 
@@ -106,7 +111,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
 
         <Button
           onClick={() => assignTeam.mutate()}
-          disabled={!selectedTeamId || (isGameFull && !isAdmin) || assignTeam.isPending}
+          disabled={!selectedTeamId || assignTeam.isPending}
           className={isGameFull && !isAdmin ? "opacity-50 cursor-not-allowed" : ""}
         >
           {assignTeam.isPending ? (
