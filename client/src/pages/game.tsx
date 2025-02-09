@@ -142,17 +142,10 @@ export default function Game() {
     mutationFn: async ({ teamId, force = false }: { teamId: number; force?: boolean }) => {
       if (!gameId) return;
 
-      // Use a larger fixed range (1-1000) for random positions
-      const randomPosition = Math.floor(Math.random() * 1000) + 1;
-
       const response = await fetch(`/api/games/${gameId}/assign-position`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          teamId,
-          force,
-          position: randomPosition
-        }),
+        body: JSON.stringify({ teamId, force }),
         credentials: 'include'
       });
 

@@ -28,7 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { useGame } from "@/hooks/use-game";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 
 interface TeamCardProps {
   gameId?: number;
@@ -96,8 +95,8 @@ export function TeamCard({
     ?.map((p: any) => p.startingLocation?.position)
     ?.filter(Boolean) || [];
 
-  // Define steps for position selection, based on typical game sizes
-  const positionSteps = [1, 10, 25, 50, 75, 100];
+  // Generate available positions array [1..10] for the clockwise pattern
+  const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const handlePositionChange = async (value: string) => {
     if (!participant?.teamId) {
@@ -107,36 +106,15 @@ export function TeamCard({
 
     setSelectedPosition(value);
     try {
-      // Parse and validate the position
-      const position = parseInt(value);
-      if (isNaN(position) || position < 1 || position > 100) {
-        throw new Error("Position must be between 1 and 100");
-      }
-
-      // Always include isAdmin flag in the mutation
       await updateLocation.mutateAsync({
         teamId: participant.teamId,
-        position,
-        force: isAdmin // Pass the admin force parameter
-      });
-
-      // After successful update, invalidate the game query to refresh the UI
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-
-      toast({
-        title: "Success",
-        description: "Starting position assigned successfully",
+        position: parseInt(value),
+        force: isAdmin
       });
     } catch (error) {
       console.error('Failed to update position:', error);
       // Reset to previous position on error
       setSelectedPosition(participant.startingLocation?.position?.toString() || "");
-      // Show error toast
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update position",
-        variant: "destructive",
-      });
     }
   };
 
@@ -244,47 +222,40 @@ export function TeamCard({
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
                   {(canAssignPosition || isAdmin) && (
-                    <div className="space-y-2">
-                      <Select
-                        value={selectedPosition}
-                        onValueChange={handlePositionChange}
-                      >
-                        <SelectTrigger className="w-full max-w-[160px] transition-all duration-200 hover:border-primary focus:ring-primary">
-                          <SelectValue placeholder="Select Site">
-                            {selectedPosition ? `Site ${selectedPosition}` : "Select Site"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={selectedPosition}
-                            onChange={(e) => handlePositionChange(e.target.value)}
-                            placeholder="Enter position (1-100)"
-                            className="mb-2"
-                          />
-                          {positionSteps.map((pos) => (
+                    <Select
+                      value={selectedPosition}
+                      onValueChange={handlePositionChange}
+                    >
+                      <SelectTrigger className="w-full max-w-[160px] transition-all duration-200 hover:border-primary focus:ring-primary">
+                        <SelectValue placeholder="Select Site">
+                          {selectedPosition ? `Site ${selectedPosition}` : "Select Site"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map((pos) => {
+                          const isTaken = takenPositions.includes(pos);
+                          const isCurrentPosition = pos === participant?.startingLocation?.position;
+                          return (
                             <SelectItem
                               key={pos}
                               value={String(pos)}
+                              disabled={isTaken && !isCurrentPosition && !isAdmin}
                               className={cn(
                                 "transition-all duration-200",
-                                pos === parseInt(selectedPosition) && "text-primary font-medium",
+                                isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
+                                isCurrentPosition && "text-primary font-medium",
                                 "hover:bg-primary/10"
                               )}
                             >
                               Site {pos}
-                              {takenPositions.includes(pos) && !isAdmin && " (Taken)"}
-                              {pos === parseInt(selectedPosition) && " (Current)"}
+                              {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
+                              {isCurrentPosition && " (Current)"}
+                              {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {isAdmin ? "Admin can assign any position (1-100)" : "Select or enter a position"}
-                      </p>
-                    </div>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
                 {canManageTeam && (
