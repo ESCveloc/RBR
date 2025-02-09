@@ -89,7 +89,6 @@ export function TeamCard({
   const currentTeamSize = participant?.team?.teamMembers?.length || team?.teamMembers?.length || 0;
   const isOverPlayerLimit = maxPlayers > 0 && currentTeamSize > maxPlayers;
 
-
   // Get taken positions from the game data
   const takenPositions = game?.participants
     ?.filter((p: any) => p.teamId !== participant?.teamId && p.startingLocation)
@@ -222,7 +221,7 @@ export function TeamCard({
             {participant.status !== "eliminated" && (
               <div className="grid gap-4 md:grid-cols-2 border-t mt-4 pt-4">
                 <div>
-                  {canAssignPosition && (
+                  {(canAssignPosition || isAdmin) && (
                     <Select
                       value={selectedPosition}
                       onValueChange={handlePositionChange}
@@ -240,17 +239,18 @@ export function TeamCard({
                             <SelectItem
                               key={pos}
                               value={String(pos)}
-                              disabled={isTaken && !isCurrentPosition}
+                              disabled={isTaken && !isCurrentPosition && !isAdmin}
                               className={cn(
                                 "transition-all duration-200",
-                                isTaken && !isCurrentPosition && "opacity-50",
+                                isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
                                 isCurrentPosition && "text-primary font-medium",
                                 "hover:bg-primary/10"
                               )}
                             >
                               Site {pos}
-                              {isTaken && !isCurrentPosition && " (Taken)"}
+                              {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
                               {isCurrentPosition && " (Current)"}
+                              {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
                             </SelectItem>
                           );
                         })}
