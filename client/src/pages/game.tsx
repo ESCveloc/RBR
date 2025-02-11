@@ -321,7 +321,7 @@ export default function Game() {
               <div className="space-y-2">
                   <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
                   <p>
-                    <strong>Teams:</strong> {game.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0} / {game.maxTeams}
+                    <strong>Teams:</strong> {game.participants?.filter(p => p.startingLocation !== null)?.length || 0} / {game.maxTeams}
                   </p>
                   <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
                   {game.startTime && (

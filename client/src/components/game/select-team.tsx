@@ -26,7 +26,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
 
   // Get game data for team limits
   const game = queryClient.getQueryData<any>([`/api/games/${gameId}`]);
-  const currentTeamCount = game?.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0;
+  const currentTeamCount = game?.participants?.filter(p => p.startingLocation !== null)?.length || 0;
   const isGameFull = currentTeamCount >= (game?.maxTeams || 0);
   const isAdmin = user?.role === 'admin';
 
