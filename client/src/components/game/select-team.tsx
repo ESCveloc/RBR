@@ -37,7 +37,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
-      // Remove game full check for admins
+      // Only apply the game full check for non-admin users
       if (isGameFull && !isAdmin) {
         throw new Error("Game has reached maximum number of teams");
       }
@@ -120,11 +120,6 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
       {isGameFull && !isAdmin && (
         <p className="text-sm text-destructive">
           Game has reached the maximum number of teams
-        </p>
-      )}
-      {isGameFull && isAdmin && (
-        <p className="text-sm text-yellow-500">
-          Game is full, but you can still add teams as an admin
         </p>
       )}
     </div>

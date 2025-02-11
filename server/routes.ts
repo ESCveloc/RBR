@@ -941,9 +941,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Team already has a starting position. Contact an administrator to change it.");
       }
 
-      // Check if the position is valid
-      if (position < 1 || position > game.maxTeams) {
-        return res.status(400).send(`Invalid position. Must be between 1 and ${game.maxTeams}`);
+      // Check if the position is valid (using fixed number of starting positions)
+      const TOTAL_STARTING_POSITIONS = 10;
+      if (position < 1 || position > TOTAL_STARTING_POSITIONS) {
+        return res.status(400).send(`Invalid position. Must be between 1 and ${TOTAL_STARTING_POSITIONS}`);
       }
 
       // Check if the requested position is already taken by another team
@@ -964,7 +965,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("This position is already taken by another team. Please select a different position.");
       }
 
-      // Calculate position coordinates based on 1-based position
+      // Calculate position coordinates based on boundaries
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -980,8 +981,8 @@ export function registerRoutes(app: Express): Server {
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
-      // Convert 1-based position to angle
-      const angle = (-1 * (position - 1) * 2 * Math.PI / game.maxTeams) + (Math.PI / 2);
+      // Convert position to angle (evenly distributed around the circle)
+      const angle = (-1 * (position - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
@@ -1003,15 +1004,6 @@ export function registerRoutes(app: Express): Server {
           )
         )
         .returning();
-
-      // Notify other clients about the update
-      const wsServer = global.gameWebSocketServer;
-      if (wsServer) {
-        wsServer.broadcastToGame(gameId, {
-          type: 'GAME_UPDATE',
-          gameId: gameId
-        });
-      }
 
       res.json(updatedParticipant);
     } catch (error) {

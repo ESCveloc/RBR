@@ -27,8 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from "@/components/ui/alert-dialog"; // Assuming this import is correct
-
+} from "@/components/ui/alert-dialog";
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -321,7 +320,10 @@ export default function Game() {
               <div className="space-y-2">
                   <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
                   <p>
-                    <strong>Teams:</strong> {game.participants?.filter(p => p.startingLocation !== null)?.length || 0} / {game.maxTeams}
+                    <strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}
+                  </p>
+                  <p>
+                    <strong>Assigned Positions:</strong> {game.participants?.filter(p => p.startingLocation !== null)?.length || 0}
                   </p>
                   <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
                   {game.startTime && (
