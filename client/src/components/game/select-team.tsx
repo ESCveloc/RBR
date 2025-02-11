@@ -26,7 +26,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
 
   // Get game data for team limits
   const game = queryClient.getQueryData<any>([`/api/games/${gameId}`]);
-  const currentTeamCount = game?.participants?.length || 0;
+  const currentTeamCount = game?.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0;
   const isGameFull = currentTeamCount >= (game?.maxTeams || 0);
   const isAdmin = user?.role === 'admin';
 
@@ -37,6 +37,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
     mutationFn: async () => {
       if (!selectedTeamId) return;
 
+      // Remove game full check for admins
       if (isGameFull && !isAdmin) {
         throw new Error("Game has reached maximum number of teams");
       }
@@ -44,7 +45,7 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
       const response = await fetch(`/api/games/${gameId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: parseInt(selectedTeamId) }),
+        body: JSON.stringify({ teamId: parseInt(selectedTeamId), force: isAdmin }),
         credentials: 'include'
       });
 
@@ -106,13 +107,13 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
 
         <Button
           onClick={() => assignTeam.mutate()}
-          disabled={!selectedTeamId || (isGameFull && !isAdmin) || assignTeam.isPending}
-          className={isGameFull && !isAdmin ? "opacity-50 cursor-not-allowed" : ""}
+          disabled={!selectedTeamId || assignTeam.isPending}
+          className={isGameFull && !isAdmin ? "opacity-50" : ""}
         >
           {assignTeam.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            isGameFull && !isAdmin ? "Game Full" : "Assign"
+            "Assign"
           )}
         </Button>
       </div>
