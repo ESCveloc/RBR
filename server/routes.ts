@@ -970,7 +970,7 @@ export function registerRoutes(app: Express): Server {
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
           lat: acc.lat + lat / coordinates.length,
-          lng: acc.lng + lng / coordinates.length
+          lng: acc.lng + lng / coordinateslength
         }),
         { lat: 0, lng: 0 }
       );
@@ -1009,6 +1009,110 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Assign position error:", error);
       res.status(500).send("Failed to assign position");
+    }
+  });
+
+  // Add random position assignment endpoint
+  app.post("/api/games/:gameId/assign-random-position", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const gameId = parseInt(req.params.gameId);
+      const { teamId } = req.body;
+
+      if (isNaN(gameId)) {
+        return res.status(400).send("Invalid game ID");
+      }
+
+      // Get game details
+      const [game] = await db
+        .select()
+        .from(games)
+        .where(eq(games.id, gameId))
+        .limit(1);
+
+      if (!game) {
+        return res.status(404).send("Game not found");
+      }
+
+      if (game.status !== "pending") {
+        return res.status(400).send("Positions can only be assigned before the game starts");
+      }
+
+      // Get all taken positions
+      const participants = await db
+        .select()
+        .from(gameParticipants)
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            ne(gameParticipants.teamId, teamId)
+          )
+        );
+
+      const takenPositions = participants
+        .filter(p => p.startingLocation !== null)
+        .map(p => p.startingLocation.position);
+
+      // Generate array of available positions (1-10)
+      const TOTAL_STARTING_POSITIONS = 10;
+      const availablePositions = Array.from(
+        { length: TOTAL_STARTING_POSITIONS },
+        (_, i) => i + 1
+      ).filter(pos => !takenPositions.includes(pos));
+
+      if (availablePositions.length === 0) {
+        return res.status(400).send("No available positions left");
+      }
+
+      // Randomly select from available positions
+      const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+
+      // Calculate coordinates for the selected position
+      const coordinates = game.boundaries.geometry.coordinates[0];
+      const center = coordinates.reduce(
+        (acc, [lng, lat]) => ({
+          lat: acc.lat + lat / coordinates.length,
+          lng: acc.lng + lng / coordinates.length
+        }),
+        { lat: 0, lng: 0 }
+      );
+
+      const radius = Math.max(...coordinates.map(([lng, lat]) => {
+        const latDiff = center.lat - lat;
+        const lngDiff = center.lng - lng;
+        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      }));
+
+      const angle = (-1 * (randomPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
+      const safetyFactor = 0.9;
+      const x = center.lng + (radius * safetyFactor * Math.cos(angle));
+      const y = center.lat + (radius * safetyFactor * Math.sin(angle));
+
+      // Update participant with new random position
+      const [updatedParticipant] = await db
+        .update(gameParticipants)
+        .set({
+          startingLocation: {
+            position: randomPosition,
+            coordinates: { lat: y, lng: x }
+          },
+          startingLocationAssignedAt: new Date()
+        })
+        .where(
+          and(
+            eq(gameParticipants.gameId, gameId),
+            eq(gameParticipants.teamId, teamId)
+          )
+        )
+        .returning();
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error("Random position assignment error:", error);
+      res.status(500).send("Failed to assign random position");
     }
   });
 

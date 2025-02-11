@@ -214,6 +214,7 @@ export function useGame(gameId: number) {
 
   const joinGame = useMutation({
     mutationFn: async (teamId: number) => {
+      // First join the game
       const response = await fetch(`/api/games/${gameId}/join`, {
         method: 'POST',
         headers: { 
@@ -229,13 +230,36 @@ export function useGame(gameId: number) {
         throw new Error(errorText);
       }
 
-      const data = await response.json();
+      const joinData = await response.json();
+
+      // Then assign random position
+      const positionResponse = await fetch(`/api/games/${gameId}/assign-random-position`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ teamId }),
+        credentials: 'include'
+      });
+
+      if (!positionResponse.ok) {
+        throw new Error(await positionResponse.text());
+      }
+
+      const positionData = await positionResponse.json();
+
+      // Send WebSocket update
       sendMessage('GAME_STATE_UPDATE', { 
         gameId,
         type: 'TEAM_JOINED',
         teamId 
       });
-      return data;
+
+      return {
+        ...joinData,
+        participant: positionData
+      };
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Game>([`/api/games/${gameId}`], (oldData) => {
