@@ -319,20 +319,15 @@ export default function Game() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
-                <p>
-                  <strong>Teams:</strong> {game.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0} / {game.maxTeams}
-                  {isAdmin && game.participants?.length !== (game.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0) && (
-                    <span className="text-sm text-muted-foreground ml-2">
-                      ({game.participants?.length || 0} total pending)
-                    </span>
+                  <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
+                  <p>
+                    <strong>Teams:</strong> {game.participants?.filter(p => p.startingLocationAssignedAt)?.length || 0} / {game.maxTeams}
+                  </p>
+                  <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
+                  {game.startTime && (
+                    <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
                   )}
-                </p>
-                <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
-                {game.startTime && (
-                  <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
-                )}
-              </div>
+                </div>
             </CardContent>
           </Card>
 
