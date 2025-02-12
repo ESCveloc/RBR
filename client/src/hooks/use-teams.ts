@@ -1,7 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Team, TeamMember } from "@db/schema";
-import { useWebSocket } from "./use-websocket";
-import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface TeamWithMembers extends Team {
@@ -15,7 +13,6 @@ interface TeamResponse {
 }
 
 export function useTeams() {
-  const { socket } = useWebSocket();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -24,26 +21,6 @@ export function useTeams() {
     staleTime: 30000, // Cache for 30 seconds
     refetchInterval: false, // Disable polling
   });
-
-  // Subscribe to team updates via WebSocket
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'TEAM_UPDATE') {
-          // Trigger a refetch when we receive a team update
-          refetch();
-        }
-      } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, [socket, refetch]);
 
   const addTeamMember = useMutation({
     mutationFn: async ({ teamId, userId }: { teamId: number; userId: number }) => {
@@ -94,6 +71,7 @@ export function useTeams() {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       toast({
         title: "Success",
         description: "Team member added successfully"
@@ -146,6 +124,7 @@ export function useTeams() {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       toast({
         title: "Success",
         description: "Team member removed successfully"
