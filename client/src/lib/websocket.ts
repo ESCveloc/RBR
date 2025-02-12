@@ -12,7 +12,6 @@ class GameWebSocket {
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private messageQueue: WebSocketMessage[] = [];
-  private authenticated = false;
   private url: string;
 
   constructor(url: string) {
@@ -30,13 +29,11 @@ class GameWebSocket {
 
     this.ws.onopen = () => {
       console.log("WebSocket connection established successfully");
-      // Wait for server to send AUTHENTICATED message
-      // Don't authenticate here as the server will verify the session cookie
+      this.sendQueuedMessages();
     };
 
     this.ws.onclose = (event) => {
       console.log("WebSocket connection closed:", event.code, event.reason);
-      this.authenticated = false;
       if (event.code === 1000 || event.code === 1001) {
         // Normal closure, don't reconnect
         return;
@@ -60,20 +57,16 @@ class GameWebSocket {
 
   private handleMessage(message: WebSocketMessage) {
     console.log("Received message:", message);
+    // Handle game-specific messages
     switch (message.type) {
-      case "AUTHENTICATED":
-        console.log("WebSocket authentication successful");
-        this.authenticated = true;
-        this.sendQueuedMessages();
+      case "GAME_STATE_UPDATE":
+      case "LOCATION_UPDATE":
+      case "TEAM_STATUS_UPDATE":
+      case "GAME_EVENT":
+        // These will be handled by the subscribers
         break;
       case "ERROR":
         console.error("WebSocket error:", message.payload);
-        if (message.payload.message === "Not authenticated") {
-          this.authenticated = false;
-        }
-        break;
-      default:
-        // Handle other message types
         break;
     }
   }
@@ -98,12 +91,6 @@ class GameWebSocket {
   }
 
   send(message: WebSocketMessage) {
-    if (!this.authenticated && message.type !== "AUTHENTICATE") {
-      console.log("Queueing message until authenticated:", message);
-      this.messageQueue.push(message);
-      return;
-    }
-
     if (this.ws?.readyState === WebSocket.OPEN) {
       console.log("Sending message:", message);
       this.ws.send(JSON.stringify(message));

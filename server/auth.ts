@@ -24,66 +24,6 @@ export const sessionStore = new MemoryStore({
   checkPeriod: 86400000 // prune expired entries every 24h
 });
 
-// Add verify function for WebSocket authentication
-export async function verify(sessionId: string): Promise<User | null> {
-  try {
-    if (!sessionId) {
-      console.log("No session ID provided");
-      return null;
-    }
-
-    // Parse session ID from cookie format
-    let sid = sessionId;
-    if (sessionId.includes('=')) {
-      sid = sessionId.split('=')[1];
-    }
-    if (sid.startsWith('s:')) {
-      sid = sid.slice(2).split('.')[0];
-    }
-
-    console.log("Attempting to verify session:", sid);
-
-    return new Promise((resolve) => {
-      sessionStore.get(sid, async (err: any, session: any) => {
-        if (err) {
-          console.error("Session store error:", err);
-          resolve(null);
-          return;
-        }
-
-        if (!session?.passport?.user) {
-          console.log("No user in session or invalid session format:", session);
-          resolve(null);
-          return;
-        }
-
-        try {
-          const [user] = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, session.passport.user))
-            .limit(1);
-
-          if (!user) {
-            console.log("User not found for session:", session.passport.user);
-            resolve(null);
-            return;
-          }
-
-          console.log("Successfully verified user:", user.id);
-          resolve(user);
-        } catch (dbError) {
-          console.error("Database error during session verification:", dbError);
-          resolve(null);
-        }
-      });
-    });
-  } catch (error) {
-    console.error("Session verification error:", error);
-    return null;
-  }
-}
-
 export function setupAuth(app: Express) {
   app.use(session({
     secret: process.env.REPL_ID || "battle-royale-secret",
@@ -97,7 +37,7 @@ export function setupAuth(app: Express) {
       path: '/'
     },
     store: sessionStore,
-    name: 'battle.sid' // Custom session name
+    name: 'battle.sid'
   }));
 
   app.use(passport.initialize());
@@ -158,76 +98,36 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Simple auth routes with minimal overhead
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false, info: IVerifyOptions) => {
-      if (err) {
-        console.error("Authentication error:", err);
-        return res.status(500).json({ error: "Login failed" });
-      }
-      if (!user) {
-        return res.status(401).json({ error: info.message || "Invalid credentials" });
-      }
-      req.login(user, (err) => {
-        if (err) {
-          console.error("Login session error:", err);
-          return res.status(500).json({ error: "Login failed" });
-        }
+      if (err) return res.status(500).json({ error: "Login failed" });
+      if (!user) return res.status(401).json({ error: info.message || "Invalid credentials" });
 
-        // Force session save to ensure it's available for WebSocket auth
-        req.session.save((err) => {
-          if (err) {
-            console.error("Session save error:", err);
-            return res.status(500).json({ error: "Login failed" });
-          }
-          res.json({
-            message: "Login successful",
-            user: {
-              id: user.id,
-              username: user.username,
-              role: user.role
-            }
-          });
+      req.login(user, (err) => {
+        if (err) return res.status(500).json({ error: "Login failed" });
+        res.json({
+          message: "Login successful",
+          user: { id: user.id, username: user.username, role: user.role }
         });
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res) => {
-    const sessionId = req.sessionID;
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).send("Logout failed");
-      }
-      // Explicitly destroy the session
-      req.session.destroy((err) => {
-        if (err) {
-          console.error("Session destruction error:", err);
-        }
-        // Remove the session from store
-        sessionStore.destroy(sessionId, (err) => {
-          if (err) {
-            console.error("Store cleanup error:", err);
-          }
-          res.json({ message: "Logged out successfully" });
-        });
-      });
+    req.logout(() => {
+      res.json({ message: "Logged out successfully" });
     });
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
+    if (!req.isAuthenticated()) return res.status(401).send("Not authenticated");
     const user = req.user as Express.User;
-    res.json({
-      id: user.id,
-      username: user.username,
-      role: user.role
-    });
+    res.json({ id: user.id, username: user.username, role: user.role });
   });
 }
 
-// Crypto implementation with proper error handling
+// Helper for password hashing
 const crypto = {
   hash: async (password: string): Promise<string> => {
     const salt = randomBytes(16).toString("hex");

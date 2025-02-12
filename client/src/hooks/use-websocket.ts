@@ -18,15 +18,13 @@ interface WebSocketInterface {
 export function useWebSocket(): WebSocketInterface {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-  const { user, isLoading: isUserLoading } = useUser();
+  const { user } = useUser();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const isConnectingRef = useRef(false);
-  const isAuthenticatedRef = useRef(false);
   const messageHandlersRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
   const pendingGameJoinRef = useRef<number | null>(null);
-  const authTimeoutRef = useRef<NodeJS.Timeout>();
 
   const cleanupWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -38,19 +36,14 @@ export function useWebSocket(): WebSocketInterface {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = undefined;
     }
-    if (authTimeoutRef.current) {
-      clearTimeout(authTimeoutRef.current);
-      authTimeoutRef.current = undefined;
-    }
     reconnectAttemptRef.current = 0;
     isConnectingRef.current = false;
-    isAuthenticatedRef.current = false;
     messageHandlersRef.current.clear();
     pendingGameJoinRef.current = null;
   }, []);
 
   const connect = useCallback(() => {
-    if (!user || isUserLoading || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
+    if (!user || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
@@ -69,19 +62,6 @@ export function useWebSocket(): WebSocketInterface {
         }
       }, 5000);
 
-      // Set authentication timeout
-      authTimeoutRef.current = setTimeout(() => {
-        if (!isAuthenticatedRef.current) {
-          console.log('Authentication timeout, closing connection');
-          ws.close();
-          toast({
-            title: "Connection Error",
-            description: "Failed to authenticate WebSocket connection",
-            variant: "destructive"
-          });
-        }
-      }, 10000);
-
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
         console.log('WebSocket connection established successfully');
@@ -89,11 +69,14 @@ export function useWebSocket(): WebSocketInterface {
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
-        // Send authentication immediately after connection
-        ws.send(JSON.stringify({
-          type: 'AUTHENTICATE',
-          payload: { userId: user.id }
-        }));
+        // Process any pending game join after connection
+        if (pendingGameJoinRef.current !== null) {
+          ws.send(JSON.stringify({
+            type: 'JOIN_GAME',
+            payload: { gameId: pendingGameJoinRef.current }
+          }));
+          pendingGameJoinRef.current = null;
+        }
       };
 
       ws.onmessage = (event) => {
@@ -108,26 +91,6 @@ export function useWebSocket(): WebSocketInterface {
               description: message.payload.message,
               variant: "destructive"
             });
-            return;
-          }
-
-          if (message.type === 'AUTHENTICATED') {
-            console.log('WebSocket authenticated successfully');
-            isAuthenticatedRef.current = true;
-            if (authTimeoutRef.current) {
-              clearTimeout(authTimeoutRef.current);
-              authTimeoutRef.current = undefined;
-            }
-
-            // Process any pending game join after successful authentication
-            if (pendingGameJoinRef.current !== null) {
-              console.log('Processing pending game join:', pendingGameJoinRef.current);
-              ws.send(JSON.stringify({
-                type: 'JOIN_GAME',
-                payload: { gameId: pendingGameJoinRef.current }
-              }));
-              pendingGameJoinRef.current = null;
-            }
             return;
           }
 
@@ -148,41 +111,29 @@ export function useWebSocket(): WebSocketInterface {
 
       ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        if (authTimeoutRef.current) {
-          clearTimeout(authTimeoutRef.current);
-          authTimeoutRef.current = undefined;
-        }
         console.error('WebSocket error:', error);
         isConnectingRef.current = false;
-        isAuthenticatedRef.current = false;
 
-        if (user) {
-          toast({
-            title: "Connection Error",
-            description: "WebSocket connection error occurred. Attempting to reconnect...",
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Connection Error",
+          description: "WebSocket connection error occurred. Attempting to reconnect...",
+          variant: "destructive"
+        });
       };
 
       ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        if (authTimeoutRef.current) {
-          clearTimeout(authTimeoutRef.current);
-          authTimeoutRef.current = undefined;
-        }
         console.log('WebSocket connection closed:', event.code, event.reason);
         wsRef.current = null;
         isConnectingRef.current = false;
-        isAuthenticatedRef.current = false;
 
-        if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts && event.code !== 1000) {
+        if (user && reconnectAttemptRef.current < maxReconnectAttempts && event.code !== 1000) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
 
           reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(connect, delay);
-        } else if (reconnectAttemptRef.current >= maxReconnectAttempts && user) {
+        } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
           toast({
             title: "Connection Error",
             description: "Failed to establish WebSocket connection after multiple attempts. Please refresh the page.",
@@ -193,34 +144,29 @@ export function useWebSocket(): WebSocketInterface {
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
       isConnectingRef.current = false;
-      isAuthenticatedRef.current = false;
-      if (user) {
-        toast({
-          title: "Connection Error",
-          description: "Failed to establish WebSocket connection",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Connection Error",
+        description: "Failed to establish WebSocket connection",
+        variant: "destructive"
+      });
     }
-  }, [user, isUserLoading, toast, cleanupWebSocket]);
+  }, [user, toast, cleanupWebSocket]);
 
   useEffect(() => {
-    if (!isUserLoading) {
-      if (user) {
-        connect();
-      } else {
-        cleanupWebSocket();
-      }
+    if (user) {
+      connect();
+    } else {
+      cleanupWebSocket();
     }
 
     return () => {
       cleanupWebSocket();
     };
-  }, [connect, user, isUserLoading, cleanupWebSocket]);
+  }, [connect, user, cleanupWebSocket]);
 
   const sendMessage = useCallback((type: string, payload: any) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !isAuthenticatedRef.current) {
-      console.warn('WebSocket not connected or not authenticated, message not sent:', { type, payload });
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('WebSocket not connected, message not sent:', { type, payload });
       return;
     }
 
@@ -267,29 +213,20 @@ export function useWebSocket(): WebSocketInterface {
 
     console.log('Attempting to join game:', gameId);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      if (!isAuthenticatedRef.current) {
-        console.log('WebSocket not yet authenticated, queueing game join');
-        pendingGameJoinRef.current = gameId;
-        return;
-      }
-
       console.log('Sending JOIN_GAME message');
       sendMessage('JOIN_GAME', { gameId });
     } else {
       console.warn('Cannot join game: WebSocket not connected');
-      toast({
-        title: "Connection Error",
-        description: "Cannot join game: WebSocket not connected. Please try again.",
-        variant: "destructive"
-      });
+      pendingGameJoinRef.current = gameId;
+      connect();
     }
-  }, [sendMessage, toast, user]);
+  }, [sendMessage, toast, user, connect]);
 
   return {
     socket: wsRef.current,
     sendMessage,
     subscribeToMessage,
-    isConnected: wsRef.current?.readyState === WebSocket.OPEN && isAuthenticatedRef.current,
+    isConnected: wsRef.current?.readyState === WebSocket.OPEN,
     joinGame
   };
 }
