@@ -14,6 +14,7 @@ interface CustomWebSocket extends WebSocket {
   isAlive?: boolean;
   pingTimeout?: NodeJS.Timeout;
   isAuthenticated?: boolean;
+  sessionId?: string;
 }
 
 interface GameRoom {
@@ -60,6 +61,16 @@ class GameWebSocketServer extends WebSocketServer {
           console.log("Ping timeout for user:", ws.userId);
           ws.terminate();
         }, 10000);
+
+        // Re-verify session on each heartbeat
+        if (ws.sessionId) {
+          verify(ws.sessionId).then(user => {
+            if (!user) {
+              console.log("Session invalid, terminating connection for user:", ws.userId);
+              ws.terminate();
+            }
+          });
+        }
       });
     }, 30000);
 
@@ -230,15 +241,9 @@ export function setupWebSocketServer(server: Server) {
         const cookies = parse(req.headers.cookie);
         let sessionId = cookies['battle.sid'];
 
-        // Handle different session cookie formats
         if (!sessionId) {
           console.log("WebSocket connection rejected: No battle.sid cookie found");
           return done(false, 401, "No session ID");
-        }
-
-        // Clean up session ID if it contains 's:' prefix
-        if (sessionId.startsWith('s:')) {
-          sessionId = sessionId.slice(2).split('.')[0];
         }
 
         console.log("Attempting to verify session:", sessionId);
@@ -251,6 +256,7 @@ export function setupWebSocketServer(server: Server) {
 
         console.log(`Authenticated WebSocket connection for user ${user.id}`);
         (req as any).user = user;
+        (req as any).sessionId = sessionId;
         return done(true);
       } catch (error) {
         console.error("WebSocket verification error:", error);
@@ -267,6 +273,8 @@ export function setupWebSocketServer(server: Server) {
     const user = (req as any).user;
     if (user) {
       ws.userId = user.id;
+      ws.sessionId = (req as any).sessionId;
+
       try {
         const [userTeam] = await db
           .select({

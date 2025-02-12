@@ -34,8 +34,11 @@ export async function verify(sessionId: string): Promise<User | null> {
 
     // Parse session ID from cookie format
     let sid = sessionId;
-    if (sessionId.startsWith('s:')) {
-      sid = sessionId.slice(2).split('.')[0];
+    if (sessionId.includes('=')) {
+      sid = sessionId.split('=')[1];
+    }
+    if (sid.startsWith('s:')) {
+      sid = sid.slice(2).split('.')[0];
     }
 
     console.log("Attempting to verify session:", sid);
@@ -169,24 +172,45 @@ export function setupAuth(app: Express) {
           console.error("Login session error:", err);
           return res.status(500).json({ error: "Login failed" });
         }
-        res.json({
-          message: "Login successful",
-          user: {
-            id: user.id,
-            username: user.username,
-            role: user.role
+
+        // Force session save to ensure it's available for WebSocket auth
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ error: "Login failed" });
           }
+          res.json({
+            message: "Login successful",
+            user: {
+              id: user.id,
+              username: user.username,
+              role: user.role
+            }
+          });
         });
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res) => {
+    const sessionId = req.sessionID;
     req.logout((err) => {
       if (err) {
         return res.status(500).send("Logout failed");
       }
-      res.json({ message: "Logged out successfully" });
+      // Explicitly destroy the session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destruction error:", err);
+        }
+        // Remove the session from store
+        sessionStore.destroy(sessionId, (err) => {
+          if (err) {
+            console.error("Store cleanup error:", err);
+          }
+          res.json({ message: "Logged out successfully" });
+        });
+      });
     });
   });
 
