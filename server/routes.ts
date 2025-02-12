@@ -887,7 +887,15 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Update the position assignment endpoint
-  // Add helper function to check team qualifications
+  // Add helper function to check team qualifications and assign random position
+  function assignRandomPosition(availablePositions: number[]): number {
+    if (availablePositions.length === 0) {
+      throw new Error("No available positions remaining");
+    }
+    const randomIndex = Math.floor(Math.random() * availablePositions.length);
+    return availablePositions[randomIndex];
+  }
+
   function checkTeamQualifications(game: any, participant: any) {
     if (!game || !participant) return false;
 
@@ -965,7 +973,7 @@ export function registerRoutes(app: Express): Server {
       // Get currently assigned positions
       const assignedPositions = await db
         .select({
-          position: sql<number>`CAST(game_participants.starting_location->>'position' AS INTEGER)`,
+          position: sql`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
           teamId: gameParticipants.teamId
         })
         .from(gameParticipants)
@@ -973,26 +981,28 @@ export function registerRoutes(app: Express): Server {
           and(
             eq(gameParticipants.gameId, gameId),
             ne(gameParticipants.teamId, teamId),
-            sql`game_participants.starting_location IS NOT NULL`
+            sql`${gameParticipants.startingLocation} IS NOT NULL`
           )
         );
 
       const takenPositions = new Set(assignedPositions.map(p => p.position));
 
-      // If position is not specified, randomly assign from available positions
-      let assignedPosition = position;
-      if (!assignedPosition) {
-        const availablePositions = Array.from({ length: 10 }, (_, i) => i + 1)
-          .filter(p => !takenPositions.has(p));
+      // Always create 10 starting positions regardless of max teams
+      const TOTAL_STARTING_POSITIONS = 10;
+      const availablePositions = Array.from({ length: TOTAL_STARTING_POSITIONS }, (_, i) => i + 1)
+        .filter(p => !takenPositions.has(p));
 
-        if (availablePositions.length === 0) {
-          return res.status(400).send("No available positions remaining");
-        }
+      // Determine position (either forced by admin or random)
+      let assignedPosition: number;
+      if (force && position) {
+        // Admin can override and assign specific position
+        assignedPosition = position;
+      } else {
+        // Randomly assign from available positions
+        assignedPosition = assignRandomPosition(availablePositions);
+      }
 
-        // Randomly select from available positions
-        const randomIndex = Math.floor(Math.random() * availablePositions.length);
-        assignedPosition = availablePositions[randomIndex];
-      } else if (!force && takenPositions.has(assignedPosition)) {
+      if (!force && takenPositions.has(assignedPosition)) {
         return res.status(400).send("This position is already taken by another team");
       }
 
@@ -1013,7 +1023,6 @@ export function registerRoutes(app: Express): Server {
       }));
 
       // Convert position to angle (evenly distributed around the circle)
-      const TOTAL_STARTING_POSITIONS = 10;
       const angle = (-1 * (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
@@ -1036,6 +1045,14 @@ export function registerRoutes(app: Express): Server {
           )
         )
         .returning();
+
+      // Broadcast position assignment to all clients
+      wss.broadcast('GAME_UPDATE', {
+        type: 'POSITION_ASSIGNED',
+        gameId,
+        teamId,
+        position: assignedPosition
+      });
 
       res.json(updatedParticipant);
     } catch (error) {
@@ -1196,7 +1213,7 @@ export function registerRoutes(app: Express): Server {
       const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
 
       // Calculate starting locations based on maxTeams
-      const startingLocations = calculateStartingLocations(gameBoundaries, maxTeams);
+      const startingLocations = calculateStartingLocations(gameBoundaries, 10); // Always 10 starting locations
 
       const [game] = await db
         .insert(games)
