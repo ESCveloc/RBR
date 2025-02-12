@@ -278,11 +278,11 @@ export function TeamCard({
                             Leave Game?
                           </AlertDialogTitle>
                           <AlertDialogDescription className="text-base text-muted-foreground">
-                            Are you sure you want to leave the game? Your team will be removed from the game and cannot rejoin unless invited back.
+                            Are you sure you want to leave the game? This action cannot be undone, and your team will need to be re-invited to rejoin.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="flex items-center gap-2 pt-2">
-                          <AlertDialogCancel className="flex-1 mt-0">
+                          <AlertDialogCancel className="flex-1 mt-0 transition-colors hover:bg-secondary">
                             Cancel
                           </AlertDialogCancel>
                           <AlertDialogAction

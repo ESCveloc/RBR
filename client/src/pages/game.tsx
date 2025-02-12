@@ -255,32 +255,39 @@ export default function Game() {
                           variant="destructive"
                           size="sm"
                           disabled={updateGameStatus.isPending}
-                          className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95 border-2 border-primary"
+                          className="transition-all duration-200 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:scale-105 active:scale-95"
                         >
                           <X className="h-4 w-4 mr-2" />
                           Cancel
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Cancel Game?</AlertDialogTitle>
-                          <AlertDialogDescription>
+                      <AlertDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
+                        <AlertDialogHeader className="flex flex-col gap-2">
+                          <AlertDialogTitle className="text-2xl font-semibold leading-none tracking-tight">Cancel Game?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-base text-muted-foreground">
                             This action will cancel the game. All teams will be removed and the game cannot be restarted.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Go Back</AlertDialogCancel>
+                        <AlertDialogFooter className="flex items-center gap-2 pt-2">
+                          <AlertDialogCancel className="flex-1 mt-0 transition-colors hover:bg-secondary">
+                            Go Back
+                          </AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleStatusUpdate('cancelled')}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
                           >
-                            {updateGameStatus.isPending && (
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            {updateGameStatus.isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Cancelling...
+                              </>
+                            ) : (
+                              'Cancel Game'
                             )}
-                            Cancel Game
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
+
                     </AlertDialog>
                   </>
                 )}
