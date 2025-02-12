@@ -528,6 +528,15 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Fix the duplicate function and type issues in the position assignment logic
+  function assignRandomPosition(availablePositions: number[]): number {
+    if (availablePositions.length === 0) {
+      throw new Error("No available positions remaining");
+    }
+    const randomIndex = Math.floor(Math.random() * availablePositions.length);
+    return availablePositions[randomIndex];
+  }
+
   app.patch("/api/teams/:teamId/captain", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -557,15 +566,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Verify new captain is a team member
-      const isMemberQuery = db
+      const isMemberQuery = await db
         .select()
         .from(teamMembers)
-        .where((teamMembers) => eq(teamMembers.teamId, teamId))
-        .where((teamMembers) => eq(teamMembers.userId, newCaptainId));
-      const [isMember] = await isMemberQuery;
+        .where(eq(teamMembers.teamId, teamId))
+        .where(eq(teamMembers.userId, newCaptainId));
 
 
-      if (!isMember) {
+      if (isMemberQuery.length === 0) {
         return res.status(400).send("New captain must be a team member");
       }
 
@@ -1618,7 +1626,7 @@ export function registerRoutes(app: Express): Server {
       // Get currently assigned positions
       const assignedPositions = await db
         .select({
-          position: sql`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
+          position: sql<number>`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
           teamId: gameParticipants.teamId
         })
         .from(gameParticipants)
