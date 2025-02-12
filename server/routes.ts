@@ -973,7 +973,7 @@ export function registerRoutes(app: Express): Server {
       // Get currently assigned positions
       const assignedPositions = await db
         .select({
-          position: sql`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
+          position: sql<number>`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
           teamId: gameParticipants.teamId
         })
         .from(gameParticipants)
@@ -1167,15 +1167,13 @@ export function registerRoutes(app: Express): Server {
 
   // Games API endpoints
   app.post("/api/games", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).send("Only administrators can create games");
     }
 
     try {
-      console.log("Received game creation request:", req.body);
       const result = gameSchema.safeParse(req.body);
       if (!result.success) {
-        console.error("Game validation failed:", result.error);
         return res.status(400).json({
           message: "Invalid game data",
           errors: result.error.issues,
@@ -1184,59 +1182,58 @@ export function registerRoutes(app: Express): Server {
 
       const {
         name,
-        boundaries,
         gameLengthMinutes,
         maxTeams,
         playersPerTeam,
+        boundaries: gameBoundaries,
         zoneConfigs
       } = result.data;
 
-      // Use default boundaries if none provided
       const settings = global.gameSettings || {
-        defaultCenter: {
-          lat: 35.8462,
-          lng: -86.3928,
-        },
+        defaultCenter: { lat: 35.8462, lng: -86.3928 },
         defaultRadiusMiles: 1,
-        zoneConfigs: [
-          { durationMinutes: 15, radiusMultiplier: 0.75, intervalMinutes: 20 },
-          { durationMinutes: 10, radiusMultiplier: 0.5, intervalMinutes: 15 },
-          { durationMinutes: 5, radiusMultiplier: 0.25, intervalMinutes: 10 },
-        ],
+        zoneConfigs: []
       };
 
-      const gameBoundaries = boundaries || {
-        center: settings.defaultCenter,
-        radiusMiles: settings.defaultRadiusMiles,
-      };
-
-      const gameZoneConfigs = zoneConfigs || settings.zoneConfigs;
-
-      // Calculate starting locations based on maxTeams
-      const startingLocations = calculateStartingLocations(gameBoundaries, 10); // Always 10 starting locations
-
+      // Create new game with minimal required fields
       const [game] = await db
         .insert(games)
         .values({
           name,
-          boundaries: gameBoundaries,
+          status: "pending",
           gameLengthMinutes,
           maxTeams,
           playersPerTeam,
-          zoneConfigs: gameZoneConfigs,
-          createdBy: (req.user as any).id,
-          status: "pending",
+          startTime: null,
+          endTime: null,
+          boundaries: gameBoundaries || {
+            type: "Feature",
+            geometry: {
+              type: "Polygon",
+              coordinates: [[
+                [settings.defaultCenter.lng - 0.01, settings.defaultCenter.lat - 0.01],
+                [settings.defaultCenter.lng + 0.01, settings.defaultCenter.lat - 0.01],
+                [settings.defaultCenter.lng + 0.01, settings.defaultCenter.lat + 0.01],
+                [settings.defaultCenter.lng - 0.01, settings.defaultCenter.lat + 0.01],
+                [settings.defaultCenter.lng - 0.01, settings.defaultCenter.lat - 0.01]
+              ]]
+            }
+          },
+          zoneConfigs: zoneConfigs || settings.zoneConfigs,
+          createdBy: req.user.id
         })
         .returning();
 
-      console.log("Game created successfully:", game);
-      res.json({ ...game, startingLocations });
-    } catch (error: any) {
-      console.error("Game creation error:", error);
-      if (error.code === '23505') {
-        return res.status(400).json({ message: "A game with this name already exists" });
-      }
-      res.status(500).json({ message: "Failed to create game" });
+      // Broadcast game creation
+      wss.broadcast('GAME_UPDATE', {
+        type: 'GAME_CREATED',
+        gameId: game.id
+      });
+
+      res.json(game);
+    } catch (error) {
+      console.error("Create game error:", error);
+      res.status(500).send("Failed to create game");
     }
   });
 
@@ -1523,19 +1520,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add helper function for random position assignment
-  async function assignRandomPosition(gameId: number, maxTeams: number): Promise<{ position: number; coordinates: null } | null> {
-    const participants = await db
-      .select()
-      .from(gameParticipants)
-      .where(eq(gameParticipants.gameId, gameId));
-
-    const takenPositions = participants
-      .filter(p => p.startingLocation)
-      .map(p => p.startingLocation.position);
-
-    const availablePositions = Array.from({ length: maxTeams }, (_, i) => i + 1)
-      .filter(pos => !takenPositions.includes(pos));
-
+  async function assignRandomPosition(availablePositions: number[]): Promise<{ position: number; coordinates: null } | null> {
     if (availablePositions.length === 0) return null;
 
     const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
@@ -1652,7 +1637,11 @@ export function registerRoutes(app: Express): Server {
         .filter(p => !takenPositions.has(p));
 
       // Randomly assign position
-      const assignedPosition = assignRandomPosition(availablePositions);
+      const assignedPosition = await assignRandomPosition(availablePositions);
+
+      if (!assignedPosition) {
+        return res.status(400).send('No available positions');
+      }
 
       // Calculate position coordinates based on boundaries
       const coordinates = game.boundaries.geometry.coordinates[0];
@@ -1671,7 +1660,7 @@ export function registerRoutes(app: Express): Server {
       }));
 
       // Convert position to angle (evenly distributed around the circle)
-      const angle = (-1 * (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
+      const angle = (-1 * (assignedPosition.position - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
@@ -1685,7 +1674,7 @@ export function registerRoutes(app: Express): Server {
           status: "alive",
           ready: false,
           startingLocation: {
-            position: assignedPosition,
+            position: assignedPosition.position,
             coordinates: { lat: y, lng: x }
           },
           startingLocationAssignedAt: new Date()
@@ -1697,7 +1686,7 @@ export function registerRoutes(app: Express): Server {
         type: 'TEAM_JOINED',
         gameId,
         teamId,
-        position: assignedPosition
+        position: assignedPosition.position
       });
 
       res.json(participant);

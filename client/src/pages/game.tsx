@@ -323,7 +323,7 @@ export default function Game() {
                     <strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}
                   </p>
                   <p>
-                    <strong>Assigned Positions:</strong> {game.participants?.filter(p => p.startingLocation !== null)?.length || 0}
+                    <strong>Assigned Positions:</strong> {(game.participants || []).filter(p => p.startingLocation !== null).length}
                   </p>
                   <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
                   {game.startTime && (
