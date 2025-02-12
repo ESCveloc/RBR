@@ -43,10 +43,10 @@ class GameWebSocketServer extends WebSocketServer {
     this.pingInterval = setInterval(() => {
       this.clients.forEach((ws: CustomWebSocket) => {
         if (!ws.isAlive) {
-          console.log("Terminating inactive connection");
           if (ws.pingTimeout) {
             clearTimeout(ws.pingTimeout);
           }
+          console.log("Terminating inactive connection");
           return ws.terminate();
         }
 
@@ -91,6 +91,7 @@ class GameWebSocketServer extends WebSocketServer {
         if (client.readyState === WebSocket.OPEN) {
           client.send(messageStr);
         } else {
+          console.log(`Client in non-OPEN state, marking for removal`);
           deadConnections.push(client);
         }
       } catch (error) {
@@ -100,6 +101,7 @@ class GameWebSocketServer extends WebSocketServer {
     });
 
     deadConnections.forEach(client => {
+      console.log(`Removing dead connection from room ${gameId}`);
       room.clients.delete(client);
       if (client.pingTimeout) {
         clearTimeout(client.pingTimeout);
@@ -107,8 +109,8 @@ class GameWebSocketServer extends WebSocketServer {
     });
 
     if (room.clients.size === 0) {
+      console.log(`Removing empty room for game ${gameId}`);
       this.gameRooms.delete(gameId);
-      console.log(`Removed empty room for game ${gameId}`);
     }
   }
 
@@ -168,6 +170,7 @@ class GameWebSocketServer extends WebSocketServer {
     }
 
     if (!this.gameRooms.has(gameId)) {
+      console.log(`Creating new room for game ${gameId}`);
       this.gameRooms.set(gameId, {
         clients: new Set(),
         lastUpdate: {
@@ -222,6 +225,7 @@ export function setupWebSocketServer(server: Server) {
 
         const cookies = parse(req.headers.cookie);
         const sessionId = cookies['battle.sid'];
+
         if (!sessionId) {
           console.log("WebSocket connection rejected: No battle.sid cookie found");
           return done(false, 401, "No session ID");
@@ -281,54 +285,56 @@ export function setupWebSocketServer(server: Server) {
         const message = JSON.parse(data.toString());
         console.log('Received message:', message);
 
-        if (!ws.userId) {
-          ws.send(JSON.stringify({
-            type: "ERROR",
-            payload: { message: "Not authenticated" }
-          }));
-          return;
-        }
-
         switch (message.type) {
           case 'AUTHENTICATE':
-            if (message.payload.userId === ws.userId) {
+            if (ws.userId && message.payload.userId === ws.userId) {
               ws.isAuthenticated = true;
               console.log(`Client ${ws.userId} authenticated`);
               ws.send(JSON.stringify({
                 type: "AUTHENTICATED",
                 payload: { userId: ws.userId }
               }));
-            }
-            break;
-
-          case "JOIN_GAME":
-            if (!ws.isAuthenticated) {
+            } else {
+              console.log(`Authentication failed for client`);
               ws.send(JSON.stringify({
                 type: "ERROR",
-                payload: { message: "Authentication required to join game" }
+                payload: { message: "Authentication failed" }
               }));
-              return;
-            }
-            wss.joinGame(ws, message.payload.gameId);
-            break;
-
-          case "LOCATION_UPDATE":
-            if (ws.gameId && ws.isAuthenticated) {
-              await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
-                userId: ws.userId,
-                location: message.payload.location
-              });
-            }
-            break;
-
-          case "GAME_STATE_UPDATE":
-            if (ws.gameId && ws.isAuthenticated) {
-              await wss.broadcastGameUpdate(ws.gameId, "GAME_STATE_UPDATE", message.payload);
             }
             break;
 
           default:
-            console.warn(`Unknown message type received: ${message.type}`);
+            if (!ws.userId || !ws.isAuthenticated) {
+              ws.send(JSON.stringify({
+                type: "ERROR",
+                payload: { message: "Not authenticated" }
+              }));
+              return;
+            }
+
+            switch (message.type) {
+              case "JOIN_GAME":
+                wss.joinGame(ws, message.payload.gameId);
+                break;
+
+              case "LOCATION_UPDATE":
+                if (ws.gameId) {
+                  await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
+                    userId: ws.userId,
+                    location: message.payload.location
+                  });
+                }
+                break;
+
+              case "GAME_STATE_UPDATE":
+                if (ws.gameId) {
+                  await wss.broadcastGameUpdate(ws.gameId, "GAME_STATE_UPDATE", message.payload);
+                }
+                break;
+
+              default:
+                console.warn(`Unknown message type received: ${message.type}`);
+            }
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
