@@ -33,11 +33,10 @@ export async function verify(sessionId: string): Promise<User | null> {
     }
 
     // Parse session ID from cookie format
-    const sid = sessionId.includes('battle.sid=s:') 
-      ? sessionId.replace('battle.sid=s:', '').split('.')[0]
-      : sessionId.includes('s:') 
-        ? sessionId.replace('s:', '').split('.')[0]
-        : sessionId;
+    let sid = sessionId;
+    if (sessionId.startsWith('s:')) {
+      sid = sessionId.slice(2).split('.')[0];
+    }
 
     console.log("Attempting to verify session:", sid);
 
