@@ -272,18 +272,22 @@ export function TeamCard({
                           Leave
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="fixed inset-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Leave Game?</AlertDialogTitle>
-                          <AlertDialogDescription>
+                      <AlertDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
+                        <AlertDialogHeader className="flex flex-col gap-2">
+                          <AlertDialogTitle className="text-2xl font-semibold leading-none tracking-tight">
+                            Leave Game?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-base text-muted-foreground">
                             Are you sure you want to leave the game? Your team will be removed from the game and cannot rejoin unless invited back.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogFooter className="flex items-center gap-2 pt-2">
+                          <AlertDialogCancel className="flex-1 mt-0">
+                            Cancel
+                          </AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => leaveGame.mutate()}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
                           >
                             {leaveGame.isPending && (
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
