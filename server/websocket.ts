@@ -13,6 +13,7 @@ interface CustomWebSocket extends WebSocket {
   teamId?: number;
   isAlive?: boolean;
   pingTimeout?: NodeJS.Timeout;
+  isAuthenticated?: boolean;
 }
 
 interface GameRoom {
@@ -26,7 +27,7 @@ interface GameRoom {
 class GameWebSocketServer extends WebSocketServer {
   private gameRooms: Map<number, GameRoom> = new Map();
   private updateThrottleMs = 100;
-  private pingInterval: NodeJS.Timeout;
+  private pingInterval: NodeJS.Timeout | null = null;
 
   constructor(options: any) {
     super(options);
@@ -35,6 +36,10 @@ class GameWebSocketServer extends WebSocketServer {
   }
 
   private setupHeartbeat() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+
     this.pingInterval = setInterval(() => {
       this.clients.forEach((ws: CustomWebSocket) => {
         if (!ws.isAlive) {
@@ -48,40 +53,72 @@ class GameWebSocketServer extends WebSocketServer {
         ws.isAlive = false;
         ws.ping();
 
-        // Set a timeout for the pong response
+        if (ws.pingTimeout) {
+          clearTimeout(ws.pingTimeout);
+        }
         ws.pingTimeout = setTimeout(() => {
           console.log("Ping timeout, terminating connection");
           ws.terminate();
-        }, 10000); // 10 second timeout
+        }, 10000);
       });
-    }, 30000); // Send ping every 30 seconds
+    }, 30000);
 
     this.on('close', () => {
-      clearInterval(this.pingInterval);
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
     });
   }
 
   async broadcast(gameId: number, message: any) {
     const room = this.gameRooms.get(gameId);
-    if (!room) return;
+    if (!room) {
+      console.log(`No room found for game ${gameId}`);
+      return;
+    }
 
     const messageStr = JSON.stringify(message);
+    const deadConnections: CustomWebSocket[] = [];
 
     room.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        try {
+      if (!client.isAuthenticated) {
+        console.log(`Skipping message to unauthenticated client`);
+        return;
+      }
+
+      try {
+        if (client.readyState === WebSocket.OPEN) {
           client.send(messageStr);
-        } catch (error) {
-          console.error("Error sending message to client:", error);
+        } else {
+          deadConnections.push(client);
         }
+      } catch (error) {
+        console.error("Error sending message to client:", error);
+        deadConnections.push(client);
       }
     });
+
+    deadConnections.forEach(client => {
+      room.clients.delete(client);
+      if (client.pingTimeout) {
+        clearTimeout(client.pingTimeout);
+      }
+    });
+
+    if (room.clients.size === 0) {
+      this.gameRooms.delete(gameId);
+      console.log(`Removed empty room for game ${gameId}`);
+    }
   }
 
   async broadcastGameUpdate(gameId: number, type: string, data: any) {
     try {
       const room = this.gameRooms.get(gameId);
-      if (!room) return;
+      if (!room) {
+        console.log(`No room found for game ${gameId}`);
+        return;
+      }
 
       const [game] = await db
         .select()
@@ -89,7 +126,10 @@ class GameWebSocketServer extends WebSocketServer {
         .where(eq(games.id, gameId))
         .limit(1);
 
-      if (!game) return;
+      if (!game) {
+        console.log(`Game ${gameId} not found`);
+        return;
+      }
 
       const participants = await db
         .select({
@@ -118,6 +158,15 @@ class GameWebSocketServer extends WebSocketServer {
   }
 
   joinGame(client: CustomWebSocket, gameId: number) {
+    if (!client.isAuthenticated || !client.userId) {
+      console.log(`Rejecting unauthenticated client from joining game ${gameId}`);
+      client.send(JSON.stringify({
+        type: "ERROR",
+        payload: { message: "Authentication required to join game" }
+      }));
+      return;
+    }
+
     if (!this.gameRooms.has(gameId)) {
       this.gameRooms.set(gameId, {
         clients: new Set(),
@@ -132,7 +181,7 @@ class GameWebSocketServer extends WebSocketServer {
     if (room) {
       room.clients.add(client);
       client.gameId = gameId;
-      console.log(`Client joined game ${gameId}`);
+      console.log(`Client ${client.userId} joined game ${gameId}`);
     }
   }
 
@@ -143,10 +192,11 @@ class GameWebSocketServer extends WebSocketServer {
         room.clients.delete(client);
         if (room.clients.size === 0) {
           this.gameRooms.delete(client.gameId);
+          console.log(`Room for game ${client.gameId} removed - no more clients`);
         }
       }
+      console.log(`Client ${client.userId} left game ${client.gameId}`);
       client.gameId = undefined;
-      console.log(`Client left game`);
     }
   }
 }
@@ -160,13 +210,10 @@ export function setupWebSocketServer(server: Server) {
     clientTracking: true,
     verifyClient: async ({ req }: { req: IncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
       try {
-        // Skip verification for Vite HMR
         if (req.headers['sec-websocket-protocol']?.includes('vite-hmr')) {
           console.log('Allowing Vite HMR WebSocket connection');
           return done(true);
         }
-
-        console.log('Verifying WebSocket connection...');
 
         if (!req.headers.cookie) {
           console.log("WebSocket connection rejected: No cookies");
@@ -174,17 +221,13 @@ export function setupWebSocketServer(server: Server) {
         }
 
         const cookies = parse(req.headers.cookie);
-        console.log('Available cookies:', Object.keys(cookies));
-
         const sessionId = cookies['battle.sid'];
         if (!sessionId) {
           console.log("WebSocket connection rejected: No battle.sid cookie found");
           return done(false, 401, "No session ID");
         }
 
-        console.log('Attempting to verify session:', sessionId);
         const user = await verify(sessionId);
-
         if (!user) {
           console.log("WebSocket connection rejected: Invalid session");
           return done(false, 401, "Invalid session");
@@ -203,13 +246,12 @@ export function setupWebSocketServer(server: Server) {
   wss.on('connection', async (ws: CustomWebSocket, req: IncomingMessage) => {
     console.log('New WebSocket connection established');
     ws.isAlive = true;
+    ws.isAuthenticated = false;
 
     const user = (req as any).user;
     if (user) {
       ws.userId = user.id;
-
       try {
-        // Get user's team information
         const [userTeam] = await db
           .select({
             teamId: teamMembers.teamId
@@ -220,6 +262,7 @@ export function setupWebSocketServer(server: Server) {
 
         if (userTeam) {
           ws.teamId = userTeam.teamId;
+          console.log(`User ${user.id} team information loaded: ${userTeam.teamId}`);
         }
       } catch (error) {
         console.error("Error fetching user team:", error);
@@ -236,6 +279,7 @@ export function setupWebSocketServer(server: Server) {
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString());
+        console.log('Received message:', message);
 
         if (!ws.userId) {
           ws.send(JSON.stringify({
@@ -246,12 +290,30 @@ export function setupWebSocketServer(server: Server) {
         }
 
         switch (message.type) {
+          case 'AUTHENTICATE':
+            if (message.payload.userId === ws.userId) {
+              ws.isAuthenticated = true;
+              console.log(`Client ${ws.userId} authenticated`);
+              ws.send(JSON.stringify({
+                type: "AUTHENTICATED",
+                payload: { userId: ws.userId }
+              }));
+            }
+            break;
+
           case "JOIN_GAME":
+            if (!ws.isAuthenticated) {
+              ws.send(JSON.stringify({
+                type: "ERROR",
+                payload: { message: "Authentication required to join game" }
+              }));
+              return;
+            }
             wss.joinGame(ws, message.payload.gameId);
             break;
 
           case "LOCATION_UPDATE":
-            if (ws.gameId) {
+            if (ws.gameId && ws.isAuthenticated) {
               await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
                 userId: ws.userId,
                 location: message.payload.location
@@ -260,10 +322,13 @@ export function setupWebSocketServer(server: Server) {
             break;
 
           case "GAME_STATE_UPDATE":
-            if (ws.gameId) {
+            if (ws.gameId && ws.isAuthenticated) {
               await wss.broadcastGameUpdate(ws.gameId, "GAME_STATE_UPDATE", message.payload);
             }
             break;
+
+          default:
+            console.warn(`Unknown message type received: ${message.type}`);
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -279,7 +344,7 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log('WebSocket connection closed');
+      console.log(`WebSocket connection closed for user ${ws.userId}`);
       if (ws.pingTimeout) {
         clearTimeout(ws.pingTimeout);
       }

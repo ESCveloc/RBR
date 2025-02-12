@@ -47,12 +47,14 @@ export function useWebSocket(): WebSocketInterface {
 
     cleanupWebSocket(); // Ensure any existing connection is properly closed
     isConnectingRef.current = true;
-    console.log('Initiating WebSocket connection...');
 
     try {
+      // Ensure we're using the same origin as the current page
       const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
       const ws = new WebSocket(wsUrl);
+      console.log('Initiating WebSocket connection to:', wsUrl);
 
+      // Set a connection timeout
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           console.log('WebSocket connection timeout, closing connection');
@@ -66,6 +68,12 @@ export function useWebSocket(): WebSocketInterface {
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
+
+        // Send initial authentication message
+        ws.send(JSON.stringify({
+          type: 'AUTHENTICATE',
+          payload: { userId: user.id }
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -118,7 +126,7 @@ export function useWebSocket(): WebSocketInterface {
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        // Only attempt to reconnect if the closure wasn't intentional
+        // Only attempt to reconnect if the closure wasn't intentional and we have a valid user
         if (user && !isUserLoading && reconnectAttemptRef.current < maxReconnectAttempts && event.code !== 1000) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
@@ -147,6 +155,7 @@ export function useWebSocket(): WebSocketInterface {
   }, [user, isUserLoading, toast, cleanupWebSocket]);
 
   useEffect(() => {
+    // Only attempt to connect if we have a valid user and are not loading
     if (!isUserLoading) {
       if (user) {
         connect();
@@ -197,6 +206,16 @@ export function useWebSocket(): WebSocketInterface {
   }, []);
 
   const joinGame = useCallback((gameId: number) => {
+    if (!user) {
+      console.warn('Cannot join game: User not authenticated');
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to join a game.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     console.log('Attempting to join game:', gameId);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       console.log('Sending JOIN_GAME message');
@@ -209,7 +228,7 @@ export function useWebSocket(): WebSocketInterface {
         variant: "destructive"
       });
     }
-  }, [sendMessage, toast]);
+  }, [sendMessage, toast, user]);
 
   return {
     socket: wsRef.current,
