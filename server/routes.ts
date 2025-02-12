@@ -887,6 +887,20 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Update the position assignment endpoint
+  // Add helper function to check team qualifications
+  function checkTeamQualifications(participant: any, maxPlayers: number) {
+    if (!participant || !participant.team) return false;
+
+    const qualifications = {
+      hasEnoughPlayers: participant.team.teamMembers.length >= maxPlayers,
+      isActive: participant.team.active,
+      isReady: participant.ready,
+      notEliminated: participant.status !== "eliminated"
+    };
+
+    return Object.values(qualifications).every(Boolean);
+  }
+
   app.post("/api/games/:gameId/assign-position", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -894,7 +908,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const gameId = parseInt(req.params.gameId);
-      const { teamId, force = false, position } = req.body;
+      const { teamId, force = false, position = null } = req.body;
 
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
@@ -922,95 +936,121 @@ export function registerRoutes(app: Express): Server {
 
       // Verify team is participating in the game
       const [participant] = await db
-        .select()
+        .select({
+          participant: gameParticipants,
+          team: {
+            ...teams,
+            teamMembers: sql<any>`json_agg(team_members.*)`
+          }
+        })
         .from(gameParticipants)
+        .innerJoin(teams, eq(gameParticipants.teamId, teams.id))
+        .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
         .where(
           and(
             eq(gameParticipants.gameId, gameId),
             eq(gameParticipants.teamId, teamId)
           )
         )
-        .limit(1);
+        .groupBy(gameParticipants.id, teams.id)
+        .limit(1)
+        .then(results => results[0]);
 
       if (!participant) {
         return res.status(404).send("Team is not participating in this game");
       }
 
       // If team already has a position and force is false, prevent reassignment
-      if (participant.startingLocation && !force) {
+      if (participant.participant.startingLocation && !force) {
         return res.status(400).send("Team already has a starting position. Contact an administrator to change it.");
       }
 
-      // Check if the position is valid (using fixed number of starting positions)
-      const TOTAL_STARTING_POSITIONS = 10;
-      if (position < 1 || position > TOTAL_STARTING_POSITIONS) {
-        return res.status(400).send(`Invalid position. Must be between 1 and ${TOTAL_STARTING_POSITIONS}`);
+      // For non-admin assignments, check qualifications
+      if (!force && !checkTeamQualifications(participant.participant, game.playersPerTeam)) {
+        return res.status(400).send("Team must meetall qualifications before being assigned a position");
       }
 
-      // Check if the requested position is already taken by another team
-      const existingPosition = await db
-        .select()
-        .from(gameParticipants)
-        .where(
-          and(
-            eq(gameParticipants.gameId, gameId),
-            sql`game_participants.starting_location->>'position' = ${String(position)}`,
-            ne(gameParticipants.teamId, teamId)
-          )
+      // Get currently assigned positions
+      const assignedPositions = await db
+      .select({
+        position: sql<number>`CAST(game_participants.starting_location->>'position' AS INTEGER)`,
+        teamId: gameParticipants.teamId
+      })
+      .from(gameParticipants)
+      .where(
+        and(
+          eq(gameParticipants.gameId, gameId),
+          ne(gameParticipants.teamId, teamId),
+          sql`game_participants.starting_location IS NOT NULL`
         )
-        .limit(1)
-        .then(results => results[0]);
-
-      if (existingPosition && !force) {
-        return res.status(400).send("This position is already taken by another team. Please select a different position.");
-      }
-
-      // Calculate position coordinates based on boundaries
-      const coordinates = game.boundaries.geometry.coordinates[0];
-      const center = coordinates.reduce(
-        (acc, [lng, lat]) => ({
-          lat: acc.lat + lat / coordinates.length,
-          lng: acc.lng + lng / coordinateslength
-        }),
-        { lat: 0, lng: 0 }
       );
 
-      const radius = Math.max(...coordinates.map(([lng, lat]) => {
-        const latDiff = center.lat - lat;
-        const lngDiff = center.lng - lng;
-        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-      }));
+    const takenPositions = new Set(assignedPositions.map(p => p.position));
 
-      // Convert position to angle (evenly distributed around the circle)
-      const angle = (-1 * (position - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
-      const safetyFactor = 0.9; // Keep points inside the boundary
-      const x = center.lng + (radius * safetyFactor * Math.cos(angle));
-      const y = center.lat + (radius * safetyFactor * Math.sin(angle));
+    // If position is not specified, randomly assign from available positions
+    let assignedPosition = position;
+    if (!assignedPosition) {
+      const availablePositions = Array.from({ length: 10 }, (_, i) => i + 1)
+        .filter(p => !takenPositions.has(p));
 
-      // Update participant with new starting location
-      const [updatedParticipant] = await db
-        .update(gameParticipants)
-        .set({
-          startingLocation: {
-            position: position,
-            coordinates: { lat: y, lng: x }
-          },
-          startingLocationAssignedAt: new Date()
-        })
-        .where(
-          and(
-            eq(gameParticipants.gameId, gameId),
-            eq(gameParticipants.teamId, teamId)
-          )
-        )
-        .returning();
+      if (availablePositions.length === 0) {
+        return res.status(400).send("No available positions remaining");
+      }
 
-      res.json(updatedParticipant);
-    } catch (error) {
-      console.error("Assign position error:", error);
-      res.status(500).send("Failed to assign position");
+      // Randomly select from available positions
+      const randomIndex = Math.floor(Math.random() * availablePositions.length);
+      assignedPosition = availablePositions[randomIndex];
+    } else if (!force && takenPositions.has(assignedPosition)) {
+      return res.status(400).send("This position is already taken by another team");
     }
-  });
+
+    // Calculate position coordinates based on boundaries
+    const coordinates = game.boundaries.geometry.coordinates[0];
+    const center = coordinates.reduce(
+      (acc, [lng, lat]) => ({
+        lat: acc.lat + lat / coordinates.length,
+        lng: acc.lng + lng / coordinates.length
+      }),
+      { lat: 0, lng: 0 }
+    );
+
+    const radius = Math.max(...coordinates.map(([lng, lat]) => {
+      const latDiff = center.lat - lat;
+      const lngDiff = center.lng - lng;
+      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    }));
+
+    // Convert position to angle (evenly distributed around the circle)
+    const TOTAL_STARTING_POSITIONS = 10;
+    const angle = (-1 * (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
+    const safetyFactor = 0.9; // Keep points inside the boundary
+    const x = center.lng + (radius * safetyFactor * Math.cos(angle));
+    const y = center.lat + (radius * safetyFactor * Math.sin(angle));
+
+    // Update participant with new starting location
+    const [updatedParticipant] = await db
+      .update(gameParticipants)
+      .set({
+        startingLocation: {
+          position: assignedPosition,
+          coordinates: { lat: y, lng: x }
+        },
+        startingLocationAssignedAt: new Date()
+      })
+      .where(
+        and(
+          eq(gameParticipants.gameId, gameId),
+          eq(gameParticipants.teamId, teamId)
+        )
+      )
+      .returning();
+
+    res.json(updatedParticipant);
+  } catch (error) {
+    console.error("Position assignment error:", error);
+    res.status(500).send("Failed to assign position");
+  }
+});
 
   // Add random position assignment endpoint
   app.post("/api/games/:gameId/assign-random-position", async (req, res) => {
