@@ -1,8 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
 import type { Server } from "http";
-import type { IncomingMessage } from "http";
 import { db } from "@db";
-import { games, teams, teamMembers, gameParticipants } from "@db/schema";
+import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
 
 // Document WebSocket message types and their purposes
@@ -11,33 +10,8 @@ type WebSocketMessage = {
   payload: any;  // Message data
 };
 
-// Current implemented real-time features:
-/*
-1. Game State Updates (Essential)
-   - Type: "GAME_STATE_UPDATE"
-   - Purpose: Updates game status, zone changes, and time remaining
-   - Necessity: Critical for game coordination
-
-2. Location Updates (Essential)
-   - Type: "LOCATION_UPDATE"
-   - Purpose: Real-time player/team position tracking
-   - Necessity: Core gameplay mechanic
-
-3. Team Status (Essential)
-   - Type: "TEAM_STATUS_UPDATE"
-   - Purpose: Team readiness and participation status
-   - Necessity: Required for game start coordination
-
-4. Game Events (Essential)
-   - Type: "GAME_EVENT"
-   - Purpose: Important game events (eliminations, zone changes)
-   - Necessity: Critical for gameplay feedback
-*/
-
 interface CustomWebSocket extends WebSocket {
   gameId?: number;
-  userId?: number;
-  teamId?: number;
   isAlive?: boolean;
   pingTimeout?: NodeJS.Timeout;
 }
@@ -72,7 +46,6 @@ class GameWebSocketServer extends WebSocketServer {
           if (ws.pingTimeout) {
             clearTimeout(ws.pingTimeout);
           }
-          console.log("Terminating inactive connection");
           return ws.terminate();
         }
 
@@ -83,7 +56,6 @@ class GameWebSocketServer extends WebSocketServer {
           clearTimeout(ws.pingTimeout);
         }
         ws.pingTimeout = setTimeout(() => {
-          console.log("Ping timeout");
           ws.terminate();
         }, 10000);
       });
@@ -112,7 +84,6 @@ class GameWebSocketServer extends WebSocketServer {
         if (client.readyState === WebSocket.OPEN) {
           client.send(messageStr);
         } else {
-          console.log(`Client in non-OPEN state, marking for removal`);
           deadConnections.push(client);
         }
       } catch (error) {
@@ -123,7 +94,6 @@ class GameWebSocketServer extends WebSocketServer {
 
     // Clean up dead connections
     if (deadConnections.length > 0) {
-      console.log(`Cleaning up ${deadConnections.length} dead connections for game ${gameId}`);
       deadConnections.forEach(client => {
         room.clients.delete(client);
         if (client.pingTimeout) {
@@ -132,7 +102,6 @@ class GameWebSocketServer extends WebSocketServer {
       });
 
       if (room.clients.size === 0) {
-        console.log(`Removing empty room for game ${gameId}`);
         this.gameRooms.delete(gameId);
       }
     }
@@ -141,10 +110,7 @@ class GameWebSocketServer extends WebSocketServer {
   async broadcastGameUpdate(gameId: number, type: string, data: any) {
     try {
       const room = this.gameRooms.get(gameId);
-      if (!room) {
-        console.log(`No room found for game ${gameId}`);
-        return;
-      }
+      if (!room) return;
 
       const [game] = await db
         .select()
@@ -152,10 +118,7 @@ class GameWebSocketServer extends WebSocketServer {
         .where(eq(games.id, gameId))
         .limit(1);
 
-      if (!game) {
-        console.log(`Game ${gameId} not found`);
-        return;
-      }
+      if (!game) return;
 
       const participants = await db
         .select()
@@ -177,7 +140,6 @@ class GameWebSocketServer extends WebSocketServer {
 
   joinGame(client: CustomWebSocket, gameId: number) {
     if (!this.gameRooms.has(gameId)) {
-      console.log(`Creating new room for game ${gameId}`);
       this.gameRooms.set(gameId, {
         clients: new Set(),
         lastUpdate: {
@@ -202,10 +164,8 @@ class GameWebSocketServer extends WebSocketServer {
         room.clients.delete(client);
         if (room.clients.size === 0) {
           this.gameRooms.delete(client.gameId);
-          console.log(`Room for game ${client.gameId} removed - no more clients`);
         }
       }
-      console.log(`Client left game ${client.gameId}`);
       client.gameId = undefined;
     }
   }
@@ -265,10 +225,6 @@ export function setupWebSocketServer(server: Server) {
           payload: { message: "Invalid message format" }
         }));
       }
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket connection error:', error);
     });
 
     ws.on('close', () => {
