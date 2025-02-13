@@ -236,24 +236,29 @@ export function TeamCard({
                           const isTaken = takenPositions.includes(pos);
                           const isCurrentPosition = pos === participant?.startingLocation?.position;
                           const positionValue = String(pos);
-                          return (
-                            <SelectItem
-                              key={pos}
-                              value={positionValue}
-                              disabled={isTaken && !isCurrentPosition && !isAdmin}
-                              className={cn(
-                                "transition-all duration-200",
-                                isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
-                                isCurrentPosition && "text-primary font-medium",
-                                "hover:bg-primary/10"
-                              )}
-                            >
-                              Site {pos}
-                              {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
-                              {isCurrentPosition && " (Current)"}
-                              {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
-                            </SelectItem>
-                          );
+
+                          // Only render SelectItem if we have a valid position number
+                          if (pos > 0) {
+                            return (
+                              <SelectItem
+                                key={pos}
+                                value={positionValue}
+                                disabled={isTaken && !isCurrentPosition && !isAdmin}
+                                className={cn(
+                                  "transition-all duration-200",
+                                  isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
+                                  isCurrentPosition && "text-primary font-medium",
+                                  "hover:bg-primary/10"
+                                )}
+                              >
+                                Site {pos}
+                                {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
+                                {isCurrentPosition && " (Current)"}
+                                {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
+                              </SelectItem>
+                            );
+                          }
+                          return null;
                         })}
                       </SelectContent>
                     </Select>
