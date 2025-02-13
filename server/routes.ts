@@ -558,13 +558,6 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Fix the duplicate function and type issues in the position assignment logic
-  function assignRandomPosition(availablePositions: number[]): number {
-    if (availablePositions.length === 0) {
-      throw new Error("No available positions remaining");
-    }
-    const randomIndex = Math.floor(Math.random() * availablePositions.length);
-    return availablePositions[randomIndex];
-  }
 
   app.patch("/api/teams/:teamId/captain", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -970,7 +963,7 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!game) {
-        return res.status(404).send(""Game not found");
+        return res.status(404).send("Game not found");
       }
 
       if (game.status !== "pending") {
@@ -984,7 +977,7 @@ export function registerRoutes(app: Express): Server {
 
       // Verify team is participating in the game
       const [participant] = await db
-        .select({
+.select({
           participant: gameParticipants,
           team: teams
         })

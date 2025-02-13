@@ -359,7 +359,7 @@ export default function Game() {
                       gameId={game.id}
                       participant={{
                         ...participant,
-                        team: participant.team || {
+                        team: (participant as any).team || {
                           id: 0,
                           name: "Unknown Team",
                           createdAt: new Date(),
