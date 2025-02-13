@@ -69,7 +69,7 @@ export default function Game() {
     if (!isConnected || !socket || !gameId) return;
 
     console.log('Setting up WebSocket subscription for game:', gameId);
-    const unsubscribe = subscribeToMessage('GAME_UPDATE', (data) => {
+    const unsubscribe = subscribeToMessage('GAME_STATE_UPDATE', (data) => {
       try {
         console.log('Received game update:', data);
         if (data.gameId === gameId) {
@@ -94,7 +94,10 @@ export default function Game() {
     staleTime: 30000,
     refetchInterval: false,
     retry: 2,
-    enabled: !!gameId
+    enabled: !!gameId,
+    onError: (error) => {
+      console.error(`Error fetching game ${gameId}:`, error);
+    }
   });
 
   const updateGameStatus = useMutation({
