@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Game, GameParticipant } from '@db/schema';
 import { useWebSocket } from './use-websocket';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface UpdatePositionData {
@@ -12,8 +12,54 @@ interface UpdatePositionData {
 
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
-  const { socket, sendMessage, subscribeToMessage } = useWebSocket();
+  const { socket, sendMessage, subscribeToMessage, sendLocationUpdate } = useWebSocket();
   const { toast } = useToast();
+  const watchIdRef = useRef<number | null>(null);
+
+  // Start location tracking when game is active
+  useEffect(() => {
+    if (!socket || !gameId) return;
+
+    const startLocationTracking = () => {
+      if (!navigator.geolocation) {
+        toast({
+          title: "Error",
+          description: "Geolocation is not supported by your browser",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Watch position with high accuracy
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          sendLocationUpdate(gameId, position);
+        },
+        (error) => {
+          toast({
+            title: "Location Error",
+            description: `Failed to get location: ${error.message}`,
+            variant: "destructive"
+          });
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 3000,
+          timeout: 5000
+        }
+      );
+    };
+
+    startLocationTracking();
+
+    // Cleanup location tracking
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [socket, gameId, sendLocationUpdate, toast]);
 
   // Subscribe to game updates
   useEffect(() => {

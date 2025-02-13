@@ -13,6 +13,7 @@ interface WebSocketInterface {
   subscribeToMessage: (type: string, handler: (payload: any) => void) => () => void;
   isConnected: boolean;
   joinGame: (gameId: number) => void;
+  sendLocationUpdate: (gameId: number, location: GeolocationPosition) => void;
 }
 
 export function useWebSocket(): WebSocketInterface {
@@ -25,6 +26,7 @@ export function useWebSocket(): WebSocketInterface {
   const isConnectingRef = useRef(false);
   const messageHandlersRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
   const pendingGameJoinRef = useRef<number | null>(null);
+  const locationUpdateQueueRef = useRef<{ gameId: number; location: GeolocationPosition }[]>([]);
 
   const cleanupWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -40,6 +42,7 @@ export function useWebSocket(): WebSocketInterface {
     isConnectingRef.current = false;
     messageHandlersRef.current.clear();
     pendingGameJoinRef.current = null;
+    locationUpdateQueueRef.current = [];
   }, []);
 
   const connect = useCallback(() => {
@@ -222,11 +225,43 @@ export function useWebSocket(): WebSocketInterface {
     }
   }, [sendMessage, toast, user, connect]);
 
+  const sendLocationUpdate = useCallback(async (gameId: number, location: GeolocationPosition) => {
+    const locationData = {
+      gameId,
+      location: {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+        timestamp: location.timestamp
+      }
+    };
+
+    // If offline, queue update for background sync
+    if (!navigator.onLine || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      locationUpdateQueueRef.current.push({ gameId, location });
+
+      // Register for background sync if supported
+      if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) { //Corrected type error here
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.sync.register('sync-location');
+        } catch (error) {
+          console.error('Background sync registration failed:', error);
+        }
+      }
+      return;
+    }
+
+    // Send update if online
+    sendMessage('LOCATION_UPDATE', locationData);
+  }, [sendMessage]);
+
   return {
     socket: wsRef.current,
     sendMessage,
     subscribeToMessage,
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
-    joinGame
+    joinGame,
+    sendLocationUpdate
   };
 }
