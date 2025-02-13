@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Game, GameParticipant } from '@db/schema';
 import { useWebSocket } from './use-websocket';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface UpdatePositionData {
@@ -10,11 +10,25 @@ interface UpdatePositionData {
   force?: boolean;
 }
 
+interface GameState {
+  positions: Record<number, GeolocationCoordinates>;
+  zones: Array<{
+    id: number;
+    coordinates: [number, number];
+    radius: number;
+    controllingTeam?: number;
+  }>;
+}
+
 export function useGame(gameId: number) {
   const queryClient = useQueryClient();
-  const { socket, sendMessage, subscribeToMessage, sendLocationUpdate } = useWebSocket();
+  const { socket, sendMessage, subscribeToMessage, sendLocationUpdate, sendZoneUpdate } = useWebSocket();
   const { toast } = useToast();
   const watchIdRef = useRef<number | null>(null);
+  const [gameState, setGameState] = useState<GameState>({
+    positions: {},
+    zones: []
+  });
 
   // Start location tracking when game is active
   useEffect(() => {
@@ -65,37 +79,43 @@ export function useGame(gameId: number) {
   useEffect(() => {
     if (!socket) return;
 
-    // Subscribe to game state updates (kept for critical game state changes)
+    // Subscribe to game state updates
     const unsubscribeGameUpdate = subscribeToMessage('GAME_STATE_UPDATE', (payload) => {
       if (payload.gameId === gameId) {
+        setGameState(payload.gameState);
         queryClient.setQueryData([`/api/games/${gameId}`], payload.game);
       }
     });
 
-    // Subscribe to position updates (critical for gameplay)
+    // Subscribe to location updates
     const unsubscribeLocationUpdate = subscribeToMessage('LOCATION_UPDATE', (payload) => {
       if (payload.gameId === gameId) {
-        queryClient.setQueryData([`/api/games/${gameId}`], (oldData: Game | undefined) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            participants: oldData.participants?.map(participant => {
-              if (participant.teamId === payload.teamId) {
-                return {
-                  ...participant,
-                  startingLocation: payload.startingLocation
-                };
-              }
-              return participant;
-            })
-          };
-        });
+        setGameState(prevState => ({
+          ...prevState,
+          positions: {
+            ...prevState.positions,
+            [payload.teamId]: payload.location
+          }
+        }));
+      }
+    });
+
+    // Subscribe to zone updates
+    const unsubscribeZoneUpdate = subscribeToMessage('ZONE_UPDATE', (payload) => {
+      if (payload.gameId === gameId) {
+        setGameState(prevState => ({
+          ...prevState,
+          zones: prevState.zones.map(zone =>
+            zone.id === payload.zoneId ? { ...zone, ...payload.update } : zone
+          )
+        }));
       }
     });
 
     return () => {
       unsubscribeGameUpdate();
       unsubscribeLocationUpdate();
+      unsubscribeZoneUpdate();
     };
   }, [socket, gameId, queryClient, subscribeToMessage]);
 
@@ -191,41 +211,17 @@ export function useGame(gameId: number) {
     }
   });
 
-  const joinGame = useMutation({
-    mutationFn: async (teamId: number) => {
-      const response = await fetch(`/api/games/${gameId}/join`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ teamId }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
+  const updateZone = useMutation({
+    mutationFn: async ({ zoneId, update }: { zoneId: number; update: Partial<GameState['zones'][0]> }) => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        sendZoneUpdate(gameId, zoneId, update);
+        return { zoneId, update };
       }
-
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData<Game>([`/api/games/${gameId}`], (oldData) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          participants: [...(oldData.participants || []), data]
-        };
-      });
-
-      toast({
-        title: "Success",
-        description: "Successfully joined the game",
-      });
+      throw new Error("WebSocket connection not available");
     },
     onError: (err: Error) => {
       toast({
-        title: "Error joining game",
+        title: "Error updating zone",
         description: err.message,
         variant: "destructive"
       });
@@ -234,10 +230,11 @@ export function useGame(gameId: number) {
 
   return {
     game,
+    gameState,
     isLoading,
     error,
     updateLocation,
-    joinGame,
+    updateZone,
     updateReadyStatus
   };
 }

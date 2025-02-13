@@ -3,6 +3,8 @@ import type { Server } from "http";
 import { db } from "@db";
 import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
+import type { Session } from "express-session";
+import type { User } from "@db/schema";
 
 // Document WebSocket message types and their purposes
 type WebSocketMessage = {
@@ -14,10 +16,27 @@ interface CustomWebSocket extends WebSocket {
   gameId?: number;
   isAlive?: boolean;
   pingTimeout?: NodeJS.Timeout;
+  session?: Session & { user?: User };
+}
+
+interface GeolocationCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
+interface GameState {
+  positions: Record<number, GeolocationCoordinates>;
+  zones: Array<{
+    id: number;
+    coordinates: [number, number];
+    radius: number;
+    controllingTeam?: number;
+  }>;
 }
 
 interface GameRoom {
   clients: Set<CustomWebSocket>;
+  gameState: GameState;
   lastUpdate: {
     timestamp: number;
     data: any;
@@ -125,23 +144,45 @@ class GameWebSocketServer extends WebSocketServer {
         .from(gameParticipants)
         .where(eq(gameParticipants.gameId, gameId));
 
-      await this.broadcast(gameId, {
+      const payload = {
         type,
         payload: {
           gameId,
           game: { ...game, participants },
+          gameState: room.gameState,
           ...data
         }
-      });
+      };
+
+      await this.broadcast(gameId, payload);
+
+      // Update last update timestamp
+      room.lastUpdate = {
+        timestamp: Date.now(),
+        data: payload
+      };
     } catch (error) {
       console.error("Error broadcasting game update:", error);
     }
   }
 
   joinGame(client: CustomWebSocket, gameId: number) {
+    if (!client.session?.user) {
+      console.log('Unauthorized client attempting to join game');
+      client.send(JSON.stringify({
+        type: "ERROR",
+        payload: { message: "Unauthorized" }
+      }));
+      return;
+    }
+
     if (!this.gameRooms.has(gameId)) {
       this.gameRooms.set(gameId, {
         clients: new Set(),
+        gameState: {
+          positions: {},
+          zones: []
+        },
         lastUpdate: {
           timestamp: Date.now(),
           data: null
@@ -154,7 +195,32 @@ class GameWebSocketServer extends WebSocketServer {
       room.clients.add(client);
       client.gameId = gameId;
       console.log(`Client joined game ${gameId}`);
+
+      // Send current game state to new client
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: "GAME_STATE_UPDATE",
+          payload: {
+            gameId,
+            gameState: room.gameState
+          }
+        }));
+      }
     }
+  }
+
+  updateGameState(gameId: number, update: Partial<GameState>) {
+    const room = this.gameRooms.get(gameId);
+    if (!room) return;
+
+    room.gameState = {
+      ...room.gameState,
+      ...update
+    };
+
+    this.broadcastGameUpdate(gameId, "GAME_STATE_UPDATE", {
+      gameState: room.gameState
+    });
   }
 
   leaveGame(client: CustomWebSocket) {
@@ -178,20 +244,27 @@ export function setupWebSocketServer(server: Server) {
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
     clientTracking: true,
-    verifyClient: (info, done) => {
+    verifyClient: (info: any, done: any) => {
       // Skip verification for Vite HMR
       if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
         return done(true);
       }
 
-      // Always allow connection for now, we'll handle authentication in the connection handler
+      // Check for valid session
+      const session = (info.req as any).session;
+      if (!session?.user) {
+        console.log('WebSocket connection rejected: No valid session');
+        return done(false, 401, 'Unauthorized');
+      }
+
       done(true);
     }
   });
 
-  wss.on('connection', async (ws: CustomWebSocket) => {
+  wss.on('connection', async (ws: CustomWebSocket, req: any) => {
     console.log('New WebSocket connection established');
     ws.isAlive = true;
+    ws.session = req.session;
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -202,6 +275,15 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on('message', async (data) => {
       try {
+        // Check authentication for every message
+        if (!ws.session?.user) {
+          ws.send(JSON.stringify({
+            type: "ERROR",
+            payload: { message: "Unauthorized" }
+          }));
+          return;
+        }
+
         const message = JSON.parse(data.toString());
         console.log('Received message:', message);
 
@@ -212,9 +294,37 @@ export function setupWebSocketServer(server: Server) {
 
           case "LOCATION_UPDATE":
             if (ws.gameId) {
-              await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
-                location: message.payload.location
-              });
+              const gameRoom = wss.gameRooms.get(ws.gameId);
+              if (gameRoom) {
+                gameRoom.gameState.positions[message.payload.teamId] = message.payload.location;
+                await wss.broadcastGameUpdate(ws.gameId, "LOCATION_UPDATE", {
+                  teamId: message.payload.teamId,
+                  location: message.payload.location
+                });
+              }
+            }
+            break;
+
+          case "ZONE_UPDATE":
+            if (ws.gameId) {
+              const gameRoom = wss.gameRooms.get(ws.gameId);
+              if (gameRoom) {
+                const zoneIndex = gameRoom.gameState.zones.findIndex(
+                  zone => zone.id === message.payload.zoneId
+                );
+
+                if (zoneIndex >= 0) {
+                  gameRoom.gameState.zones[zoneIndex] = {
+                    ...gameRoom.gameState.zones[zoneIndex],
+                    ...message.payload.update
+                  };
+
+                  await wss.broadcastGameUpdate(ws.gameId, "ZONE_UPDATE", {
+                    zoneId: message.payload.zoneId,
+                    update: message.payload.update
+                  });
+                }
+              }
             }
             break;
 

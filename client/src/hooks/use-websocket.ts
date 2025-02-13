@@ -7,6 +7,16 @@ type WebSocketMessage = {
   payload: any;
 };
 
+interface GameState {
+  positions: Record<number, GeolocationCoordinates>;
+  zones: Array<{
+    id: number;
+    coordinates: [number, number];
+    radius: number;
+    controllingTeam?: number;
+  }>;
+}
+
 interface WebSocketInterface {
   socket: WebSocket | null;
   sendMessage: (type: string, payload: any) => void;
@@ -14,6 +24,7 @@ interface WebSocketInterface {
   isConnected: boolean;
   joinGame: (gameId: number) => void;
   sendLocationUpdate: (gameId: number, location: GeolocationPosition) => void;
+  sendZoneUpdate: (gameId: number, zoneId: number, update: Partial<GameState['zones'][0]>) => void;
 }
 
 export function useWebSocket(): WebSocketInterface {
@@ -27,6 +38,7 @@ export function useWebSocket(): WebSocketInterface {
   const messageHandlersRef = useRef<Map<string, Set<(payload: any) => void>>>(new Map());
   const pendingGameJoinRef = useRef<number | null>(null);
   const locationUpdateQueueRef = useRef<{ gameId: number; location: GeolocationPosition }[]>([]);
+  const zoneUpdateQueueRef = useRef<{ gameId: number; zoneId: number; update: any }[]>([]);
 
   const cleanupWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -43,6 +55,7 @@ export function useWebSocket(): WebSocketInterface {
     messageHandlersRef.current.clear();
     pendingGameJoinRef.current = null;
     locationUpdateQueueRef.current = [];
+    zoneUpdateQueueRef.current = [];
   }, []);
 
   const connect = useCallback(() => {
@@ -79,6 +92,21 @@ export function useWebSocket(): WebSocketInterface {
             payload: { gameId: pendingGameJoinRef.current }
           }));
           pendingGameJoinRef.current = null;
+        }
+
+        // Process any queued updates
+        while (locationUpdateQueueRef.current.length > 0) {
+          const update = locationUpdateQueueRef.current.shift();
+          if (update) {
+            sendLocationUpdate(update.gameId, update.location);
+          }
+        }
+
+        while (zoneUpdateQueueRef.current.length > 0) {
+          const update = zoneUpdateQueueRef.current.shift();
+          if (update) {
+            sendZoneUpdate(update.gameId, update.zoneId, update.update);
+          }
         }
       };
 
@@ -236,24 +264,21 @@ export function useWebSocket(): WebSocketInterface {
       }
     };
 
-    // If offline, queue update for background sync
     if (!navigator.onLine || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       locationUpdateQueueRef.current.push({ gameId, location });
-
-      // Register for background sync if supported
-      if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) { //Corrected type error here
-        try {
-          const registration = await navigator.serviceWorker.ready;
-          await registration.sync.register('sync-location');
-        } catch (error) {
-          console.error('Background sync registration failed:', error);
-        }
-      }
       return;
     }
 
-    // Send update if online
     sendMessage('LOCATION_UPDATE', locationData);
+  }, [sendMessage]);
+
+  const sendZoneUpdate = useCallback((gameId: number, zoneId: number, update: Partial<GameState['zones'][0]>) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      zoneUpdateQueueRef.current.push({ gameId, zoneId, update });
+      return;
+    }
+
+    sendMessage('ZONE_UPDATE', { gameId, zoneId, update });
   }, [sendMessage]);
 
   return {
@@ -262,6 +287,7 @@ export function useWebSocket(): WebSocketInterface {
     subscribeToMessage,
     isConnected: wsRef.current?.readyState === WebSocket.OPEN,
     joinGame,
-    sendLocationUpdate
+    sendLocationUpdate,
+    sendZoneUpdate
   };
 }
