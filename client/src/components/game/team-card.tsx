@@ -54,10 +54,10 @@ export function TeamCard({
   showMembers = false,
   showLocation = false
 }: TeamCardProps) {
-  const [selectedPosition, setSelectedPosition] = useState<string>(
+  const [selectedPosition, setSelectedPosition] = useState<string | undefined>(
     participant?.startingLocation?.position
       ? String(participant.startingLocation.position)
-      : ""
+      : undefined
   );
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -114,7 +114,7 @@ export function TeamCard({
     } catch (error) {
       console.error('Failed to update position:', error);
       // Reset to previous position on error
-      setSelectedPosition(participant.startingLocation?.position?.toString() || "");
+      setSelectedPosition(participant.startingLocation?.position?.toString() || undefined);
     }
   };
 
@@ -235,10 +235,11 @@ export function TeamCard({
                         {positions.map((pos) => {
                           const isTaken = takenPositions.includes(pos);
                           const isCurrentPosition = pos === participant?.startingLocation?.position;
+                          const positionValue = String(pos);
                           return (
                             <SelectItem
                               key={pos}
-                              value={String(pos)}
+                              value={positionValue}
                               disabled={isTaken && !isCurrentPosition && !isAdmin}
                               className={cn(
                                 "transition-all duration-200",
