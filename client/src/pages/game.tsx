@@ -35,7 +35,22 @@ export default function Game() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  const gameId = match && params?.id ? parseInt(params.id) : undefined;
+  // Only parse gameId if both match and params.id exist and params.id is not "0"
+  const gameId = match && params?.id && params.id !== "0" ? parseInt(params.id) : undefined;
+
+  // If no valid gameId, redirect immediately
+  if (!gameId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Invalid Game ID</h1>
+          <Link href="/">
+            <Button>Return to Home</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const { socket, isConnected, subscribeToMessage, joinGame } = useWebSocket();
 
@@ -170,19 +185,6 @@ export default function Game() {
     }
   });
 
-
-  if (!match || !gameId) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
-          <Link href="/">
-            <Button>Return to Home</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
