@@ -99,22 +99,28 @@ export function TeamCard({
   const positions = Array.from({ length: 10 }, (_, i) => i + 1);
 
   const handlePositionChange = async (value: string) => {
-    if (!participant?.teamId) {
-      console.log('No team ID available for position update');
+    if (!participant?.teamId || !value) {
+      console.log('No team ID or invalid position value');
       return;
     }
 
-    setSelectedPosition(value);
     try {
+      const positionNumber = parseInt(value, 10);
+      if (isNaN(positionNumber) || positionNumber < 1 || positionNumber > 10) {
+        console.error('Invalid position number:', value);
+        return;
+      }
+
+      setSelectedPosition(value);
       await updateLocation.mutateAsync({
         teamId: participant.teamId,
-        position: parseInt(value),
+        position: positionNumber,
         force: isAdmin
       });
     } catch (error) {
       console.error('Failed to update position:', error);
       // Reset to previous position on error
-      setSelectedPosition(participant.startingLocation?.position?.toString() || undefined);
+      setSelectedPosition(participant.startingLocation?.position?.toString());
     }
   };
 
@@ -238,27 +244,24 @@ export function TeamCard({
                           const positionValue = String(pos);
 
                           // Only render SelectItem if we have a valid position number
-                          if (pos > 0) {
-                            return (
-                              <SelectItem
-                                key={pos}
-                                value={positionValue}
-                                disabled={isTaken && !isCurrentPosition && !isAdmin}
-                                className={cn(
-                                  "transition-all duration-200",
-                                  isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
-                                  isCurrentPosition && "text-primary font-medium",
-                                  "hover:bg-primary/10"
-                                )}
-                              >
-                                Site {pos}
-                                {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
-                                {isCurrentPosition && " (Current)"}
-                                {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
-                              </SelectItem>
-                            );
-                          }
-                          return null;
+                          return (
+                            <SelectItem
+                              key={pos}
+                              value={positionValue}
+                              disabled={isTaken && !isCurrentPosition && !isAdmin}
+                              className={cn(
+                                "transition-all duration-200",
+                                isTaken && !isCurrentPosition && !isAdmin && "opacity-50",
+                                isCurrentPosition && "text-primary font-medium",
+                                "hover:bg-primary/10"
+                              )}
+                            >
+                              Site {pos}
+                              {isTaken && !isCurrentPosition && !isAdmin && " (Taken)"}
+                              {isCurrentPosition && " (Current)"}
+                              {isTaken && !isCurrentPosition && isAdmin && " (Override Available)"}
+                            </SelectItem>
+                          );
                         })}
                       </SelectContent>
                     </Select>
