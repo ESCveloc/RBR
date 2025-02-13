@@ -35,11 +35,11 @@ export default function Game() {
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  // Only parse gameId if both match and params.id exist and params.id is not "0"
-  const gameId = match && params?.id && params.id !== "0" ? parseInt(params.id) : undefined;
+  // Parse and validate gameId
+  const gameId = match && params?.id ? parseInt(params.id) : null;
 
-  // If no valid gameId, redirect immediately
-  if (!gameId) {
+  // If no valid gameId, show error page
+  if (!match || !gameId || isNaN(gameId)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -53,11 +53,10 @@ export default function Game() {
   }
 
   const { socket, isConnected, subscribeToMessage, joinGame } = useWebSocket();
-
   const isAdmin = user?.role === 'admin';
-
   const backLink = isAdmin ? "/admin" : "/";
 
+  // Set up WebSocket connection
   useEffect(() => {
     if (isConnected && socket && gameId) {
       console.log('Joining game room:', gameId);
@@ -65,10 +64,11 @@ export default function Game() {
     }
   }, [isConnected, socket, gameId, joinGame]);
 
+  // Subscribe to game updates
   useEffect(() => {
     if (!isConnected || !socket || !gameId) return;
 
-    console.log('Setting up WebSocket subscription in Game page for game:', gameId);
+    console.log('Setting up WebSocket subscription for game:', gameId);
     const unsubscribe = subscribeToMessage('GAME_UPDATE', (data) => {
       try {
         console.log('Received game update:', data);
@@ -81,18 +81,20 @@ export default function Game() {
     });
 
     return () => {
-      console.log('Cleaning up WebSocket subscription in Game page');
+      console.log('Cleaning up WebSocket subscription');
       if (unsubscribe) {
         unsubscribe();
       }
     };
   }, [socket, isConnected, gameId, subscribeToMessage, queryClient]);
 
+  // Fetch game data
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
     staleTime: 30000,
     refetchInterval: false,
-    placeholderData: () => queryClient.getQueryData([`/api/games/${gameId}`])
+    retry: 2,
+    enabled: !!gameId
   });
 
   const updateGameStatus = useMutation({
@@ -185,7 +187,6 @@ export default function Game() {
     }
   });
 
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -195,11 +196,14 @@ export default function Game() {
   }
 
   if (error || !game) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to load game data";
+    console.error('Game loading error:', errorMessage);
+
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Error Loading Game</h1>
-          <p className="text-muted-foreground mb-4">{error?.message || "Failed to load game data"}</p>
+          <p className="text-muted-foreground mb-4">{errorMessage}</p>
           <Link href="/">
             <Button>Return to Home</Button>
           </Link>
