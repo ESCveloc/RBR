@@ -122,9 +122,9 @@ export function SelectTeam({ gameId }: SelectTeamProps) {
                 );
               })
             ) : (
-              <SelectItem value="" disabled>
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
                 No available teams
-              </SelectItem>
+              </div>
             )}
           </SelectContent>
         </Select>
