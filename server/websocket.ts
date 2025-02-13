@@ -177,7 +177,16 @@ export function setupWebSocketServer(server: Server) {
     path: '/ws',
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
-    clientTracking: true
+    clientTracking: true,
+    verifyClient: (info, done) => {
+      // Skip verification for Vite HMR
+      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        return done(true);
+      }
+
+      // Always allow connection for now, we'll handle authentication in the connection handler
+      done(true);
+    }
   });
 
   wss.on('connection', async (ws: CustomWebSocket) => {

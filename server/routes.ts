@@ -1,10 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
-import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
+import { users, games, teams, teamMembers, gameParticipants } from "@db/schema";
 import { eq, ilike, or, and, sql, exists, ne } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -26,85 +25,14 @@ const gameSchema = z.object({
   })).optional()
 });
 
-// Update zone calculation logic
-function calculateStartingLocations(boundaries: any, numPoints: number) {
-  const coordinates = boundaries.geometry.coordinates[0];
-
-  // Calculate center point (this should remain constant for all zones)
-  const center = coordinates.reduce(
-    (acc: { lat: number; lng: number }, coord: number[]) => {
-      return {
-        lat: acc.lat + coord[1] / coordinates.length,
-        lng: acc.lng + coord[0] / coordinates.length
-      };
-    },
-    { lat: 0, lng: 0 }
-  );
-
-  // Calculate initial radius based on the furthest point
-  const baseRadius = Math.max(...coordinates.map((coord: number[]) => {
-    const lat = coord[1];
-    const lng = coord[0];
-    const latDiff = center.lat - lat;
-    const lngDiff = center.lng - lng;
-    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-  }));
-
-  // Generate equidistant points around the circle with safe radius
-  const startingLocations = [];
-  const safeRadius = baseRadius * 0.9; // Keep points well within the boundary
-
-  for (let i = 0; i < numPoints; i++) {
-    const angle = (i * 2 * Math.PI) / numPoints;
-    const lat = center.lat + (safeRadius * Math.sin(angle));
-    const lng = center.lng + (safeRadius * Math.cos(angle));
-    startingLocations.push({
-      position: i + 1,
-      coordinates: { lat, lng },
-      center, // Store center for reference
-      baseRadius // Store initial radius for reference
-    });
-  }
-
-  return startingLocations;
-}
-
 export function registerRoutes(app: Express): Server {
   // Setup authentication routes
   setupAuth(app);
 
   const httpServer = createServer(app);
 
-  // Setup WebSocket server with explicit path to avoid conflicts
-  const wss = new WebSocketServer({
-    server: httpServer,
-    path: '/ws',
-    verifyClient: (info, done) => {
-      // Skip verification for Vite HMR
-      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
-        return done(true);
-      }
-
-      // Verify session/authentication
-      const sessionParser = app.get('sessionParser');
-      sessionParser(info.req, {} as any, () => {
-        const isAuthenticated = (info.req as any).isAuthenticated?.();
-        done(isAuthenticated);
-      });
-    }
-  });
-
-  wss.on('connection', (ws, req) => {
-    console.log('New WebSocket connection established');
-
-    ws.on('close', () => {
-      console.log('WebSocket connection closed');
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-    });
-  });
+  // Setup WebSocket server with proper session handling
+  const wss = setupWebSocketServer(httpServer);
 
   // Admin settings endpoint
   app.put("/api/admin/settings", async (req, res) => {
@@ -977,7 +905,7 @@ export function registerRoutes(app: Express): Server {
 
       // Verify team is participating in the game
       const [participant] = await db
-.select({
+        .select({
           participant: gameParticipants,
           team: teams
         })
@@ -1754,3 +1682,45 @@ const settingsSchema = z.object({
     intervalMinutes: z.number().min(5).max(60)
   })).min(1),
 });
+
+function calculateStartingLocations(boundaries: any, numPoints: number) {
+  const coordinates = boundaries.geometry.coordinates[0];
+
+  // Calculate center point (this should remain constant for all zones)
+  const center = coordinates.reduce(
+    (acc: { lat: number; lng: number }, coord: number[]) => {
+      return {
+        lat: acc.lat + coord[1] / coordinates.length,
+        lng: acc.lng + coord[0] / coordinates.length
+      };
+    },
+    { lat: 0, lng: 0 }
+  );
+
+  // Calculate initial radius based on the furthest point
+  const baseRadius = Math.max(...coordinates.map((coord: number[]) => {
+    const lat = coord[1];
+    const lng = coord[0];
+    const latDiff = center.lat - lat;
+    const lngDiff = center.lng - lng;
+    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+  }));
+
+  // Generate equidistant points around the circle with safe radius
+  const startingLocations = [];
+  const safeRadius = baseRadius * 0.9; // Keep points well within the boundary
+
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i * 2 * Math.PI) / numPoints;
+    const lat = center.lat + (safeRadius * Math.sin(angle));
+    const lng = center.lng + (safeRadius * Math.cos(angle));
+    startingLocations.push({
+      position: i + 1,
+      coordinates: { lat, lng },
+      center, // Store center for reference
+      baseRadius // Store initial radius for reference
+    });
+  }
+
+  return startingLocations;
+}
