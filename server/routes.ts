@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
+import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
 import { users, games, teams, teamMembers, gameParticipants } from "@db/schema"; // Added gameParticipants
@@ -74,8 +75,36 @@ export function registerRoutes(app: Express): Server {
 
   const httpServer = createServer(app);
 
-  // Setup WebSocket server for real-time updates
-  const wss = setupWebSocketServer(httpServer);
+  // Setup WebSocket server with explicit path to avoid conflicts
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/ws',
+    verifyClient: (info, done) => {
+      // Skip verification for Vite HMR
+      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        return done(true);
+      }
+
+      // Verify session/authentication
+      const sessionParser = app.get('sessionParser');
+      sessionParser(info.req, {} as any, () => {
+        const isAuthenticated = (info.req as any).isAuthenticated?.();
+        done(isAuthenticated);
+      });
+    }
+  });
+
+  wss.on('connection', (ws, req) => {
+    console.log('New WebSocket connection established');
+
+    ws.on('close', () => {
+      console.log('WebSocket connection closed');
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+  });
 
   // Admin settings endpoint
   app.put("/api/admin/settings", async (req, res) => {
@@ -941,7 +970,7 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!game) {
-        return res.status(404).send("Game not found");
+        return res.status(404).send(""Game not found");
       }
 
       if (game.status !== "pending") {

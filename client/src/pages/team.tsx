@@ -35,52 +35,30 @@ export default function TeamManagement() {
   const team = teams?.find(t => t.id === teamId);
   const isCaptain = team?.captainId === user?.id;
 
+  // Set initial description when team data is loaded
+  useEffect(() => {
+    if (team?.description) {
+      setDescription(team.description);
+    }
+  }, [team?.description]);
+
   const updateTeam = useMutation({
     mutationFn: async (newDescription: string) => {
-      try {
-        console.log('Making update team request:', {
-          url: `/api/teams/${teamId}`,
-          description: newDescription
-        });
+      const response = await fetch(`/api/teams/${teamId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ description: newDescription }),
+        credentials: "include",
+      });
 
-        const response = await fetch(`/api/teams/${teamId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({ description: newDescription }),
-          credentials: "include",
-        });
-
-        console.log('Update team response:', {
-          status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
-        });
-
-        if (!response.ok) {
-          const contentType = response.headers.get("content-type");
-          const errorText = await response.text();
-          console.error('Update team error:', {
-            status: response.status,
-            contentType,
-            errorText
-          });
-          throw new Error(errorText);
-        }
-
-        const text = await response.text();
-        console.log('Response text:', text);
-
-        try {
-          return JSON.parse(text);
-        } catch (e) {
-          throw new Error(`Invalid JSON response: ${text}`);
-        }
-      } catch (error: any) {
-        console.error('Update team caught error:', error);
-        throw error;
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });

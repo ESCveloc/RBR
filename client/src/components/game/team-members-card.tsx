@@ -28,9 +28,12 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Update the query to include polling for team member changes
   const { data: members = [], isLoading } = useQuery<User[]>({
     queryKey: [`/api/teams/${teamId}/members`],
-    enabled: !!teamId // Only fetch if we have a teamId
+    enabled: !!teamId,
+    refetchInterval: 10000, // Poll every 10 seconds
+    staleTime: 5000, // Consider data stale after 5 seconds
   });
 
   const removeMember = useMutation({
@@ -80,7 +83,7 @@ export function TeamMembersCard({ teamId, captainId, isCaptain }: TeamMembersCar
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate both team and member queries to refresh UI
+      // Invalidate queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: [`/api/teams/${teamId}/members`] });
       toast({

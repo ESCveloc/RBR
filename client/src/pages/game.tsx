@@ -206,7 +206,7 @@ export default function Game() {
     );
   }
 
-  const handleStatusUpdate = (newStatus: 'active' | 'completed' | 'cancelled') => {
+  const handleStatusUpdate = (newStatus: Game['status']) => {
     console.log('Attempting to update status:', { newStatus, currentStatus: game.status });
     updateGameStatus.mutate({ status: newStatus });
   };
@@ -261,33 +261,25 @@ export default function Game() {
                           Cancel
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
-                        <AlertDialogHeader className="flex flex-col gap-2">
-                          <AlertDialogTitle className="text-2xl font-semibold leading-none tracking-tight">Cancel Game?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-base text-muted-foreground">
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel Game?</AlertDialogTitle>
+                          <AlertDialogDescription>
                             This action will cancel the game. All teams will be removed and the game cannot be restarted.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter className="flex items-center gap-2 pt-2">
-                          <AlertDialogCancel className="flex-1 mt-0 transition-colors hover:bg-secondary">
-                            Go Back
-                          </AlertDialogCancel>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Go Back</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleStatusUpdate('cancelled')}
-                            className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             {updateGameStatus.isPending ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                Cancelling...
-                              </>
-                            ) : (
-                              'Cancel Game'
-                            )}
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : 'Cancel Game'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
-
                     </AlertDialog>
                   </>
                 )}
@@ -365,10 +357,23 @@ export default function Game() {
                     <TeamCard
                       key={participant.id}
                       gameId={game.id}
-                      participant={participant}
+                      participant={{
+                        ...participant,
+                        team: participant.team || {
+                          id: 0,
+                          name: "Unknown Team",
+                          createdAt: new Date(),
+                          active: true,
+                          description: null,
+                          captainId: 0,
+                          wins: 0,
+                          losses: 0,
+                          tags: null,
+                          teamMembers: []
+                        }
+                      }}
                       canAssignPosition={isAdmin && game.status === 'pending'}
                       showMembers={true}
-                      showStatus={true}
                       showLocation={game.status === 'active'}
                     />
                   ))

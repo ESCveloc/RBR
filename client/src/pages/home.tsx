@@ -220,7 +220,13 @@ export default function Home() {
                     {teams?.map((team) => (
                       <TeamCard 
                         key={team.id} 
-                        team={team}
+                        team={{
+                          ...team,
+                          teamMembers: team.teamMembers.map(member => ({
+                            ...member,
+                            joinedAt: member.joinedAt.toISOString()
+                          }))
+                        }}
                       />
                     ))}
                   </div>
