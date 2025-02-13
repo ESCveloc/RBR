@@ -5,6 +5,7 @@ import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
 import type { Session } from "express-session";
 import type { User } from "@db/schema";
+import { sessionStore } from "./auth";
 
 // Document WebSocket message types and their purposes
 type WebSocketMessage = {
@@ -194,7 +195,7 @@ class GameWebSocketServer extends WebSocketServer {
     if (room) {
       room.clients.add(client);
       client.gameId = gameId;
-      console.log(`Client joined game ${gameId}`);
+      console.log(`Client ${client.session.user.id} joined game ${gameId}`);
 
       // Send current game state to new client
       if (client.readyState === WebSocket.OPEN) {
@@ -244,20 +245,53 @@ export function setupWebSocketServer(server: Server) {
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
     clientTracking: true,
-    verifyClient: (info: any, done: any) => {
+    verifyClient: async (info: any, done: any) => {
       // Skip verification for Vite HMR
       if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
         return done(true);
       }
 
-      // Check for valid session
-      const session = (info.req as any).session;
-      if (!session?.user) {
-        console.log('WebSocket connection rejected: No valid session');
-        return done(false, 401, 'Unauthorized');
-      }
+      // Add diagnostic logging
+      console.log('WebSocket connection attempt - Headers:', {
+        cookie: info.req.headers.cookie,
+        origin: info.origin,
+        protocol: info.req.headers['sec-websocket-protocol']
+      });
 
-      done(true);
+      try {
+        // Parse session from cookie
+        const cookies = info.req.headers.cookie?.split(';').reduce((acc: any, cookie: string) => {
+          const [key, value] = cookie.trim().split('=');
+          acc[key] = value;
+          return acc;
+        }, {});
+
+        const sessionId = cookies?.['battle.sid']?.replace('s%3A', '').split('.')[0];
+        if (!sessionId) {
+          console.log('No session cookie found');
+          return done(false, 401, 'Unauthorized');
+        }
+
+        // Get session from store
+        sessionStore.get(sessionId, (err: any, session: Session) => {
+          if (err || !session?.user) {
+            console.log('WebSocket connection rejected: Invalid session', {
+              hasError: !!err,
+              hasSession: !!session,
+              hasUser: !!session?.user
+            });
+            return done(false, 401, 'Unauthorized');
+          }
+
+          // Attach session to request for later use
+          info.req.session = session;
+          console.log('WebSocket connection authorized for user:', session.user.id);
+          done(true);
+        });
+      } catch (error) {
+        console.error('Error verifying WebSocket client:', error);
+        done(false, 500, 'Internal Server Error');
+      }
     }
   });
 
@@ -265,6 +299,12 @@ export function setupWebSocketServer(server: Server) {
     console.log('New WebSocket connection established');
     ws.isAlive = true;
     ws.session = req.session;
+
+    // Log successful connection details
+    console.log('WebSocket session attached:', {
+      userId: ws.session?.user?.id,
+      isAuthenticated: !!ws.session?.user
+    });
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -277,6 +317,7 @@ export function setupWebSocketServer(server: Server) {
       try {
         // Check authentication for every message
         if (!ws.session?.user) {
+          console.log('Unauthorized message attempt from client');
           ws.send(JSON.stringify({
             type: "ERROR",
             payload: { message: "Unauthorized" }
@@ -347,7 +388,7 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log(`WebSocket connection closed`);
+      console.log(`WebSocket connection closed for user ${ws.session?.user?.id}`);
       if (ws.pingTimeout) {
         clearTimeout(ws.pingTimeout);
       }

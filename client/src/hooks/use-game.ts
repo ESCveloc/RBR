@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Game, GameParticipant } from '@db/schema';
+import type { Game } from '@db/schema';
 import { useWebSocket } from './use-websocket';
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +20,7 @@ interface GameState {
   }>;
 }
 
-export function useGame(gameId: number) {
+export function useGameState(gameId: number) {
   const queryClient = useQueryClient();
   const { socket, sendMessage, subscribeToMessage, sendLocationUpdate, sendZoneUpdate } = useWebSocket();
   const { toast } = useToast();
@@ -125,15 +125,15 @@ export function useGame(gameId: number) {
     refetchInterval: false
   });
 
-  const updateReadyStatus = useMutation({
-    mutationFn: async ({ teamId, ready }: { teamId: number; ready: boolean }) => {
-      const response = await fetch(`/api/games/${gameId}/team-ready`, {
-        method: 'POST',
+  const updateGameStatus = useMutation({
+    mutationFn: async ({ status }: { status: Game['status'] }) => {
+      const response = await fetch(`/api/games/${gameId}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ teamId, ready }),
+        body: JSON.stringify({ status }),
         credentials: 'include'
       });
 
@@ -144,24 +144,15 @@ export function useGame(gameId: number) {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.setQueryData<Game>([`/api/games/${gameId}`], (oldData) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          participants: oldData.participants?.map(p =>
-            p.teamId === data.teamId ? { ...p, ready: data.ready } : p
-          )
-        };
-      });
-
+      queryClient.setQueryData([`/api/games/${gameId}`], data);
       toast({
         title: "Success",
-        description: "Team ready status updated successfully"
+        description: "Game status updated successfully"
       });
     },
     onError: (err: Error) => {
       toast({
-        title: "Error updating ready status",
+        title: "Error updating game status",
         description: err.message,
         variant: "destructive"
       });
@@ -235,6 +226,6 @@ export function useGame(gameId: number) {
     error,
     updateLocation,
     updateZone,
-    updateReadyStatus
+    updateGameStatus
   };
 }
