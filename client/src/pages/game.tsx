@@ -15,7 +15,7 @@ import { Loader2, ArrowLeft, Play, X, Users } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { SelectTeam } from "@/components/game/select-team";
 import { useWebSocket } from "@/hooks/use-websocket";
-import type { Game } from "@db/schema";
+import type { Game, GameParticipant } from "@db/schema";
 import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
 import {
   AlertDialog,
@@ -69,7 +69,7 @@ export default function Game() {
     if (!isConnected || !socket || !gameId) return;
 
     console.log('Setting up WebSocket subscription for game:', gameId);
-    const unsubscribe = subscribeToMessage('GAME_STATE_UPDATE', (data) => {
+    const unsubscribe = subscribeToMessage('GAME_STATE_UPDATE', (data: any) => {
       try {
         console.log('Received game update:', data);
         if (data.gameId === gameId) {
@@ -91,13 +91,18 @@ export default function Game() {
   // Fetch game data
   const { data: game, isLoading, error } = useQuery<Game>({
     queryKey: [`/api/games/${gameId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/games/${gameId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch game ${gameId}`);
+      }
+      return response.json();
+    },
     staleTime: 30000,
     refetchInterval: false,
-    retry: 2,
-    enabled: !!gameId,
-    onError: (error) => {
-      console.error(`Error fetching game ${gameId}:`, error);
-    }
+    retry: 2
   });
 
   const updateGameStatus = useMutation({
@@ -230,7 +235,7 @@ export default function Game() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">{game?.name}</h1>
+            <h1 className="text-xl font-bold">{game.name}</h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -326,18 +331,18 @@ export default function Game() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                  <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
-                  <p>
-                    <strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}
-                  </p>
-                  <p>
-                    <strong>Assigned Positions:</strong> {(game.participants || []).filter(p => p.startingLocation !== null).length}
-                  </p>
-                  <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
-                  {game.startTime && (
-                    <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
-                  )}
-                </div>
+                <p><strong>Duration:</strong> {game.gameLengthMinutes} minutes</p>
+                <p>
+                  <strong>Teams:</strong> {game.participants?.length || 0} / {game.maxTeams}
+                </p>
+                <p>
+                  <strong>Assigned Positions:</strong> {(game.participants || []).filter(p => p.startingLocation !== null).length}
+                </p>
+                <p><strong>Players per Team:</strong> {game.playersPerTeam}</p>
+                {game.startTime && (
+                  <p><strong>Started:</strong> {new Date(game.startTime).toLocaleString()}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -366,21 +371,7 @@ export default function Game() {
                     <TeamCard
                       key={participant.id}
                       gameId={game.id}
-                      participant={{
-                        ...participant,
-                        team: (participant as any).team || {
-                          id: 0,
-                          name: "Unknown Team",
-                          createdAt: new Date(),
-                          active: true,
-                          description: null,
-                          captainId: 0,
-                          wins: 0,
-                          losses: 0,
-                          tags: null,
-                          teamMembers: []
-                        }
-                      }}
+                      participant={participant}
                       canAssignPosition={isAdmin && game.status === 'pending'}
                       showMembers={true}
                       showLocation={game.status === 'active'}

@@ -48,6 +48,26 @@ import { useTeams } from "@/hooks/use-teams";
 import { useWebSocket } from '@/hooks/use-websocket';
 import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
 
+interface User {
+  id: number;
+  username: string;
+  role: "admin" | "user";
+  createdAt: string;
+}
+
+interface AdminSettingsType {
+  defaultCenter: {
+    lat: number;
+    lng: number;
+  };
+  defaultRadiusMiles: number;
+  zoneConfigs: Array<{
+    durationMinutes: number;
+    radiusMultiplier: number;
+    intervalMinutes: number;
+  }>;
+}
+
 const settingsSchema = z.object({
   defaultCenter: z.object({
     lat: z.number().min(-90).max(90),
@@ -187,8 +207,17 @@ export default function Admin() {
     refetchInterval: false // Disable polling, rely on WebSocket updates
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: users, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/users", {
+        credentials: "include"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+      return response.json();
+    }
   });
 
   const gameForm = useForm<z.infer<typeof formSchema>>({
@@ -576,7 +605,7 @@ export default function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users?.map((user) => (
+                  {users?.map((user: User) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.username}</TableCell>
                       <TableCell>{user.role}</TableCell>
