@@ -983,83 +983,110 @@ export default function Admin() {
                           name="zoneConfigs"
                           render={({ field }) => (
                             <FormItem className="space-y-4 pt-4">
+                              <FormLabel>Zone Configurations</FormLabel>
                               <div className="space-y-4">
-                                <div className="grid grid-cols-3 gap-4">
-                                  {field.value.map((config, index) => (
-                                    <div key={index}>
-                                      <div>
+                                {field.value.map((config, index) => (
+                                  <Card key={index} className="p-4">
+                                    <CardHeader className="p-0 pb-4">
+                                      <div className="flex items-center justify-between">
+                                        <CardTitle className="text-lg">Zone {index + 1}</CardTitle>
+                                        {index > 0 && (
+                                          <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => {
+                                              const newConfigs = [...field.value];
+                                              newConfigs.splice(index, 1);
+                                              field.onChange(newConfigs);
+                                            }}
+                                          >
+                                            Remove
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </CardHeader>
+                                    <div className="grid gap-4">
+                                      <FormItem>
                                         <FormLabel>Duration (minutes)</FormLabel>
-                                        <Input
-                                          type="number"
-                                          min={5}
-                                          max={60}
-                                          value={config.durationMinutes}
-                                          onChange={(e) => {
-                                            const newValue = Number(e.target.value);
-                                            const newConfigs = [...field.value];
-                                            newConfigs[index] = {
-                                              ...config,
-                                              durationMinutes: newValue
-                                            };
-                                            field.onChange(newConfigs);
-                                          }}
-                                        />
-                                      </div>
-                                      <div>
+                                        <FormControl>
+                                          <Input
+                                            type="number"
+                                            min={5}
+                                            max={60}
+                                            value={config.durationMinutes}
+                                            onChange={(e) => {
+                                              const newValue = Number(e.targettarget.value);
+                                              const newConfigs = [...field.value];
+                                              newConfigs[index] = {
+                                                ...config,
+                                                durationMinutes: newValue
+                                              };
+                                              field.onChange(newConfigs);
+                                            }}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                      <FormItem>
                                         <FormLabel>Radius Multiplier</FormLabel>
-                                        <Input
-                                          type="number"
-                                          min={0.1}
-                                          max={1}
-                                          step={0.1}
-                                          value={config.radiusMultiplier}
-                                          onChange={(e) => {
-                                            const newValue = Number(e.target.value);
-                                            const newConfigs = [...field.value];
-                                            newConfigs[index] = {
-                                              ...config,
-                                              radiusMultiplier: newValue
-                                            };
-                                            field.onChange(newConfigs);
-                                          }}
-                                        />
-                                      </div>
-                                      <div>
+                                        <FormControl>
+                                          <Input
+                                            type="number"
+                                            min={0.1}
+                                            max={1}
+                                            step={0.1}
+                                            value={config.radiusMultiplier}
+                                            onChange={(e) => {
+                                              const newValue = Number(e.target.value);
+                                              const newConfigs = [...field.value];
+                                              newConfigs[index] = {
+                                                ...config,
+                                                radiusMultiplier: newValue
+                                              };
+                                              field.onChange(newConfigs);
+                                            }}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                      <FormItem>
                                         <FormLabel>Interval (minutes)</FormLabel>
-                                        <Input
-                                          type="number"
-                                          min={5}
-                                          max={60}
-                                          value={config.intervalMinutes}
-                                          onChange={(e) => {
-                                            const newValue = Number(e.target.value);
-                                            const newConfigs = [...field.value];
-                                            newConfigs[index] = {
-                                              ...config,
-                                              intervalMinutes: newValue
-                                            };
-                                            field.onChange(newConfigs);
-                                          }}
-                                        />
-                                      </div>
+                                        <FormControl>
+                                          <Input
+                                            type="number"
+                                            min={5}
+                                            max={60}
+                                            value={config.intervalMinutes}
+                                            onChange={(e) => {
+                                              const newValue = Number(e.target.value);
+                                              const newConfigs = [...field.value];
+                                              newConfigs[index] = {
+                                                ...config,
+                                                intervalMinutes: newValue
+                                              };
+                                              field.onChange(newConfigs);
+                                            }}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
                                     </div>
-                                  ))}
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      const newConfig = {
-                                        durationMinutes: 15,
-                                        radiusMultiplier: 0.5,
-                                        intervalMinutes: 15
-                                      };
-                                      field.onChange([...field.value, newConfig]);
-                                    }}
-                                  >
-                                    Add Zone Configuration
-                                  </Button>
-                                </div>
+                                  </Card>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const newConfig = {
+                                      durationMinutes: 15,
+                                      radiusMultiplier: 0.5,
+                                      intervalMinutes: 15
+                                    };
+                                    field.onChange([...field.value, newConfig]);
+                                  }}
+                                >
+                                  Add Zone Configuration
+                                </Button>
                               </div>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
