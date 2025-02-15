@@ -85,6 +85,12 @@ export function useWebSocket(): WebSocketInterface {
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
+        // Send authentication message immediately after connection
+        ws.send(JSON.stringify({
+          type: 'AUTHENTICATE',
+          payload: { userId: user.id }
+        }));
+
         // Process any pending game join after connection
         if (pendingGameJoinRef.current !== null) {
           ws.send(JSON.stringify({
@@ -122,6 +128,17 @@ export function useWebSocket(): WebSocketInterface {
               description: message.payload.message,
               variant: "destructive"
             });
+            return;
+          }
+
+          if (message.type === 'AUTH_SUCCESS') {
+            console.log('WebSocket authentication successful');
+            return;
+          }
+
+          if (message.type === 'AUTH_ERROR') {
+            console.error('WebSocket authentication failed:', message.payload);
+            ws.close();
             return;
           }
 
@@ -264,7 +281,7 @@ export function useWebSocket(): WebSocketInterface {
       }
     };
 
-    if (!navigator.onLine || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       locationUpdateQueueRef.current.push({ gameId, location });
       return;
     }
