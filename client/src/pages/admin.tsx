@@ -324,25 +324,21 @@ export default function Admin() {
 
   const updateSettings = useMutation({
     mutationFn: async (values: z.infer<typeof settingsSchema>) => {
-      try {
-        const response = await fetch("/api/admin/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
-          credentials: "include",
-        });
+      const response = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+        credentials: "include",
+      });
 
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-
-        await updateTheme.mutateAsync(values.theme);
-
-        return response.json();
-      } catch (error) {
-        console.error("Failed to update settings:", error);
-        throw error;
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
+
+      // Update theme separately
+      await updateTheme.mutateAsync(values.theme);
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
@@ -758,7 +754,12 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <Form {...settingsForm}>
-                <form onSubmit={settingsForm.handleSubmit(updateSettings.mutate)} className="space-y-6">
+                <form 
+                  onSubmit={settingsForm.handleSubmit((data) => {
+                    updateSettings.mutate(data);
+                  })} 
+                  className="space-y-6"
+                >
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="theme">
                       <AccordionTrigger className="text-lg font-semibold">
