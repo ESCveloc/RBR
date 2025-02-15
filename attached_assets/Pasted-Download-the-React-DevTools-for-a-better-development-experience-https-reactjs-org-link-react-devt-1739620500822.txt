@@ -1,0 +1,194 @@
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+use-user.ts:74 [Auth] Current user state: 
+{user: null, isLoading: true, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: null, isLoading: true, error: null}
+use-user.ts:45 [Auth] Fetching user data
+use-user.ts:60 [Auth] User data received: 
+{id: 19, username: 'boss', role: 'admin', password: '[REDACTED]'}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-websocket.ts:81 [WebSocket] Attempting connection to: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws
+use-websocket.ts:81 [WebSocket] Attempting connection to: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+admin:101 ServiceWorker registration successful: https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+admin:1 Error while trying to use the following icon from the Manifest: https://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/icon-192x192.png (Download error or resource isn't a valid image)
+client:535 WebSocket connection to 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/' failed: 
+setupWebSocket	@	client:535
+(anonymous)	@	client:530
+client:535 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/' is invalid.
+    at setupWebSocket (client:535:19)
+    at fallback (client:508:16)
+    at WebSocket.<anonymous> (client:551:7)
+setupWebSocket	@	client:535
+fallback	@	client:508
+(anonymous)	@	client:551
+use-websocket.ts:82 WebSocket connection to 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws' failed: 
+(anonymous)	@	use-websocket.ts:82
+(anonymous)	@	use-websocket.ts:199
+use-websocket.ts:156 [WebSocket] Connection error: 
+Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+isTrusted
+: 
+true
+bubbles
+: 
+false
+cancelBubble
+: 
+false
+cancelable
+: 
+false
+composed
+: 
+false
+currentTarget
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+defaultPrevented
+: 
+false
+eventPhase
+: 
+0
+returnValue
+: 
+true
+srcElement
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+target
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+timeStamp
+: 
+5525.600000023842
+type
+: 
+"error"
+[[Prototype]]
+: 
+Event
+ws.onerror	@	use-websocket.ts:156
+error		
+(anonymous)	@	use-websocket.ts:154
+(anonymous)	@	use-websocket.ts:199
+use-websocket.ts:168 [WebSocket] Connection closed: 1006 
+use-websocket.ts:174 [WebSocket] Scheduling reconnection attempt 1 in 1000ms
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-user.ts:74 [Auth] Current user state: 
+{user: {…}, isLoading: false, error: null}
+use-websocket.ts:81 [WebSocket] Attempting connection to: wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws
+use-websocket.ts:86 [WebSocket] Connection timeout, closing socket
+use-websocket.ts:87 WebSocket connection to 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws' failed: WebSocket is closed before the connection is established.
+(anonymous)	@	use-websocket.ts:87
+setTimeout		
+(anonymous)	@	use-websocket.ts:84
+(anonymous)	@	use-websocket.ts:199
+use-websocket.ts:156 [WebSocket] Connection error: 
+Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+isTrusted
+: 
+true
+bubbles
+: 
+false
+cancelBubble
+: 
+false
+cancelable
+: 
+false
+composed
+: 
+false
+currentTarget
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+defaultPrevented
+: 
+false
+eventPhase
+: 
+0
+returnValue
+: 
+true
+srcElement
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+target
+: 
+WebSocket {url: 'wss://e465fe06-5c61-4421-b5da-ba7a1dd87c8a-00-nuxmxbzumk6b.worf.replit.dev/ws', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}
+timeStamp
+: 
+7577.300000011921
+type
+: 
+"error"
+[[Prototype]]
+: 
+Event
+ws.onerror	@	use-websocket.ts:156
+error		
+(anonymous)	@	use-websocket.ts:154
+(anonymous)	@	use-websocket.ts:199

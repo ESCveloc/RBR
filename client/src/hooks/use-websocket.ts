@@ -72,11 +72,10 @@ export function useWebSocket(): WebSocketInterface {
     isConnectingRef.current = true;
 
     try {
-      // Get the WebSocket URL
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = window.location.host;
-      const wsPath = '/ws';
-      const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
+      // Get the WebSocket URL ensuring it's properly formed
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      const wsUrl = `${protocol}//${host}/ws`;
 
       console.log('[WebSocket] Attempting connection to:', wsUrl);
       const ws = new WebSocket(wsUrl);
@@ -156,11 +155,13 @@ export function useWebSocket(): WebSocketInterface {
         console.error('[WebSocket] Connection error:', error);
         isConnectingRef.current = false;
 
-        toast({
-          title: "Connection Error",
-          description: "Failed to connect to game server. Retrying...",
-          variant: "destructive"
-        });
+        if (ws.readyState !== WebSocket.OPEN) {
+          toast({
+            title: "Connection Error",
+            description: "Failed to connect to game server. Retrying...",
+            variant: "destructive"
+          });
+        }
       };
 
       ws.onclose = (event) => {
@@ -169,10 +170,10 @@ export function useWebSocket(): WebSocketInterface {
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        if (user && reconnectAttemptRef.current < maxReconnectAttempts && event.code !== 1000) {
+        // Only attempt reconnection if not a normal closure and we have a valid user
+        if (user && event.code !== 1000 && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
           console.log(`[WebSocket] Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
-
           reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
@@ -208,14 +209,14 @@ export function useWebSocket(): WebSocketInterface {
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected, message not sent:', { type, payload });
+      console.warn('[WebSocket] Not connected, message not sent:', { type, payload });
       return;
     }
 
     try {
       wsRef.current.send(JSON.stringify({ type, payload }));
     } catch (error) {
-      console.error('Error sending WebSocket message:', error);
+      console.error('[WebSocket] Error sending message:', error);
       toast({
         title: "Error",
         description: "Failed to send message",
