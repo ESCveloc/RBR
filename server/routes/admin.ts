@@ -58,13 +58,11 @@ router.get("/settings", async (req, res) => {
 
 router.put("/settings", async (req, res) => {
   try {
-    console.log('Received settings update:', JSON.stringify(req.body, null, 2));
+    console.log('Received settings update:', req.body);
 
     // Validate the incoming data
     const validatedData = settingsSchema.parse(req.body);
     const { theme, defaultCenter, defaultRadiusMiles, zoneConfigs } = validatedData;
-
-    console.log('Validated zone configs:', JSON.stringify(zoneConfigs, null, 2));
 
     // Start a transaction to ensure atomic updates
     await db.transaction(async (tx) => {

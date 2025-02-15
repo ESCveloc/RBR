@@ -8,17 +8,10 @@ import { eq, ilike, or, and, sql, exists, ne } from "drizzle-orm";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { parse as parseCookie } from "cookie";
-import session from "express-session";
-import MemoryStore from "memorystore";
 
 const scryptAsync = promisify(scrypt);
 
-const MemoryStoreSession = MemoryStore(session);
-export const sessionStore = new MemoryStoreSession({
-  checkPeriod: 86400000 // prune expired entries every 24h
-});
-
+// Update game schema to match frontend
 const gameSchema = z.object({
   name: z.string().min(1, "Game name is required"),
   gameLengthMinutes: z.number().min(10).max(180),
@@ -33,26 +26,15 @@ const gameSchema = z.object({
 });
 
 export function registerRoutes(app: Express): Server {
-  app.use(
-    session({
-      store: sessionStore,
-      secret: process.env.SESSION_SECRET || 'your-secret-key',
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-      }
-    })
-  );
-
+  // Setup authentication routes
   setupAuth(app);
 
   const httpServer = createServer(app);
 
+  // Setup WebSocket server with proper session handling
   const wss = setupWebSocketServer(httpServer);
 
+  // Admin settings endpoint
   app.put("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
@@ -67,6 +49,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
+      // Store settings in memory for now
       global.gameSettings = result.data;
 
       res.json({ message: "Settings updated successfully" });
@@ -76,6 +59,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update zone settings with more conservative shrinking
   app.get("/api/admin/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
@@ -97,9 +81,10 @@ export function registerRoutes(app: Express): Server {
     res.json(settings);
   });
 
+  // Minimal API route for verification - check database connection
   app.get("/api/health", async (req, res) => {
     try {
-      await db.query.teams.findFirst();
+      await db.query.teams.findFirst(); // Simple query to test DB connection
       res.status(200).send("Database and API routes are working.");
     } catch (error) {
       console.error("Database connection error:", error);
@@ -107,6 +92,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Profile update endpoint
   app.put("/api/user/profile", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -114,6 +100,7 @@ export function registerRoutes(app: Express): Server {
 
     const { username, currentPassword, newPassword, firstName, preferredPlayTimes, avatar } = req.body;
 
+    // Verify current password
     const [user] = await db
       .select()
       .from(users)
@@ -132,6 +119,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).send("Current password is incorrect");
     }
 
+    // Check if new username is already taken (if username is being changed)
     if (username !== user.username) {
       const [existingUser] = await db
         .select()
@@ -144,6 +132,7 @@ export function registerRoutes(app: Express): Server {
       }
     }
 
+    // Update user profile
     const updateData: any = {
       username,
       firstName,
@@ -151,6 +140,7 @@ export function registerRoutes(app: Express): Server {
       avatar
     };
 
+    // If new password is provided, hash it
     if (newPassword) {
       const newSalt = randomBytes(16).toString("hex");
       const newHashedPasswordBuf = (await scryptAsync(
@@ -180,6 +170,7 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
+  // Admin API routes
   app.get("/api/admin/users", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Forbidden");
@@ -215,6 +206,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).send("Invalid user ID or role");
     }
 
+    // Prevent self-demotion
     if (userId === req.user.id) {
       return res.status(400).send("Cannot modify your own role");
     }
@@ -233,18 +225,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Teams API endpoints
   app.post("/api/teams", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
     }
 
     try {
+      console.log("Creating team with request body:", req.body);
       const { name, description } = req.body;
 
       if (!name || typeof name !== "string" || name.length < 3) {
         return res.status(400).send("Team name must be at least 3 characters long");
       }
 
+      // Match exactly the database schema
       const [team] = await db
         .insert(teams)
         .values({
@@ -259,6 +254,9 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
+      console.log("Team created successfully:", team);
+
+      // Add captain as first team member
       await db.insert(teamMembers).values({
         teamId: team.id,
         userId: req.user.id,
@@ -310,6 +308,7 @@ export function registerRoutes(app: Express): Server {
         )
         .groupBy(teams.id);
 
+      console.log('Teams with member counts:', userTeams);
       res.json(userTeams);
     } catch (error) {
       console.error("Teams fetch error:", error);
@@ -317,6 +316,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get team members endpoint
   app.get("/api/teams/:teamId/members", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -328,6 +328,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Get team members
       const members = await db
         .select({
           id: users.id,
@@ -346,6 +347,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for removing team members
   app.delete("/api/teams/:teamId/members/:userId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -359,6 +361,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID or user ID");
       }
 
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -373,10 +376,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can remove members");
       }
 
+      // Prevent captain from removing themselves
       if (userId === team.captainId) {
         return res.status(400).send("Team captain cannot be removed");
       }
 
+      // Remove team member
       await db
         .delete(teamMembers)
         .where(
@@ -393,6 +398,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Search users endpoint
   app.get("/api/users/search", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -422,6 +428,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add team member endpoint
   app.post("/api/teams/:teamId/members", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -435,6 +442,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -449,6 +457,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can add members");
       }
 
+      // Check if user is already a member
       const existingMember = await db
         .select()
         .from(teamMembers)
@@ -463,6 +472,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("User is already a team member");
       }
 
+      // Add new team member
       await db.insert(teamMembers).values({
         teamId,
         userId,
@@ -474,6 +484,8 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Failed to add team member");
     }
   });
+
+  // Fix the duplicate function and type issues in the position assignment logic
 
   app.patch("/api/teams/:teamId/captain", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -488,6 +500,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID or captain ID");
       }
 
+      // Verify team exists and current user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -502,6 +515,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only the current captain can transfer leadership");
       }
 
+      // Verify new captain is a team member
       const isMemberQuery = await db
         .select()
         .from(teamMembers)
@@ -513,6 +527,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("New captain must be a team member");
       }
 
+      // Update team captain
       const [updatedTeam] = await db
         .update(teams)
         .set({ captainId: newCaptainId })
@@ -526,6 +541,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for updating team details
   app.patch("/api/teams/:teamId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -533,12 +549,13 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const teamId = parseInt(req.params.teamId);
-      const { name } = req.body;
+      const { name } = req.body;  // Only allow updating the name for now
 
       if (isNaN(teamId)) {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -553,6 +570,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can update team details");
       }
 
+      // Update team name if provided
       const updateData: any = {};
       if (name) {
         updateData.name = name;
@@ -562,6 +580,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("No valid fields to update");
       }
 
+      // Update team
       const [updatedTeam] = await db
         .update(teams)
         .set(updateData)
@@ -575,6 +594,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for deactivating team
   app.patch("/api/teams/:teamId/deactivate", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -587,6 +607,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -601,6 +622,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can deactivate the team");
       }
 
+      // Update team active status
       const [updatedTeam] = await db
         .update(teams)
         .set({ active: false })
@@ -614,6 +636,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for reactivating team
   app.patch("/api/teams/:teamId/reactivate", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -626,6 +649,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Verify team exists and user is captain
       const [team] = await db
         .select()
         .from(teams)
@@ -640,6 +664,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team captain can reactivate the team");
       }
 
+      // Update team active status
       const [updatedTeam] = await db
         .update(teams)
         .set({ active: true })
@@ -653,6 +678,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this endpoint after the other team-related endpoints
   app.post("/api/teams/:teamId/ready", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -666,6 +692,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid team ID");
       }
 
+      // Verify team exists and user is a member
       const [team] = await db
         .select()
         .from(teams)
@@ -676,6 +703,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team not found");
       }
 
+      // Check if user is a team member
       const [isMember] = await db
         .select()
         .from(teamMembers)
@@ -691,6 +719,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("Only team members can update ready status");
       }
 
+      // Update team ready status
+      // Note: We'll add the ready column to the teams table when implementing database migrations
       res.json({ ready });
     } catch (error) {
       console.error("Update team ready status error:", error);
@@ -698,6 +728,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update team ready status endpoint
   app.post("/api/games/:gameId/team-ready", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -711,6 +742,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
+      // Verify participant exists
       const [participant] = await db
         .select({
           id: gameParticipants.id,
@@ -731,10 +763,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
+      // Allow both team captain and admin to update ready status
       if (participant.team.captainId !== req.user.id && req.user.role !== 'admin') {
         return res.status(403).send("Only team captain or admin can update ready status");
       }
 
+      // Update participant ready status
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({ ready })
@@ -753,6 +787,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Leave game endpoint
   app.post("/api/games/:gameId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -766,6 +801,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
+      // Verify participant exists
       const [participant] = await db
         .select({
           id: gameParticipants.id,
@@ -786,10 +822,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
+      // Allow both team captain and admin to leave game
       if (participant.team.captainId !== req.user.id && req.user.role !== 'admin') {
         return res.status(403).send("Only team captain or admin can leave the game");
       }
 
+      // Delete the participant
       await db
         .delete(gameParticipants)
         .where(
@@ -806,6 +844,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the position assignment endpoint
+  // Add helper function to check team qualifications and assign random position
   function assignRandomPosition(availablePositions: number[]): number {
     if (availablePositions.length === 0) {
       throw new Error("No available positions remaining");
@@ -817,6 +857,7 @@ export function registerRoutes(app: Express): Server {
   function checkTeamQualifications(game: any, participant: any) {
     if (!game || !participant) return false;
 
+    // Get current number of teams in the game
     const currentTeamCount = game.participants?.length || 0;
 
     const qualifications = {
@@ -842,6 +883,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
+      // Get game details and verify status
       const [game] = await db
         .select()
         .from(games)
@@ -856,10 +898,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Positions can only be assigned before the game starts");
       }
 
+      // Only admin can force reassign positions
       if (force && req.user.role !== "admin") {
         return res.status(403).send("Only administrators can force position reassignment");
       }
 
+      // Verify team is participating in the game
       const [participant] = await db
         .select({
           participant: gameParticipants,
@@ -879,10 +923,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Team is not participating in this game");
       }
 
+      // For non-admin assignments, check qualifications
       if (!force && !checkTeamQualifications(game, participant)) {
         return res.status(400).send("Team must meet all qualifications before being assigned a position");
       }
 
+      // Get currently assigned positions
       const assignedPositions = await db
         .select({
           position: sql<number>`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
@@ -899,14 +945,18 @@ export function registerRoutes(app: Express): Server {
 
       const takenPositions = new Set(assignedPositions.map(p => p.position));
 
+      // Always create 10 starting positions regardless of max teams
       const TOTAL_STARTING_POSITIONS = 10;
       const availablePositions = Array.from({ length: TOTAL_STARTING_POSITIONS }, (_, i) => i + 1)
         .filter(p => !takenPositions.has(p));
 
+      // Determine position (either forced by admin or random)
       let assignedPosition: number;
       if (force && position) {
+        // Admin can override and assign specific position
         assignedPosition = position;
       } else {
+        // Randomly assign from available positions
         assignedPosition = assignRandomPosition(availablePositions);
       }
 
@@ -914,6 +964,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("This position is already taken by another team");
       }
 
+      // Calculate position coordinates based on boundaries
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -929,11 +980,13 @@ export function registerRoutes(app: Express): Server {
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
+      // Convert position to angle (evenly distributed around the circle)
       const angle = (-1 * (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
-      const safetyFactor = 0.9;
+      const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
+      // Update participant with new starting location
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({
@@ -951,6 +1004,7 @@ export function registerRoutes(app: Express): Server {
         )
         .returning();
 
+      // Broadcast position assignment to all clients
       wss.broadcast('GAME_UPDATE', {
         type: 'POSITION_ASSIGNED',
         gameId,
@@ -965,6 +1019,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add random position assignment endpoint
   app.post("/api/games/:gameId/assign-random-position", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -978,6 +1033,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid game ID");
       }
 
+      // Get game details
       const [game] = await db
         .select()
         .from(games)
@@ -992,6 +1048,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Positions can only be assigned before the game starts");
       }
 
+      // Get all taken positions
       const participants = await db
         .select()
         .from(gameParticipants)
@@ -1006,6 +1063,7 @@ export function registerRoutes(app: Express): Server {
         .filter(p => p.startingLocation !== null)
         .map(p => p.startingLocation.position);
 
+      // Generate array of available positions (1-10)
       const TOTAL_STARTING_POSITIONS = 10;
       const availablePositions = Array.from(
         { length: TOTAL_STARTING_POSITIONS },
@@ -1016,8 +1074,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("No available positions left");
       }
 
+      // Randomly select from available positions
       const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
 
+      // Calculate coordinates for the selected position
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -1038,6 +1098,7 @@ export function registerRoutes(app: Express): Server {
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
+      // Update participant with new random position
       const [updatedParticipant] = await db
         .update(gameParticipants)
         .set({
@@ -1062,6 +1123,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Games API endpoints
   app.post("/api/games", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.status(403).send("Only administrators can create games");
@@ -1091,6 +1153,7 @@ export function registerRoutes(app: Express): Server {
         zoneConfigs: []
       };
 
+      // Create new game with minimal required fields
       const [game] = await db
         .insert(games)
         .values({
@@ -1119,6 +1182,7 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
+      // Broadcast game creation
       wss.broadcast('GAME_UPDATE', {
         type: 'GAME_CREATED',
         gameId: game.id
@@ -1131,6 +1195,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get all games with status and team members
   app.get("/api/games", async (req, res) => {
     try {
       const allGames = await db
@@ -1151,6 +1216,7 @@ export function registerRoutes(app: Express): Server {
         .from(games)
         .orderBy(games.createdAt);
 
+      // Fetch participants for all games with team data
       const gamesWithParticipants = await Promise.all(
         allGames.map(async (game) => {
           const participants = await db
@@ -1176,12 +1242,14 @@ export function registerRoutes(app: Express): Server {
             .leftJoin(teams, eq(gameParticipants.teamId, teams.id))
             .where(eq(gameParticipants.gameId, game.id));
 
+          // For each participant, get their team members
           const participantsWithTeamMembers = await Promise.all(
             participants.map(async (participant) => {
               if (!participant.teamId) {
                 return participant;
               }
 
+              // Get all team members for this team
               const members = await db
                 .select({
                   id: teamMembers.id,
@@ -1212,6 +1280,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get game by ID with enhanced team data
   app.get("/api/games/:gameId", async (req, res) => {
     try {
       const gameId = parseInt(req.params.gameId);
@@ -1280,6 +1349,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Game not found");
       }
 
+      // Filter out null participants (from left join when no participants exist)
       if (game.participants && game.participants[0] === null) {
         game.participants = [];
       }
@@ -1291,6 +1361,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update game status
   app.patch("/api/games/:gameId/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -1314,6 +1385,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Game not found");
       }
 
+      // Validate state transition
       if (status === "active" && game.status !== "pending") {
         return res.status(400).send("Can only activate pending games");
       }
@@ -1346,6 +1418,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoint for managing team starting locations
   app.post("/api/games/:gameId/assign-starting-location", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not logged in");
@@ -1359,6 +1432,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Team ID and position are required");
       }
 
+      // Verify the game exists and user is admin or game creator
       const [game] = await db
         .select()
         .from(games)
@@ -1369,10 +1443,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Game not found");
       }
 
+      // Only allow admins or game creator to manually assign positions
       if (req.user.role !== "admin" && game.createdBy !== req.user.id) {
         return res.status(403).send("Unauthorized to assign starting locations");
       }
 
+      // Update the team's starting location
       const startingLocations = calculateStartingLocations(game.boundaries, game.maxTeams);
       const selectedLocation = startingLocations[position - 1];
 
@@ -1401,6 +1477,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add helper function for random position assignment
   async function assignRandomPosition(availablePositions: number[]): Promise<{ position: number; coordinates: null } | null> {
     if (availablePositions.length === 0) return null;
 
@@ -1418,10 +1495,13 @@ export function registerRoutes(app: Express): Server {
       const { teamId } = req.body;
       const isAdmin = req.user.role === 'admin';
 
+      console.log('Join game request:', { gameId, teamId, userId: req.user.id, isAdmin });
+
       if (isNaN(gameId)) {
         return res.status(400).send("Invalid game ID");
       }
 
+      // Get game details
       const [game] = await db
         .select()
         .from(games)
@@ -1429,9 +1509,13 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!game) {
+        console.log('Game not found:', gameId);
         return res.status(404).send("Game not found");
       }
 
+      console.log('Found game:', game);
+
+      // Get team details
       const [team] = await db
         .select({
           team: teams,
@@ -1444,13 +1528,19 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!team) {
+        console.log('Team not found:', teamId);
         return res.status(404).send("Team not found");
       }
 
+      console.log('Found team:', team);
+
+      // Check permissions
       if (team.team.captainId !== req.user.id && !isAdmin) {
+        console.log('Permission denied - not captain or admin:', { captainId: team.team.captainId, userId: req.user.id, isAdmin });
         return res.status(403).send("Only team captain or admin can join games");
       }
 
+      // Check if team is already participating
       const [existingParticipant] = await db
         .select()
         .from(gameParticipants)
@@ -1463,9 +1553,11 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (existingParticipant) {
+        console.log('Team already participating:', { gameId, teamId });
         return res.status(400).send("Team is already participating in this game");
       }
 
+      // Check current number of teams
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(gameParticipants)
@@ -1475,11 +1567,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Game has reached maximum number of teams");
       }
 
+      // Check team size
       const teamSize = team.teamMembers?.length || 0;
       if (teamSize > game.playersPerTeam) {
         return res.status(400).send(`Team size exceeds game limit of ${game.playersPerTeam} players`);
       }
 
+      // Get currently assigned positions
       const assignedPositions = await db
         .select({
           position: sql<number>`CAST((${gameParticipants.startingLocation}->>'position') AS INTEGER)`,
@@ -1495,16 +1589,19 @@ export function registerRoutes(app: Express): Server {
 
       const takenPositions = new Set(assignedPositions.map(p => p.position));
 
+      // Always create 10 starting positions regardless of max teams
       const TOTAL_STARTING_POSITIONS = 10;
       const availablePositions = Array.from({ length: TOTAL_STARTING_POSITIONS }, (_, i) => i + 1)
         .filter(p => !takenPositions.has(p));
 
+      // Randomly assign position
       const assignedPosition = await assignRandomPosition(availablePositions);
 
       if (!assignedPosition) {
         return res.status(400).send('No available positions');
       }
 
+      // Calculate position coordinates based on boundaries
       const coordinates = game.boundaries.geometry.coordinates[0];
       const center = coordinates.reduce(
         (acc, [lng, lat]) => ({
@@ -1520,11 +1617,13 @@ export function registerRoutes(app: Express): Server {
         return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       }));
 
+      // Convert position to angle (evenly distributed around the circle)
       const angle = (-1 * (assignedPosition.position - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
-      const safetyFactor = 0.9;
+      const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
 
+      // Create participant with assigned position
       const [participant] = await db
         .insert(gameParticipants)
         .values({
@@ -1540,6 +1639,7 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
+      // Broadcast team join to all clients
       wss.broadcast('GAME_UPDATE', {
         type: 'TEAM_JOINED',
         gameId,
@@ -1559,7 +1659,7 @@ export function registerRoutes(app: Express): Server {
 
 declare global {
   var gameSettings: any;
-  var gameWebSocketServer: any;
+  var gameWebSocketServer: any; // Declare gameWebSocketServer
   namespace Express {
     interface User {
       id: number;
@@ -1569,6 +1669,7 @@ declare global {
   }
 }
 
+// Settings schema and game zone configs
 const settingsSchema = z.object({
   defaultCenter: z.object({
     lat: z.number().min(-90).max(90),
@@ -1585,6 +1686,7 @@ const settingsSchema = z.object({
 function calculateStartingLocations(boundaries: any, numPoints: number) {
   const coordinates = boundaries.geometry.coordinates[0];
 
+  // Calculate center point (this should remain constant for all zones)
   const center = coordinates.reduce(
     (acc: { lat: number; lng: number }, coord: number[]) => {
       return {
@@ -1595,6 +1697,7 @@ function calculateStartingLocations(boundaries: any, numPoints: number) {
     { lat: 0, lng: 0 }
   );
 
+  // Calculate initial radius based on the furthest point
   const baseRadius = Math.max(...coordinates.map((coord: number[]) => {
     const lat = coord[1];
     const lng = coord[0];
@@ -1603,8 +1706,9 @@ function calculateStartingLocations(boundaries: any, numPoints: number) {
     return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
   }));
 
+  // Generate equidistant points around the circle with safe radius
   const startingLocations = [];
-  const safeRadius = baseRadius * 0.9;
+  const safeRadius = baseRadius * 0.9; // Keep points well within the boundary
 
   for (let i = 0; i < numPoints; i++) {
     const angle = (i * 2 * Math.PI) / numPoints;
@@ -1613,8 +1717,8 @@ function calculateStartingLocations(boundaries: any, numPoints: number) {
     startingLocations.push({
       position: i + 1,
       coordinates: { lat, lng },
-      center,
-      baseRadius
+      center, // Store center for reference
+      baseRadius // Store initial radius for reference
     });
   }
 

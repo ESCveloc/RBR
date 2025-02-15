@@ -5,8 +5,6 @@ import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
 import type { Session } from "express-session";
 import type { User } from "@db/schema";
-import { parse as parseCookie } from "cookie";
-import { sessionStore } from "./routes";
 
 // Document WebSocket message types and their purposes
 type WebSocketMessage = {
@@ -246,57 +244,27 @@ export function setupWebSocketServer(server: Server) {
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
     clientTracking: true,
-    verifyClient: async (info: any, done: any) => {
-      try {
-        // Skip verification for Vite HMR
-        if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
-          return done(true);
-        }
-
-        // Parse the cookie header
-        const cookieHeader = info.req.headers.cookie;
-        if (!cookieHeader) {
-          console.log('WebSocket connection rejected: No cookie header');
-          return done(false, 401, 'Unauthorized');
-        }
-
-        const cookies = parseCookie(cookieHeader);
-        const sessionId = cookies['connect.sid']?.slice(2, 34);
-
-        if (!sessionId) {
-          console.log('WebSocket connection rejected: No session ID in cookie');
-          return done(false, 401, 'Unauthorized');
-        }
-
-        // Get session from store
-        sessionStore.get(sessionId, (err, session) => {
-          if (err) {
-            console.error('Session store error:', err);
-            return done(false, 500, 'Internal Server Error');
-          }
-
-          if (!session?.user) {
-            console.log('WebSocket connection rejected: No user in session');
-            return done(false, 401, 'Unauthorized');
-          }
-
-          // Store session in request for later use
-          info.req.session = session;
-          done(true);
-        });
-      } catch (error) {
-        console.error('WebSocket verification error:', error);
-        done(false, 500, 'Internal Server Error');
+    verifyClient: (info: any, done: any) => {
+      // Skip verification for Vite HMR
+      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        return done(true);
       }
+
+      // Check for valid session
+      const session = (info.req as any).session;
+      if (!session?.user) {
+        console.log('WebSocket connection rejected: No valid session');
+        return done(false, 401, 'Unauthorized');
+      }
+
+      done(true);
     }
   });
 
   wss.on('connection', async (ws: CustomWebSocket, req: any) => {
     console.log('New WebSocket connection established');
-
-    // Store the session from the verification step
-    ws.session = req.session;
     ws.isAlive = true;
+    ws.session = req.session;
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -307,7 +275,7 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on('message', async (data) => {
       try {
-        // Use the stored session instead of verifying again
+        // Check authentication for every message
         if (!ws.session?.user) {
           ws.send(JSON.stringify({
             type: "ERROR",
@@ -379,7 +347,7 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log('WebSocket connection closed');
+      console.log(`WebSocket connection closed`);
       if (ws.pingTimeout) {
         clearTimeout(ws.pingTimeout);
       }
