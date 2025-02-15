@@ -6,11 +6,13 @@ import { setupAuth } from "./auth";
 import sessionMiddleware from "./session";
 
 const app = express();
+
+// Add session middleware before any other middleware
+app.use(sessionMiddleware);
+
+// Body parsing middleware after session
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Add session middleware before any routes
-app.use(sessionMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {

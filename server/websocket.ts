@@ -7,7 +7,7 @@ import type { Session } from "express-session";
 import type { User } from "@db/schema";
 import type { IncomingMessage } from "http";
 import cookie from "cookie";
-import sessionMiddleware from "./session"; // Use relative path
+import sessionMiddleware from "./session";
 
 // Extend IncomingMessage to include session
 interface ExtendedIncomingMessage extends IncomingMessage {
@@ -21,154 +21,47 @@ interface CustomWebSocket extends WebSocket {
   session?: Session & { user?: User };
 }
 
-interface GeolocationCoordinates {
-  latitude: number;
-  longitude: number;
-}
-
-interface GameState {
-  positions: Record<number, GeolocationCoordinates>;
-  zones: Array<{
-    id: number;
-    coordinates: [number, number];
-    radius: number;
-    controllingTeam?: number;
-  }>;
-}
-
-interface GameRoom {
-  clients: Set<CustomWebSocket>;
-  gameState: GameState;
-}
-
-class GameWebSocketServer extends WebSocketServer {
-  private gameRooms: Map<number, GameRoom> = new Map();
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-
-  constructor(options: any) {
-    super(options);
-    this.setupHeartbeat();
-  }
-
-  private setupHeartbeat() {
-    this.heartbeatInterval = setInterval(() => {
-      this.clients.forEach((ws: CustomWebSocket) => {
-        if (!ws.isAlive) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
-      });
-    }, 30000);
-
-    this.on('close', () => {
-      if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    });
-  }
-
-  async broadcast(gameId: number, message: any) {
-    const room = this.gameRooms.get(gameId);
-    if (!room) return;
-
-    const messageStr = JSON.stringify(message);
-    const deadClients: CustomWebSocket[] = [];
-
-    room.clients.forEach(client => {
-      try {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(messageStr);
-        } else {
-          deadClients.push(client);
-        }
-      } catch (error) {
-        deadClients.push(client);
-      }
-    });
-
-    if (deadClients.length > 0) {
-      deadClients.forEach(client => room.clients.delete(client));
-      if (room.clients.size === 0) {
-        this.gameRooms.delete(gameId);
-      }
-    }
-  }
-
-  async broadcastGameUpdate(gameId: number, type: string, data: any = {}) {
-    const room = this.gameRooms.get(gameId);
-    if (!room) return;
-
-    try {
-      const [game] = await db
-        .select()
-        .from(games)
-        .where(eq(games.id, gameId))
-        .limit(1);
-
-      if (!game) return;
-
-      const participants = await db
-        .select()
-        .from(gameParticipants)
-        .where(eq(gameParticipants.gameId, gameId));
-
-      await this.broadcast(gameId, {
-        type,
-        payload: {
-          gameId,
-          game: { ...game, participants },
-          gameState: room.gameState,
-          ...data
-        }
-      });
-    } catch (error) {
-      console.error("[WebSocket] Broadcast error:", error);
-    }
-  }
+interface WebSocketMessage {
+  type: string;
+  payload: any;
 }
 
 export function setupWebSocketServer(server: Server) {
-  const wss = new GameWebSocketServer({
+  const wss = new WebSocketServer({
     server,
     path: '/ws',
     clientTracking: true,
-    verifyClient: async (info: { req: ExtendedIncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
+    verifyClient: async ({ req }: { req: ExtendedIncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
       try {
-        // Skip verification for Vite HMR
-        if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        if (req.headers['sec-websocket-protocol'] === 'vite-hmr') {
           return done(true);
         }
 
-        // Parse cookies from the upgrade request
-        const cookies = cookie.parse(info.req.headers.cookie || '');
+        const cookies = cookie.parse(req.headers.cookie || '');
         if (!cookies['battle.sid']) {
-          console.error('[WebSocket] No session cookie found');
           return done(false, 401, 'No session cookie found');
         }
 
-        // Create a new promise to handle session loading
-        await new Promise<void>((resolve, reject) => {
-          try {
-            sessionMiddleware(info.req as any, {} as any, (err?: any) => {
-              if (err) {
-                console.error('[WebSocket] Session middleware error:', err);
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
-          } catch (error) {
-            console.error('[WebSocket] Session middleware execution error:', error);
-            reject(error);
-          }
+        // Setup express-specific properties
+        (req as any).originalUrl = req.url;
+        (req as any).method = req.method || 'GET';
+        (req as any).complete = true;
+        (req as any).headers = req.headers;
+        (req as any).get = (name: string) => req.headers[name.toLowerCase()];
+        (req as any).connection = req.socket;
+
+        // Parse session synchronously
+        await new Promise<void>((resolve) => {
+          sessionMiddleware(req as any, { end: () => null } as any, () => resolve());
         });
 
-        if (!info.req.session?.user?.id) {
-          console.error('[WebSocket] No user in session');
+        if (!req.session?.user?.id) {
           return done(false, 401, 'Unauthorized');
         }
 
-        info.req.userSession = info.req.session;
+        req.userSession = req.session;
         done(true);
       } catch (error) {
-        console.error('[WebSocket] Verification failed:', error);
         done(false, 500, 'Session verification failed');
       }
     }
@@ -182,7 +75,7 @@ export function setupWebSocketServer(server: Server) {
       ws.isAlive = true;
     });
 
-    ws.on('message', (data) => {
+    ws.on('message', async (data) => {
       try {
         if (!ws.session?.user?.id) {
           ws.send(JSON.stringify({
@@ -192,19 +85,17 @@ export function setupWebSocketServer(server: Server) {
           return;
         }
 
-        const message = JSON.parse(data.toString());
-
+        const message: WebSocketMessage = JSON.parse(data.toString());
         switch (message.type) {
           case "JOIN_GAME":
-            wss.joinGame(ws, message.payload.gameId);
-            break;
-
-          case "GAME_STATE":
-            if (ws.gameId) {
-              wss.updateGameState(ws, ws.gameId, message.payload);
+            if (message.payload.gameId) {
+              ws.gameId = message.payload.gameId;
+              ws.send(JSON.stringify({
+                type: "JOINED_GAME",
+                payload: { gameId: message.payload.gameId }
+              }));
             }
             break;
-
           default:
             console.warn('[WebSocket] Unknown message type:', message.type);
         }
@@ -217,7 +108,9 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      wss.leaveGame(ws);
+      if (ws.gameId) {
+        ws.gameId = undefined;
+      }
     });
   });
 
