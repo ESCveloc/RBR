@@ -4,6 +4,31 @@ import { settings } from "@db/schema";
 import { eq } from "drizzle-orm";
 import fs from "fs/promises";
 import path from "path";
+import { z } from "zod";
+
+// Validation schemas
+const themeSchema = z.object({
+  primary: z.string(),
+  variant: z.enum(["professional", "tint", "vibrant"]),
+  appearance: z.enum(["light", "dark", "system"]),
+  radius: z.number().min(0).max(2),
+});
+
+const zoneConfigSchema = z.object({
+  durationMinutes: z.number().min(5).max(60),
+  radiusMultiplier: z.number().min(0.1).max(1),
+  intervalMinutes: z.number().min(5).max(60),
+});
+
+const settingsSchema = z.object({
+  defaultCenter: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  defaultRadiusMiles: z.number().min(0.1).max(10),
+  zoneConfigs: z.array(zoneConfigSchema).min(1),
+  theme: themeSchema,
+});
 
 const router = Router();
 
@@ -34,21 +59,46 @@ router.get("/settings", async (req, res) => {
 router.put("/settings", async (req, res) => {
   try {
     console.log('Received settings update:', req.body);
-    const { theme, ...otherSettings } = req.body;
 
-    // Update settings in database
-    await db
-      .update(settings)
-      .set(otherSettings)
-      .where(eq(settings.id, 1));
+    // Validate the incoming data
+    const validatedData = settingsSchema.parse(req.body);
+    const { theme, defaultCenter, defaultRadiusMiles, zoneConfigs } = validatedData;
 
-    // Update theme.json
-    const themeFilePath = path.join(process.cwd(), "theme.json");
-    await fs.writeFile(themeFilePath, JSON.stringify(theme, null, 2));
+    // Start a transaction to ensure atomic updates
+    await db.transaction(async (tx) => {
+      // Update settings in database
+      await tx
+        .update(settings)
+        .set({
+          defaultCenter,
+          defaultRadiusMiles,
+          zoneConfigs,
+          updatedAt: new Date(),
+        })
+        .where(eq(settings.id, 1));
 
-    return res.json({ message: "Settings updated successfully" });
+      // Update theme.json
+      const themeFilePath = path.join(process.cwd(), "theme.json");
+      await fs.writeFile(themeFilePath, JSON.stringify(theme, null, 2));
+    });
+
+    return res.json({ 
+      message: "Settings updated successfully",
+      settings: {
+        defaultCenter,
+        defaultRadiusMiles,
+        zoneConfigs,
+        theme
+      }
+    });
   } catch (error) {
     console.error("Failed to update settings:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: "Invalid settings data", 
+        details: error.errors 
+      });
+    }
     return res.status(500).json({ error: "Failed to update settings" });
   }
 });

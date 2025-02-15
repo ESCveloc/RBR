@@ -359,9 +359,25 @@ export default function Admin() {
 
   const onSettingsSubmit = async (data: z.infer<typeof settingsSchema>) => {
     try {
-      await updateSettings.mutateAsync(data);
+      console.log('Submitting settings:', data);
+      const result = await updateSettings.mutateAsync(data);
+
+      // Only update theme if server update was successful
+      if (result?.settings?.theme) {
+        updateTheme(result.settings.theme);
+      }
+
+      toast({
+        title: "Success",
+        description: "Settings updated successfully",
+      });
     } catch (error) {
       console.error('Form submission error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update settings",
+        variant: "destructive",
+      });
     }
   };
 
@@ -763,8 +779,8 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <Form {...settingsForm}>
-                <form 
-                  onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} 
+                <form
+                  onSubmit={settingsForm.handleSubmit(onSettingsSubmit)}
                   className="space-y-6"
                 >
                   <Accordion type="single" collapsible className="w-full">
@@ -968,97 +984,81 @@ export default function Admin() {
                           render={({ field }) => (
                             <FormItem className="space-y-4 pt-4">
                               <div className="space-y-4">
-                                {field.value.map((zone, index) => (
-                                  <Card key={index} className="p-4">
-                                    <CardHeader className="p-0 pb-4">
-                                      <div className="flex items-center justify-between">
-                                        <CardTitle className="text-lg">Zone {index + 1}</CardTitle>
-                                        {index > 0 && (
-                                          <Button
-                                            type="button"
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => {
-                                              const newConfigs = [...field.value];
-                                              newConfigs.splice(index, 1);
-                                              field.onChange(newConfigs);
-                                            }}
-                                          >
-                                            Remove
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </CardHeader>
-                                    <div className="grid gap-4">
+                                <div className="grid grid-cols-3 gap-4">
+                                  {field.value.map((config, index) => (
+                                    <div key={index}>
                                       <div>
                                         <FormLabel>Duration (minutes)</FormLabel>
-                                        <Slider
+                                        <Input
+                                          type="number"
                                           min={5}
                                           max={60}
-                                          step={5}
-                                          value={[zone.durationMinutes]}
-                                          onValueChange={([value]) => {
+                                          value={config.durationMinutes}
+                                          onChange={(e) => {
+                                            const newValue = Number(e.target.value);
                                             const newConfigs = [...field.value];
-                                            newConfigs[index].durationMinutes = value;
+                                            newConfigs[index] = {
+                                              ...config,
+                                              durationMinutes: newValue
+                                            };
                                             field.onChange(newConfigs);
                                           }}
                                         />
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                          <span>{zone.durationMinutes} minutes</span>
-                                          <span>60 minutes</span>
-                                        </div>
                                       </div>
                                       <div>
-                                        <FormLabel>Interval Before Zone (minutes)</FormLabel>
-                                        <Slider
+                                        <FormLabel>Radius Multiplier</FormLabel>
+                                        <Input
+                                          type="number"
+                                          min={0.1}
+                                          max={1}
+                                          step={0.1}
+                                          value={config.radiusMultiplier}
+                                          onChange={(e) => {
+                                            const newValue = Number(e.target.value);
+                                            const newConfigs = [...field.value];
+                                            newConfigs[index] = {
+                                              ...config,
+                                              radiusMultiplier: newValue
+                                            };
+                                            field.onChange(newConfigs);
+                                          }}
+                                        />
+                                      </div>
+                                      <div>
+                                        <FormLabel>Interval (minutes)</FormLabel>
+                                        <Input
+                                          type="number"
                                           min={5}
                                           max={60}
-                                          step={5}
-                                          value={[zone.intervalMinutes]}
-                                          onValueChange={([value]) => {
+                                          value={config.intervalMinutes}
+                                          onChange={(e) => {
+                                            const newValue = Number(e.target.value);
                                             const newConfigs = [...field.value];
-                                            newConfigs[index].intervalMinutes = value;
+                                            newConfigs[index] = {
+                                              ...config,
+                                              intervalMinutes: newValue
+                                            };
                                             field.onChange(newConfigs);
                                           }}
                                         />
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                          <span>{zone.intervalMinutes} minutes</span>
-                                          <span>60 minutes</span>
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <FormLabel>Zone Size (% of previous)</FormLabel>
-                                        <Slider
-                                          min={10}
-                                          max={100}
-                                          step={5}
-                                          value={[zone.radiusMultiplier * 100]}
-                                          onValueChange={([value]) => {
-                                            const newConfigs = [...field.value];
-                                            newConfigs[index].radiusMultiplier = value / 100;
-                                            field.onChange(newConfigs);
-                                          }}
-                                        />
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                          <span>{(zone.radiusMultiplier * 100).toFixed(0)}%</span>
-                                          <span>100%</span>
-                                        </div>
                                       </div>
                                     </div>
-                                  </Card>
-                                ))}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => {
-                                    field.onChange([
-                                      ...field.value,
-                                      { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
-                                    ]);
-                                  }}
-                                >
-                                  Add Zone
-                                </Button>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const newConfig = {
+                                        durationMinutes: 15,
+                                        radiusMultiplier: 0.5,
+                                        intervalMinutes: 15
+                                      };
+                                      field.onChange([...field.value, newConfig]);
+                                    }}
+                                  >
+                                    Add Zone Configuration
+                                  </Button>
+                                </div>
                               </div>
                             </FormItem>
                           )}
