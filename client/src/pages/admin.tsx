@@ -363,8 +363,21 @@ export default function Admin() {
       console.log('Submitting settings:', data);
       const result = await updateSettings.mutateAsync(data);
 
-      if (result?.settings?.theme) {
-        updateTheme(result.settings.theme);
+      if (result?.settings) {
+        // Update both theme and local form state
+        if (result.settings.theme) {
+          updateTheme(result.settings.theme);
+        }
+
+        // Update form with new settings
+        settingsForm.reset({
+          ...result.settings,
+          theme: result.settings.theme || settingsForm.getValues('theme')
+        });
+
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/games"] });
       }
 
       toast({
@@ -586,6 +599,7 @@ export default function Admin() {
                           defaultCenter={settings?.defaultCenter}
                           defaultRadiusMiles={settings?.defaultRadiusMiles}
                           zoneConfigs={settingsForm.watch("zoneConfigs")}
+                          key={JSON.stringify(settingsForm.watch("zoneConfigs"))} // Force re-render on zone config changes
                         />
                       </div>
                     </div>
@@ -1018,12 +1032,14 @@ export default function Admin() {
                                             value={config.durationMinutes}
                                             onChange={(e) => {
                                               const newValue = Number(e.target.value);
-                                              const newConfigs = [...field.value];
-                                              newConfigs[index] = {
-                                                ...config,
-                                                durationMinutes: newValue
-                                              };
-                                              field.onChange(newConfigs);
+                                              if (!isNaN(newValue) && newValue >= 5 && newValue <= 60) {
+                                                const newConfigs = [...field.value];
+                                                newConfigs[index] = {
+                                                  ...config,
+                                                  durationMinutes: newValue
+                                                };
+                                                field.onChange(newConfigs);
+                                              }
                                             }}
                                           />
                                         </FormControl>
@@ -1039,12 +1055,14 @@ export default function Admin() {
                                             value={config.radiusMultiplier}
                                             onChange={(e) => {
                                               const newValue = Number(e.target.value);
-                                              const newConfigs = [...field.value];
-                                              newConfigs[index] = {
-                                                ...config,
-                                                radiusMultiplier: newValue
-                                              };
-                                              field.onChange(newConfigs);
+                                              if (!isNaN(newValue) && newValue >= 0.1 && newValue <= 1) {
+                                                const newConfigs = [...field.value];
+                                                newConfigs[index] = {
+                                                  ...config,
+                                                  radiusMultiplier: newValue
+                                                };
+                                                field.onChange(newConfigs);
+                                              }
                                             }}
                                           />
                                         </FormControl>
@@ -1059,12 +1077,14 @@ export default function Admin() {
                                             value={config.intervalMinutes}
                                             onChange={(e) => {
                                               const newValue = Number(e.target.value);
-                                              const newConfigs = [...field.value];
-                                              newConfigs[index] = {
-                                                ...config,
-                                                intervalMinutes: newValue
-                                              };
-                                              field.onChange(newConfigs);
+                                              if (!isNaN(newValue) && newValue >= 5 && newValue <= 60) {
+                                                const newConfigs = [...field.value];
+                                                newConfigs[index] = {
+                                                  ...config,
+                                                  intervalMinutes: newValue
+                                                };
+                                                field.onChange(newConfigs);
+                                              }
                                             }}
                                           />
                                         </FormControl>
