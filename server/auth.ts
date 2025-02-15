@@ -26,18 +26,17 @@ export const sessionStore = new MemoryStore({
 
 export function setupAuth(app: Express) {
   app.use(session({
-    secret: process.env.REPL_ID || "battle-royale-secret",
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: false, // Allow non-HTTPS in development
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      sameSite: 'lax',
-      path: '/'
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax'
     },
-    store: sessionStore,
-    name: 'battle.sid'
+    name: 'connect.sid' // This matches what the WebSocket verification expects
   }));
 
   app.use(passport.initialize());
@@ -82,6 +81,7 @@ export function setupAuth(app: Express) {
   }));
 
   passport.serializeUser((user, done) => {
+    console.log('Serializing user:', user.id);
     done(null, user.id);
   });
 
@@ -92,13 +92,15 @@ export function setupAuth(app: Express) {
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
+
+      console.log('Deserialized user:', user?.id);
       done(null, user);
     } catch (error) {
+      console.error("Deserialization error:", error);
       done(error);
     }
   });
 
-  // Simple auth routes with minimal overhead
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false, info: IVerifyOptions) => {
       if (err) return res.status(500).json({ error: "Login failed" });
@@ -106,6 +108,12 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return res.status(500).json({ error: "Login failed" });
+
+        // Set cookie options explicitly
+        if (req.session) {
+          req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        }
+
         res.json({
           message: "Login successful",
           user: { id: user.id, username: user.username, role: user.role }
