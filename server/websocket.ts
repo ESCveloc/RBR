@@ -6,13 +6,7 @@ import { eq } from "drizzle-orm";
 import type { Session } from "express-session";
 import type { User } from "@db/schema";
 import { parse as parseCookie } from "cookie";
-import session from "express-session";
-import MemoryStore from "memorystore";
-
-const MemoryStoreSession = MemoryStore(session);
-const sessionStore = new MemoryStoreSession({
-  checkPeriod: 86400000 // prune expired entries every 24h
-});
+import { sessionStore } from "./routes";
 
 // Document WebSocket message types and their purposes
 type WebSocketMessage = {
@@ -267,7 +261,7 @@ export function setupWebSocketServer(server: Server) {
         }
 
         const cookies = parseCookie(cookieHeader);
-        const sessionId = cookies['connect.sid']?.slice(2, 34); // Extract session ID from cookie
+        const sessionId = cookies['connect.sid']?.slice(2, 34);
 
         if (!sessionId) {
           console.log('WebSocket connection rejected: No session ID in cookie');
@@ -276,12 +270,17 @@ export function setupWebSocketServer(server: Server) {
 
         // Get session from store
         sessionStore.get(sessionId, (err, session) => {
-          if (err || !session?.user) {
-            console.log('WebSocket connection rejected: Invalid session', err);
+          if (err) {
+            console.error('Session store error:', err);
+            return done(false, 500, 'Internal Server Error');
+          }
+
+          if (!session?.user) {
+            console.log('WebSocket connection rejected: No user in session');
             return done(false, 401, 'Unauthorized');
           }
 
-          // Attach session to request for later use
+          // Store session in request for later use
           info.req.session = session;
           done(true);
         });
@@ -294,8 +293,10 @@ export function setupWebSocketServer(server: Server) {
 
   wss.on('connection', async (ws: CustomWebSocket, req: any) => {
     console.log('New WebSocket connection established');
-    ws.isAlive = true;
+
+    // Store the session from the verification step
     ws.session = req.session;
+    ws.isAlive = true;
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -306,7 +307,7 @@ export function setupWebSocketServer(server: Server) {
 
     ws.on('message', async (data) => {
       try {
-        // Check authentication for every message
+        // Use the stored session instead of verifying again
         if (!ws.session?.user) {
           ws.send(JSON.stringify({
             type: "ERROR",
@@ -378,7 +379,7 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log(`WebSocket connection closed`);
+      console.log('WebSocket connection closed');
       if (ws.pingTimeout) {
         clearTimeout(ws.pingTimeout);
       }
