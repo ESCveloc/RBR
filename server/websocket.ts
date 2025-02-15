@@ -51,7 +51,7 @@ class GameWebSocketServer extends WebSocketServer {
   constructor(options: any) {
     super(options);
     this.setupHeartbeat();
-    console.log("GameWebSocketServer initialized");
+    console.log("[GameWebSocketServer] Initialized");
   }
 
   private setupHeartbeat() {
@@ -276,28 +276,40 @@ export function setupWebSocketServer(server: Server) {
     verifyClient: (info: { req: any }, done: (result: boolean, code?: number, message?: string) => void) => {
       // Skip verification for Vite HMR
       if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        console.log('[WebSocket] Allowing Vite HMR connection');
         return done(true);
       }
 
-      // Ensure we have access to the session
+      // Access session from the request
       const session = info.req.session;
 
+      console.log('[WebSocket] Verifying client connection:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+      });
+
       if (!session?.user?.id) {
-        console.log('WebSocket connection rejected: No valid session', {
+        console.log('[WebSocket] Connection rejected: Invalid session', {
           session: session ? 'exists' : 'missing',
-          user: session?.user ? 'exists' : 'missing'
+          user: session?.user ? 'exists' : 'missing',
+          userId: session?.user?.id
         });
         return done(false, 401, 'Unauthorized');
       }
 
       // Session is valid, attach it to the request for later use
       info.req.userSession = session;
+      console.log('[WebSocket] Client verified successfully:', {
+        userId: session.user.id,
+        username: session.user.username
+      });
       done(true);
     }
   });
 
   wss.on('connection', async (ws: CustomWebSocket, req: any) => {
-    console.log('New WebSocket connection established with user:', req.userSession?.user?.username);
+    console.log('[WebSocket] New connection established with user:', req.userSession?.user?.username);
     ws.isAlive = true;
     ws.session = req.userSession;
 
@@ -330,8 +342,8 @@ export function setupWebSocketServer(server: Server) {
           case "LOCATION_UPDATE":
             if (ws.gameId) {
               wss.updateLocation(
-                ws.gameId, 
-                message.payload.teamId, 
+                ws.gameId,
+                message.payload.teamId,
                 message.payload.location
               );
             }

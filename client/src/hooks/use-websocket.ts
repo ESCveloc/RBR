@@ -60,6 +60,11 @@ export function useWebSocket(): WebSocketInterface {
 
   const connect = useCallback(() => {
     if (!user || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocket] Connection attempt skipped:', {
+        noUser: !user,
+        isConnecting: isConnectingRef.current,
+        alreadyConnected: wsRef.current?.readyState === WebSocket.OPEN
+      });
       return;
     }
 
@@ -67,26 +72,32 @@ export function useWebSocket(): WebSocketInterface {
     isConnectingRef.current = true;
 
     try {
-      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+      // Get the WebSocket URL
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.host;
+      const wsPath = '/ws';
+      const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
+
+      console.log('[WebSocket] Attempting connection to:', wsUrl);
       const ws = new WebSocket(wsUrl);
-      console.log('Initiating WebSocket connection to:', wsUrl);
 
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
-          console.log('WebSocket connection timeout, closing connection');
+          console.log('[WebSocket] Connection timeout, closing socket');
           ws.close();
         }
       }, 5000);
 
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        console.log('WebSocket connection established successfully');
+        console.log('[WebSocket] Connection established successfully');
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
-        // Process any pending game join after connection
+        // Process pending game join
         if (pendingGameJoinRef.current !== null) {
+          console.log('[WebSocket] Processing pending game join:', pendingGameJoinRef.current);
           ws.send(JSON.stringify({
             type: 'JOIN_GAME',
             payload: { gameId: pendingGameJoinRef.current }
@@ -94,7 +105,7 @@ export function useWebSocket(): WebSocketInterface {
           pendingGameJoinRef.current = null;
         }
 
-        // Process any queued updates
+        // Process queued updates
         while (locationUpdateQueueRef.current.length > 0) {
           const update = locationUpdateQueueRef.current.shift();
           if (update) {
@@ -113,10 +124,10 @@ export function useWebSocket(): WebSocketInterface {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('Received WebSocket message:', message);
+          console.log('[WebSocket] Received message:', message);
 
           if (message.type === 'ERROR') {
-            console.error('WebSocket error message:', message.payload);
+            console.error('[WebSocket] Error message:', message.payload);
             toast({
               title: "WebSocket Error",
               description: message.payload.message,
@@ -131,53 +142,53 @@ export function useWebSocket(): WebSocketInterface {
               try {
                 handler(message.payload);
               } catch (err) {
-                console.error('Error in message handler:', err);
+                console.error('[WebSocket] Handler error:', err);
               }
             });
           }
         } catch (error) {
-          console.error('WebSocket message parsing error:', error);
+          console.error('[WebSocket] Message parsing error:', error);
         }
       };
 
       ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.error('WebSocket error:', error);
+        console.error('[WebSocket] Connection error:', error);
         isConnectingRef.current = false;
 
         toast({
           title: "Connection Error",
-          description: "WebSocket connection error occurred. Attempting to reconnect...",
+          description: "Failed to connect to game server. Retrying...",
           variant: "destructive"
         });
       };
 
       ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        console.log('WebSocket connection closed:', event.code, event.reason);
+        console.log('[WebSocket] Connection closed:', event.code, event.reason);
         wsRef.current = null;
         isConnectingRef.current = false;
 
         if (user && reconnectAttemptRef.current < maxReconnectAttempts && event.code !== 1000) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
-          console.log(`Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
+          console.log(`[WebSocket] Scheduling reconnection attempt ${reconnectAttemptRef.current + 1} in ${delay}ms`);
 
           reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
           toast({
             title: "Connection Error",
-            description: "Failed to establish WebSocket connection after multiple attempts. Please refresh the page.",
+            description: "Unable to connect to game server. Please refresh the page.",
             variant: "destructive"
           });
         }
       };
     } catch (error) {
-      console.error('Error creating WebSocket connection:', error);
+      console.error('[WebSocket] Setup error:', error);
       isConnectingRef.current = false;
       toast({
         title: "Connection Error",
-        description: "Failed to establish WebSocket connection",
+        description: "Failed to establish connection to game server",
         variant: "destructive"
       });
     }
