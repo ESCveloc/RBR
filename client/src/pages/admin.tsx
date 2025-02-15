@@ -308,7 +308,7 @@ export default function Admin() {
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: settings.zoneConfigs // Use current settings' zone configurations
+        zoneConfigs: settings.zoneConfigs 
       };
 
       console.log("Creating game with data:", gameData);
@@ -363,7 +363,6 @@ export default function Admin() {
       console.log('Submitting settings:', data);
       const result = await updateSettings.mutateAsync(data);
 
-      // Only update theme if server update was successful
       if (result?.settings?.theme) {
         updateTheme(result.settings.theme);
       }
@@ -586,6 +585,7 @@ export default function Admin() {
                           selectedArea={selectedArea}
                           defaultCenter={settings?.defaultCenter}
                           defaultRadiusMiles={settings?.defaultRadiusMiles}
+                          zoneConfigs={settingsForm.watch("zoneConfigs")}
                         />
                       </div>
                     </div>
@@ -1022,7 +1022,7 @@ export default function Admin() {
                                               newConfigs[index] = {
                                                 ...config,
                                                 durationMinutes: newValue
-                                                                                            };
+                                              };
                                               field.onChange(newConfigs);
                                             }}
                                           />
