@@ -79,6 +79,28 @@ export const gameParticipants = pgTable("game_participants", {
   startingLocationAssignedAt: timestamp("starting_location_assigned_at")
 });
 
+// Add settings table and types
+export const settings = pgTable("settings", {
+  id: serial("id").primaryKey(),
+  defaultCenter: jsonb("default_center").$type<{ lat: number; lng: number }>().notNull().default({ lat: 35.8462, lng: -78.6431 }),
+  defaultRadiusMiles: integer("default_radius_miles").notNull().default(1),
+  zoneConfigs: jsonb("zone_configs").$type<Array<{
+    durationMinutes: number;
+    radiusMultiplier: number;
+    intervalMinutes: number;
+  }>>().notNull().default([{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }]),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
+// Add settings schemas
+export const insertSettingsSchema = createInsertSchema(settings);
+export const selectSettingsSchema = createSelectSchema(settings);
+
+// Add settings type
+export type Settings = typeof settings.$inferSelect;
+export type InsertSettings = typeof settings.$inferInsert;
+
+
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   teams: many(teamMembers),

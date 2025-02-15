@@ -205,9 +205,8 @@ export default function Admin() {
       });
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
-    },
+    }
   });
-
 
   useEffect(() => {
     if (!isConnected || !socket) return;
@@ -261,7 +260,7 @@ export default function Admin() {
 
   const settingsForm = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: settings || {
+    defaultValues: {
       defaultCenter: { lat: 0, lng: 0 },
       defaultRadiusMiles: 1,
       zoneConfigs: [{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }],
@@ -273,6 +272,22 @@ export default function Admin() {
       },
     },
   });
+
+  useEffect(() => {
+    if (settings) {
+      settingsForm.reset({
+        defaultCenter: settings.defaultCenter,
+        defaultRadiusMiles: settings.defaultRadiusMiles,
+        zoneConfigs: settings.zoneConfigs,
+        theme: settings.theme || {
+          primary: "#007bff",
+          variant: "professional",
+          appearance: "system",
+          radius: 1,
+        },
+      });
+    }
+  }, [settings, settingsForm]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
