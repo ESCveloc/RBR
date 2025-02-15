@@ -275,6 +275,7 @@ export default function Admin() {
 
   useEffect(() => {
     if (settings) {
+      console.log('Updating settings form with:', settings);
       settingsForm.reset({
         defaultCenter: settings.defaultCenter,
         defaultRadiusMiles: settings.defaultRadiusMiles,
@@ -305,10 +306,22 @@ export default function Admin() {
         settings.defaultRadiusMiles
       );
 
+      // Ensure we're using the latest settings from the server
+      const currentSettings = await queryClient.fetchQuery({
+        queryKey: ["/api/admin/settings"],
+        queryFn: async () => {
+          const response = await fetch("/api/admin/settings", {
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error("Failed to fetch settings");
+          return response.json();
+        }
+      });
+
       const gameData = {
         ...values,
         boundaries,
-        zoneConfigs: settings.zoneConfigs 
+        zoneConfigs: currentSettings.zoneConfigs
       };
 
       console.log("Creating game with data:", gameData);
@@ -341,12 +354,24 @@ export default function Admin() {
 
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      toast({
-        title: "Success",
-        description: "Settings updated successfully",
-      });
+    onSuccess: (result) => {
+      if (result?.settings) {
+        // Update theme if present
+        if (result.settings.theme) {
+          updateTheme(result.settings.theme);
+        }
+
+        // Force a refetch of settings
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+
+        // Also invalidate games since they depend on settings
+        queryClient.invalidateQueries({ queryKey: ["/api/games"] });
+
+        toast({
+          title: "Success",
+          description: "Settings updated successfully",
+        });
+      }
     },
     onError: (error: Error) => {
       console.error('Settings update error:', error);
@@ -994,7 +1019,7 @@ export default function Admin() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <FormField
-                          control={settingsForm.control}
+                                                    control={settingsForm.control}
                           name="zoneConfigs"
                           render={({ field }) => (
                             <FormItem className="space-y-4 pt-4">
