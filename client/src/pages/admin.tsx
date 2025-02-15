@@ -307,7 +307,8 @@ export default function Admin() {
 
       const gameData = {
         ...values,
-        boundaries
+        boundaries,
+        zoneConfigs: settings.zoneConfigs // Use current settings' zone configurations
       };
 
       console.log("Creating game with data:", gameData);
@@ -1016,12 +1017,12 @@ export default function Admin() {
                                             max={60}
                                             value={config.durationMinutes}
                                             onChange={(e) => {
-                                              const newValue = Number(e.targettarget.value);
+                                              const newValue = Number(e.target.value);
                                               const newConfigs = [...field.value];
                                               newConfigs[index] = {
                                                 ...config,
                                                 durationMinutes: newValue
-                                              };
+                                                                                            };
                                               field.onChange(newConfigs);
                                             }}
                                           />
