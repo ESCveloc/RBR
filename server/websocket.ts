@@ -5,6 +5,14 @@ import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
 import type { Session } from "express-session";
 import type { User } from "@db/schema";
+import { parse as parseCookie } from "cookie";
+import session from "express-session";
+import MemoryStore from "memorystore";
+
+const MemoryStoreSession = MemoryStore(session);
+const sessionStore = new MemoryStoreSession({
+  checkPeriod: 86400000 // prune expired entries every 24h
+});
 
 // Document WebSocket message types and their purposes
 type WebSocketMessage = {
@@ -244,20 +252,43 @@ export function setupWebSocketServer(server: Server) {
     perMessageDeflate: false,
     maxPayload: 64 * 1024,
     clientTracking: true,
-    verifyClient: (info: any, done: any) => {
-      // Skip verification for Vite HMR
-      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
-        return done(true);
-      }
+    verifyClient: async (info: any, done: any) => {
+      try {
+        // Skip verification for Vite HMR
+        if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+          return done(true);
+        }
 
-      // Check for valid session
-      const session = (info.req as any).session;
-      if (!session?.user) {
-        console.log('WebSocket connection rejected: No valid session');
-        return done(false, 401, 'Unauthorized');
-      }
+        // Parse the cookie header
+        const cookieHeader = info.req.headers.cookie;
+        if (!cookieHeader) {
+          console.log('WebSocket connection rejected: No cookie header');
+          return done(false, 401, 'Unauthorized');
+        }
 
-      done(true);
+        const cookies = parseCookie(cookieHeader);
+        const sessionId = cookies['connect.sid']?.slice(2, 34); // Extract session ID from cookie
+
+        if (!sessionId) {
+          console.log('WebSocket connection rejected: No session ID in cookie');
+          return done(false, 401, 'Unauthorized');
+        }
+
+        // Get session from store
+        sessionStore.get(sessionId, (err, session) => {
+          if (err || !session?.user) {
+            console.log('WebSocket connection rejected: Invalid session', err);
+            return done(false, 401, 'Unauthorized');
+          }
+
+          // Attach session to request for later use
+          info.req.session = session;
+          done(true);
+        });
+      } catch (error) {
+        console.error('WebSocket verification error:', error);
+        done(false, 500, 'Internal Server Error');
+      }
     }
   });
 
