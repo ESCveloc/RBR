@@ -25,41 +25,23 @@ export const sessionStore = new MemoryStore({
 });
 
 export function setupAuth(app: Express) {
-  const isProduction = app.get("env") === "production";
-  const cookieSettings = {
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: isProduction, // Only use secure in production
-    httpOnly: true,
-    sameSite: isProduction ? 'strict' : 'lax' as const,
-    path: '/'
-  };
-
   app.use(session({
     secret: process.env.REPL_ID || "battle-royale-secret",
     resave: false,
     saveUninitialized: false,
-    rolling: true, // Refresh cookie on each request
-    cookie: cookieSettings,
+    cookie: { 
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: false, // Allow non-HTTPS in development
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/'
+    },
     store: sessionStore,
-    name: 'battle.sid',
-    unset: 'destroy'
+    name: 'battle.sid'
   }));
 
   app.use(passport.initialize());
   app.use(passport.session());
-
-  // Add session debug middleware in development
-  if (!isProduction) {
-    app.use((req, res, next) => {
-      console.log('Session Debug:', {
-        id: req.sessionID,
-        cookie: req.session?.cookie,
-        user: req.user?.id,
-        isAuthenticated: req.isAuthenticated()
-      });
-      next();
-    });
-  }
 
   passport.use(new LocalStrategy(async (username, password, done) => {
     try {
@@ -116,31 +98,14 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Auth routes
+  // Simple auth routes with minimal overhead
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error | null, user: Express.User | false, info: IVerifyOptions) => {
-      if (err) {
-        console.error("Login error:", err);
-        return res.status(500).json({ error: "Login failed" });
-      }
-      if (!user) {
-        console.log("Login failed:", info.message);
-        return res.status(401).json({ error: info.message || "Invalid credentials" });
-      }
+      if (err) return res.status(500).json({ error: "Login failed" });
+      if (!user) return res.status(401).json({ error: info.message || "Invalid credentials" });
 
       req.login(user, (err) => {
-        if (err) {
-          console.error("Session creation error:", err);
-          return res.status(500).json({ error: "Login failed" });
-        }
-
-        // Ensure cookie is set properly
-        if (req.session) {
-          req.session.cookie.maxAge = cookieSettings.maxAge;
-          req.session.cookie.secure = cookieSettings.secure;
-        }
-
-        console.log("Login successful for user:", user.id);
+        if (err) return res.status(500).json({ error: "Login failed" });
         res.json({
           message: "Login successful",
           user: { id: user.id, username: user.username, role: user.role }
@@ -150,26 +115,14 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res) => {
-    const userId = req.user?.id;
     req.logout(() => {
-      req.session?.destroy((err) => {
-        if (err) {
-          console.error("Logout error:", err);
-          return res.status(500).json({ error: "Logout failed" });
-        }
-        console.log("Logout successful for user:", userId);
-        res.json({ message: "Logged out successfully" });
-      });
+      res.json({ message: "Logged out successfully" });
     });
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      console.log("Unauthenticated user access attempt");
-      return res.status(401).send("Not authenticated");
-    }
+    if (!req.isAuthenticated()) return res.status(401).send("Not authenticated");
     const user = req.user as Express.User;
-    console.log("User info requested:", user.id);
     res.json({ id: user.id, username: user.username, role: user.role });
   });
 }

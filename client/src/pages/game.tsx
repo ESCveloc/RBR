@@ -28,7 +28,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { useGameState } from '@/hooks/use-game';
 
 export default function Game() {
   const [match, params] = useRoute<{ id: string }>("/game/:id");
@@ -53,9 +52,7 @@ export default function Game() {
     );
   }
 
-  // Use the enhanced WebSocket and game state hooks
   const { socket, isConnected, subscribeToMessage, joinGame } = useWebSocket();
-  const { game, gameState, isLoading, error, updateLocation } = useGameState(gameId);
   const isAdmin = user?.role === 'admin';
   const backLink = isAdmin ? "/admin" : "/";
 
@@ -91,7 +88,113 @@ export default function Game() {
     };
   }, [socket, isConnected, gameId, subscribeToMessage, queryClient]);
 
-  // Handle loading and error states
+  // Fetch game data
+  const { data: game, isLoading, error } = useQuery<Game>({
+    queryKey: [`/api/games/${gameId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/games/${gameId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch game ${gameId}`);
+      }
+      return response.json();
+    },
+    staleTime: 30000,
+    refetchInterval: false,
+    retry: 2
+  });
+
+  const updateGameStatus = useMutation({
+    mutationFn: async ({ status }: { status: Game['status'] }) => {
+      if (!gameId) {
+        throw new Error('No game ID provided');
+      }
+
+      console.log('Updating game status:', { gameId, status });
+
+      const response = await fetch(`/api/games/${gameId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ status }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update game status");
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ status }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/games/${gameId}`] });
+      const previousGame = queryClient.getQueryData<Game>([`/api/games/${gameId}`]);
+
+      if (previousGame) {
+        queryClient.setQueryData<Game>([`/api/games/${gameId}`], {
+          ...previousGame,
+          status
+        });
+      }
+
+      return { previousGame };
+    },
+    onError: (error: Error, variables, context) => {
+      if (context?.previousGame) {
+        queryClient.setQueryData([`/api/games/${gameId}`], context.previousGame);
+      }
+      console.error('Error updating game status:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Game status updated successfully",
+      });
+    }
+  });
+
+  const assignPosition = useMutation({
+    mutationFn: async ({ teamId, force = false }: { teamId: number; force?: boolean }) => {
+      if (!gameId) return;
+
+      const response = await fetch(`/api/games/${gameId}/assign-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, force }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      toast({
+        title: "Success",
+        description: "Starting position assigned.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -217,11 +320,7 @@ export default function Game() {
       <main className="container mx-auto p-4 grid gap-8 md:grid-cols-[1fr_300px]">
         <div className="order-2 md:order-1">
           <div className="h-[600px] w-full rounded-lg overflow-hidden border">
-            <MapView 
-              game={game} 
-              gameState={gameState} 
-              onPositionUpdate={updateLocation}
-            />
+            <MapView game={game} />
           </div>
         </div>
 

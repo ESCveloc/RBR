@@ -3,10 +3,13 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { db } from "@db";
-import { games, gameParticipants } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { users, games, teams, teamMembers, gameParticipants } from "@db/schema";
+import { eq, ilike, or, and, sql, exists, ne } from "drizzle-orm";
 import { z } from "zod";
-import type { Session } from "express-session";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
 
 // Update game schema to match frontend
 const gameSchema = z.object({
@@ -978,7 +981,7 @@ export function registerRoutes(app: Express): Server {
       }));
 
       // Convert position to angle (evenly distributed around the circle)
-      const angle = (-1* (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
+      const angle = (-1 * (assignedPosition - 1) * 2 * Math.PI / TOTAL_STARTING_POSITIONS) + (Math.PI / 2);
       const safetyFactor = 0.9; // Keep points inside the boundary
       const x = center.lng + (radius * safetyFactor * Math.cos(angle));
       const y = center.lat + (radius * safetyFactor * Math.sin(angle));
