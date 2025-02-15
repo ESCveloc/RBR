@@ -10,7 +10,18 @@ const router = Router();
 router.get("/settings", async (req, res) => {
   try {
     const [adminSettings] = await db.select().from(settings).limit(1);
-    return res.json(adminSettings);
+
+    // Read current theme.json
+    const themeFilePath = path.join(process.cwd(), "theme.json");
+    const themeData = JSON.parse(await fs.readFile(themeFilePath, 'utf8'));
+
+    // Merge theme data with admin settings
+    const fullSettings = {
+      ...adminSettings,
+      theme: themeData
+    };
+
+    return res.json(fullSettings);
   } catch (error) {
     console.error("Failed to fetch settings:", error);
     return res.status(500).json({ error: "Failed to fetch settings" });
@@ -20,11 +31,11 @@ router.get("/settings", async (req, res) => {
 router.put("/settings", async (req, res) => {
   try {
     const { theme, ...otherSettings } = req.body;
-    
+
     // Update settings in database
     await db
       .update(settings)
-      .set({ ...req.body })
+      .set(otherSettings)
       .where(eq(settings.id, 1));
 
     // Update theme.json

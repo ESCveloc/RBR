@@ -152,6 +152,7 @@ export default function Admin() {
   const { user, logout } = useUser();
   const { teams, isLoading: teamsLoading } = useTeams();
   const { socket, isConnected, subscribeToMessage } = useWebSocket();
+  const { theme, updateTheme } = useTheme();
 
   const createGame = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -306,34 +307,43 @@ export default function Admin() {
     }
   }
 
-  const updateSettings = async (values: z.infer<typeof settingsSchema>) => {
-    try {
-      const response = await fetch("/api/admin/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-        credentials: "include",
-      });
+  const updateSettings = useMutation({
+    mutationFn: async (values: z.infer<typeof settingsSchema>) => {
+      try {
+        const response = await fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        await updateTheme.mutateAsync(values.theme);
+
+        return response.json();
+      } catch (error) {
+        console.error("Failed to update settings:", error);
+        throw error;
       }
-
-      const { updateTheme } = useTheme();
-      await updateTheme.mutateAsync(values.theme);
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       toast({
         title: "Success",
         description: "Settings updated successfully",
       });
-    } catch (error: any) {
+    },
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-    }
-  };
+    },
+  });
 
   const updateUserRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: "admin" | "user" }) => {
@@ -733,7 +743,7 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <Form {...settingsForm}>
-                <form onSubmit={settingsForm.handleSubmit(updateSettings)} className="space-y-6">
+                <form onSubmit={settingsForm.handleSubmit(updateSettings.mutate)} className="space-y-6">
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="theme">
                       <AccordionTrigger className="text-lg font-semibold">
