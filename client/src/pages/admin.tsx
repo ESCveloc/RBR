@@ -60,6 +60,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useTheme } from "@/hooks/use-theme";
 
 interface User {
   id: number;
@@ -317,6 +318,9 @@ export default function Admin() {
       if (!response.ok) {
         throw new Error(await response.text());
       }
+
+      const { updateTheme } = useTheme();
+      await updateTheme.mutateAsync(values.theme);
 
       toast({
         title: "Success",
