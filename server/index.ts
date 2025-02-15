@@ -3,10 +3,14 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { db } from "@db";
 import { setupAuth } from "./auth";
+import sessionMiddleware from "./session";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Add session middleware before any routes
+app.use(sessionMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {

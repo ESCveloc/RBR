@@ -5,6 +5,15 @@ import { games, gameParticipants } from "@db/schema";
 import { eq } from "drizzle-orm";
 import type { Session } from "express-session";
 import type { User } from "@db/schema";
+import type { IncomingMessage } from "http";
+import cookie from "cookie";
+import sessionMiddleware from "./session"; // Use relative path
+
+// Extend IncomingMessage to include session
+interface ExtendedIncomingMessage extends IncomingMessage {
+  session?: Session & { user?: User };
+  userSession?: Session & { user?: User };
+}
 
 interface CustomWebSocket extends WebSocket {
   gameId?: number;
@@ -39,25 +48,19 @@ class GameWebSocketServer extends WebSocketServer {
   constructor(options: any) {
     super(options);
     this.setupHeartbeat();
-    console.log("[WebSocket] Server initialized");
   }
 
   private setupHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       this.clients.forEach((ws: CustomWebSocket) => {
-        if (!ws.isAlive) {
-          console.log("[WebSocket] Terminating inactive client");
-          return ws.terminate();
-        }
+        if (!ws.isAlive) return ws.terminate();
         ws.isAlive = false;
         ws.ping();
       });
     }, 30000);
 
     this.on('close', () => {
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-      }
+      if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
     });
   }
 
@@ -76,21 +79,14 @@ class GameWebSocketServer extends WebSocketServer {
           deadClients.push(client);
         }
       } catch (error) {
-        console.error(`[WebSocket] Send error:`, error);
         deadClients.push(client);
       }
     });
 
-    // Cleanup dead connections
     if (deadClients.length > 0) {
-      deadClients.forEach(client => {
-        room.clients.delete(client);
-        console.log("[WebSocket] Removed dead client from game", gameId);
-      });
-
+      deadClients.forEach(client => room.clients.delete(client));
       if (room.clients.size === 0) {
         this.gameRooms.delete(gameId);
-        console.log("[WebSocket] Removed empty game room", gameId);
       }
     }
   }
@@ -106,10 +102,7 @@ class GameWebSocketServer extends WebSocketServer {
         .where(eq(games.id, gameId))
         .limit(1);
 
-      if (!game) {
-        console.log("[WebSocket] Game not found:", gameId);
-        return;
-      }
+      if (!game) return;
 
       const participants = await db
         .select()
@@ -129,80 +122,6 @@ class GameWebSocketServer extends WebSocketServer {
       console.error("[WebSocket] Broadcast error:", error);
     }
   }
-
-  joinGame(client: CustomWebSocket, gameId: number) {
-    if (!client.session?.user) {
-      console.log("[WebSocket] Unauthorized join attempt");
-      client.send(JSON.stringify({
-        type: "ERROR",
-        payload: { message: "Unauthorized" }
-      }));
-      return;
-    }
-
-    console.log("[WebSocket] Client joining game:", {
-      gameId,
-      userId: client.session.user.id,
-      username: client.session.user.username
-    });
-
-    if (!this.gameRooms.has(gameId)) {
-      this.gameRooms.set(gameId, {
-        clients: new Set(),
-        gameState: { positions: {}, zones: [] }
-      });
-      console.log("[WebSocket] Created new game room:", gameId);
-    }
-
-    const room = this.gameRooms.get(gameId)!;
-    room.clients.add(client);
-    client.gameId = gameId;
-
-    // Send current state to new client
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({
-        type: "GAME_STATE",
-        payload: {
-          gameId,
-          gameState: room.gameState
-        }
-      }));
-    }
-  }
-
-  leaveGame(client: CustomWebSocket) {
-    if (client.gameId) {
-      const room = this.gameRooms.get(client.gameId);
-      if (room) {
-        room.clients.delete(client);
-        console.log("[WebSocket] Client left game:", {
-          gameId: client.gameId,
-          username: client.session?.user?.username
-        });
-
-        if (room.clients.size === 0) {
-          this.gameRooms.delete(client.gameId);
-          console.log("[WebSocket] Removed empty game room:", client.gameId);
-        }
-      }
-      client.gameId = undefined;
-    }
-  }
-
-  updateGameState(client: CustomWebSocket, gameId: number, update: Partial<GameState>) {
-    if (!client.session?.user) {
-      console.log("[WebSocket] Unauthorized state update attempt");
-      return;
-    }
-
-    const room = this.gameRooms.get(gameId);
-    if (!room) return;
-
-    Object.assign(room.gameState, update);
-    this.broadcastGameUpdate(gameId, "GAME_STATE", {
-      gameState: room.gameState
-    });
-  }
 }
 
 export function setupWebSocketServer(server: Server) {
@@ -210,34 +129,52 @@ export function setupWebSocketServer(server: Server) {
     server,
     path: '/ws',
     clientTracking: true,
-    verifyClient: (info: { req: any }, done: (result: boolean, code?: number, message?: string) => void) => {
-      // Skip verification for Vite HMR
-      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
-        console.log('[WebSocket] Allowing Vite HMR connection');
-        return done(true);
+    verifyClient: async (info: { req: ExtendedIncomingMessage }, done: (result: boolean, code?: number, message?: string) => void) => {
+      try {
+        // Skip verification for Vite HMR
+        if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+          return done(true);
+        }
+
+        // Parse cookies from the upgrade request
+        const cookies = cookie.parse(info.req.headers.cookie || '');
+        if (!cookies['battle.sid']) {
+          console.error('[WebSocket] No session cookie found');
+          return done(false, 401, 'No session cookie found');
+        }
+
+        // Create a new promise to handle session loading
+        await new Promise<void>((resolve, reject) => {
+          try {
+            sessionMiddleware(info.req as any, {} as any, (err?: any) => {
+              if (err) {
+                console.error('[WebSocket] Session middleware error:', err);
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          } catch (error) {
+            console.error('[WebSocket] Session middleware execution error:', error);
+            reject(error);
+          }
+        });
+
+        if (!info.req.session?.user?.id) {
+          console.error('[WebSocket] No user in session');
+          return done(false, 401, 'Unauthorized');
+        }
+
+        info.req.userSession = info.req.session;
+        done(true);
+      } catch (error) {
+        console.error('[WebSocket] Verification failed:', error);
+        done(false, 500, 'Session verification failed');
       }
-
-      const session = info.req.session;
-      console.log('[WebSocket] Verifying client:', {
-        hasSession: !!session,
-        hasUser: !!session?.user,
-        userId: session?.user?.id,
-        headers: info.req.headers
-      });
-
-      if (!session?.user?.id) {
-        console.log('[WebSocket] Rejecting unauthorized connection');
-        return done(false, 401, 'Unauthorized');
-      }
-
-      info.req.userSession = session;
-      console.log('[WebSocket] Client verified:', session.user.username);
-      done(true);
     }
   });
 
-  wss.on('connection', (ws: CustomWebSocket, req: any) => {
-    console.log('[WebSocket] Client connected:', req.userSession?.user?.username);
+  wss.on('connection', (ws: CustomWebSocket, req: ExtendedIncomingMessage) => {
     ws.isAlive = true;
     ws.session = req.userSession;
 
@@ -256,10 +193,6 @@ export function setupWebSocketServer(server: Server) {
         }
 
         const message = JSON.parse(data.toString());
-        console.log('[WebSocket] Received message:', {
-          type: message.type,
-          from: ws.session.user.username
-        });
 
         switch (message.type) {
           case "JOIN_GAME":
@@ -276,7 +209,6 @@ export function setupWebSocketServer(server: Server) {
             console.warn('[WebSocket] Unknown message type:', message.type);
         }
       } catch (error) {
-        console.error('[WebSocket] Message handling error:', error);
         ws.send(JSON.stringify({
           type: "ERROR",
           payload: { message: "Invalid message format" }
@@ -285,7 +217,6 @@ export function setupWebSocketServer(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log('[WebSocket] Client disconnected:', ws.session?.user?.username);
       wss.leaveGame(ws);
     });
   });

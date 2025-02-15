@@ -20,7 +20,7 @@ interface WebSocketInterface {
 export function useWebSocket(): WebSocketInterface {
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, isLoading: userLoading } = useUser();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
@@ -30,7 +30,7 @@ export function useWebSocket(): WebSocketInterface {
 
   const cleanupWebSocket = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.onclose = null; // Prevent onclose from triggering during cleanup
+      wsRef.current.onclose = null; // Prevent onclose handler during cleanup
       wsRef.current.close();
       wsRef.current = null;
     }
@@ -43,31 +43,21 @@ export function useWebSocket(): WebSocketInterface {
   }, []);
 
   const connect = useCallback(() => {
-    if (!user) {
-      console.log('[WebSocket] No user available, skipping connection');
-      return;
-    }
+    // Don't attempt connection if user is still loading or not authenticated
+    if (userLoading || !user?.id) return;
 
-    if (isConnectingRef.current) {
-      console.log('[WebSocket] Connection already in progress');
-      return;
-    }
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('[WebSocket] Connection already open');
-      return;
-    }
+    if (isConnectingRef.current) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     cleanupWebSocket();
     isConnectingRef.current = true;
 
     try {
-      // Get the WebSocket URL using current window location
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host || window.location.hostname;
       const wsUrl = `${protocol}//${host}/ws`;
 
-      console.log('[WebSocket] Connecting to:', wsUrl);
+      console.log('[WebSocket] Attempting connection to:', wsUrl);
       const ws = new WebSocket(wsUrl);
 
       const connectionTimeout = setTimeout(() => {
@@ -79,17 +69,12 @@ export function useWebSocket(): WebSocketInterface {
 
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        console.log('[WebSocket] Connected successfully');
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
 
         if (pendingGameJoinRef.current !== null) {
-          console.log('[WebSocket] Processing pending game join:', pendingGameJoinRef.current);
-          ws.send(JSON.stringify({
-            type: 'JOIN_GAME',
-            payload: { gameId: pendingGameJoinRef.current }
-          }));
+          sendMessage('JOIN_GAME', { gameId: pendingGameJoinRef.current });
           pendingGameJoinRef.current = null;
         }
       };
@@ -97,10 +82,8 @@ export function useWebSocket(): WebSocketInterface {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('[WebSocket] Received:', message);
 
           if (message.type === 'ERROR') {
-            console.error('[WebSocket] Server error:', message.payload);
             toast({
               title: "Server Error",
               description: message.payload.message,
@@ -126,37 +109,37 @@ export function useWebSocket(): WebSocketInterface {
 
       ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.error('[WebSocket] Error:', error);
         isConnectingRef.current = false;
+        console.error('[WebSocket] Connection error:', error);
       };
 
       ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        console.log('[WebSocket] Closed:', event.code, event.reason);
         wsRef.current = null;
         isConnectingRef.current = false;
+        console.log('[WebSocket] Connection closed:', event.code);
 
-        // Only reconnect if we have a user and it wasn't a normal closure
-        if (user && event.code !== 1000 && reconnectAttemptRef.current < maxReconnectAttempts) {
+        // Only attempt reconnect if user is authenticated and it wasn't a normal closure
+        if (user?.id && event.code !== 1000 && reconnectAttemptRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
-          console.log(`[WebSocket] Will reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1})`);
           reconnectAttemptRef.current++;
+          console.log(`[WebSocket] Scheduling reconnection attempt ${reconnectAttemptRef.current} in ${delay}ms`);
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         }
       };
     } catch (error) {
-      console.error('[WebSocket] Setup error:', error);
       isConnectingRef.current = false;
+      console.error('[WebSocket] Setup error:', error);
       toast({
         title: "Connection Error",
-        description: "Failed to setup WebSocket connection",
+        description: "Failed to establish WebSocket connection",
         variant: "destructive"
       });
     }
-  }, [user, toast, cleanupWebSocket]);
+  }, [user, userLoading, toast, cleanupWebSocket]);
 
   useEffect(() => {
-    if (user) {
+    if (!userLoading && user?.id) {
       connect();
     } else {
       cleanupWebSocket();
@@ -165,11 +148,10 @@ export function useWebSocket(): WebSocketInterface {
     return () => {
       cleanupWebSocket();
     };
-  }, [user, connect, cleanupWebSocket]);
+  }, [user, userLoading, connect, cleanupWebSocket]);
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] Not connected, message dropped:', { type, payload });
       return;
     }
 
@@ -199,10 +181,7 @@ export function useWebSocket(): WebSocketInterface {
   }, []);
 
   const joinGame = useCallback((gameId: number) => {
-    if (!user) {
-      console.warn('[WebSocket] Cannot join game: Not authenticated');
-      return;
-    }
+    if (!user?.id) return;
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       sendMessage('JOIN_GAME', { gameId });
