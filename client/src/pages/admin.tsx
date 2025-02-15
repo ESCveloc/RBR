@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Trophy, Users, Settings, Plus, Power } from "lucide-react";
+import { Loader2, Trophy, Users, Settings, Plus, Power, MoonIcon, SunIcon, Paintbrush, MapPin, Target } from "lucide-react";
 import type { Game } from "@db/schema";
 import type { Feature, Polygon } from "geojson";
 import {
@@ -47,6 +47,19 @@ import { useUser } from "@/hooks/use-user";
 import { useTeams } from "@/hooks/use-teams";
 import { useWebSocket } from '@/hooks/use-websocket';
 import { getGameStatusColor, getGameStatusText } from "@/lib/game-status";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface User {
   id: number;
@@ -66,7 +79,20 @@ interface AdminSettingsType {
     radiusMultiplier: number;
     intervalMinutes: number;
   }>;
+  theme: {
+    primary: string;
+    variant: "professional" | "tint" | "vibrant";
+    appearance: "light" | "dark" | "system";
+    radius: number;
+  };
 }
+
+const themeSchema = z.object({
+  primary: z.string(),
+  variant: z.enum(["professional", "tint", "vibrant"]),
+  appearance: z.enum(["light", "dark", "system"]),
+  radius: z.number().min(0).max(2),
+});
 
 const settingsSchema = z.object({
   defaultCenter: z.object({
@@ -79,6 +105,7 @@ const settingsSchema = z.object({
     radiusMultiplier: z.number().min(0.1).max(1),
     intervalMinutes: z.number().min(5).max(60),
   })).min(1),
+  theme: themeSchema,
 });
 
 const formSchema = z.object({
@@ -180,7 +207,6 @@ export default function Admin() {
   });
 
 
-  // Subscribe to real-time game updates
   useEffect(() => {
     if (!isConnected || !socket) return;
 
@@ -203,8 +229,8 @@ export default function Admin() {
 
   const { data: games, isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: ["/api/games"],
-    staleTime: 30000, // Cache data for 30 seconds
-    refetchInterval: false // Disable polling, rely on WebSocket updates
+    staleTime: 30000, 
+    refetchInterval: false 
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
@@ -237,6 +263,12 @@ export default function Admin() {
       defaultCenter: { lat: 0, lng: 0 },
       defaultRadiusMiles: 1,
       zoneConfigs: [{ durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 }],
+      theme: {
+        primary: "#007bff",
+        variant: "professional",
+        appearance: "system",
+        radius: 1,
+      },
     },
   });
 
@@ -251,13 +283,11 @@ export default function Admin() {
         return;
       }
 
-      // Generate boundaries using settings
       const boundaries = generateDefaultBoundaries(
         settings.defaultCenter,
         settings.defaultRadiusMiles
       );
 
-      // Include the generated boundaries in the values
       const gameData = {
         ...values,
         boundaries
@@ -695,153 +725,310 @@ export default function Admin() {
           <Card>
             <CardHeader>
               <CardTitle>Game Settings</CardTitle>
-              <CardDescription>Configure default game settings</CardDescription>
+              <CardDescription>Configure game appearance and behavior</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...settingsForm}>
                 <form onSubmit={settingsForm.handleSubmit(updateSettings)} className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={settingsForm.control}
-                      name="defaultCenter.lat"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Default Center Latitude</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={settingsForm.control}
-                      name="defaultCenter.lng"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Default Center Longitude</FormLabel>
-                          <FormControl>
-                           <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={settingsForm.control}
-                    name="defaultRadiusMiles"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Default Radius (miles)</FormLabel>
-                        <FormControl>
-                          <div className="space-y-2">
-                            <Slider
-                              min={0.1}
-                              max={10}
-                              step={0.1}
-                              value={[field.value]}
-                              onValueChange={([value]) => field.onChange(value)}
-                            />
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>{field.value.toFixed(1)} miles</span>
-                              <span>10 miles</span>
-                            </div>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={settingsForm.control}
-                    name="zoneConfigs"
-                    render={({ field }) => (
-                      <FormItem className="space-y-4">
-                        <FormLabel>Zone Configurations</FormLabel>
-                        <div className="space-y-4">
-                          {field.value.map((zone, index) => (
-                            <Card key={index} className="p-4">
-                              <CardHeader className="p-0 pb-4">
-                                <CardTitle className="text-lg">Zone {index + 1}</CardTitle>
-                              </CardHeader>
-                              <div className="grid gap-4">
-                                <div>
-                                  <FormLabel>Duration (minutes)</FormLabel>
-                                  <Slider
-                                    min={5}
-                                    max={60}
-                                    step={5}
-                                    value={[zone.durationMinutes]}
-                                    onValueChange={([value]) => {
-                                      const newConfigs = [...field.value];
-                                      newConfigs[index].durationMinutes = value;
-                                      field.onChange(newConfigs);
-                                    }}
-                                  />
-                                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                    <span>{zone.durationMinutes} minutes</span>
-                                    <span>60 minutes</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <FormLabel>Interval Before Zone (minutes)</FormLabel>
-                                  <Slider
-                                    min={5}
-                                    max={60}
-                                    step={5}
-                                    value={[zone.intervalMinutes]}
-                                    onValueChange={([value]) => {
-                                      const newConfigs = [...field.value];
-                                      newConfigs[index].intervalMinutes = value;
-                                      field.onChange(newConfigs);
-                                    }}
-                                  />
-                                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                    <span>{zone.intervalMinutes} minutes</span>
-                                    <span>60 minutes</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <FormLabel>Zone Size (% of previous)</FormLabel>
-                                  <Slider
-                                    min={10}
-                                    max={100}
-                                    step={5}
-                                    value={[zone.radiusMultiplier * 100]}
-                                    onValueChange={([value]) => {
-                                      const newConfigs = [...field.value];
-                                      newConfigs[index].radiusMultiplier = value / 100;
-                                      field.onChange(newConfigs);
-                                    }}
-                                  />
-                                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                    <span>{(zone.radiusMultiplier * 100).toFixed(0)}%</span>
-                                    <span>100%</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </Card>
-                          ))}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              field.onChange([
-                                ...field.value,
-                                { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
-                              ]);
-                            }}
-                          >
-                            Add Zone
-                          </Button>
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="theme">
+                      <AccordionTrigger className="text-lg font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Paintbrush className="h-4 w-4" />
+                          Theme Settings
                         </div>
-                      </FormItem>
-                    )}
-                  />
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4 pt-4">
+                          <FormField
+                            control={settingsForm.control}
+                            name="theme.appearance"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Appearance</FormLabel>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select appearance" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="light">
+                                      <div className="flex items-center gap-2">
+                                        <SunIcon className="h-4 w-4" />
+                                        Light
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="dark">
+                                      <div className="flex items-center gap-2">
+                                        <MoonIcon className="h-4 w-4" />
+                                        Dark
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="system">System</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={settingsForm.control}
+                            name="theme.variant"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Color Variant</FormLabel>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select variant" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="professional">Professional</SelectItem>
+                                    <SelectItem value="tint">Tint</SelectItem>
+                                    <SelectItem value="vibrant">Vibrant</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={settingsForm.control}
+                            name="theme.primary"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Primary Color</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="color"
+                                    {...field}
+                                    className="h-10 px-2 py-1"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={settingsForm.control}
+                            name="theme.radius"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Border Radius</FormLabel>
+                                <FormControl>
+                                  <div className="space-y-2">
+                                    <Slider
+                                      min={0}
+                                      max={2}
+                                      step={0.1}
+                                      value={[field.value]}
+                                      onValueChange={([value]) => field.onChange(value)}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>Square</span>
+                                      <span>Rounded</span>
+                                    </div>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="location">
+                      <AccordionTrigger className="text-lg font-semibold">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Location Settings
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4 pt-4">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <FormField
+                              control={settingsForm.control}
+                              name="defaultCenter.lat"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Default Center Latitude</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={settingsForm.control}
+                              name="defaultCenter.lng"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Default Center Longitude</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="any" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={settingsForm.control}
+                            name="defaultRadiusMiles"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Default Radius (miles)</FormLabel>
+                                <FormControl>
+                                  <div className="space-y-2">
+                                    <Slider
+                                      min={0.1}
+                                      max={10}
+                                      step={0.1}
+                                      value={[field.value]}
+                                      onValueChange={([value]) => field.onChange(value)}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>{field.value.toFixed(1)} miles</span>
+                                      <span>10 miles</span>
+                                    </div>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="zones">
+                      <AccordionTrigger className="text-lg font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4" />
+                          Zone Configurations
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <FormField
+                          control={settingsForm.control}
+                          name="zoneConfigs"
+                          render={({ field }) => (
+                            <FormItem className="space-y-4 pt-4">
+                              <div className="space-y-4">
+                                {field.value.map((zone, index) => (
+                                  <Card key={index} className="p-4">
+                                    <CardHeader className="p-0 pb-4">
+                                      <div className="flex items-center justify-between">
+                                        <CardTitle className="text-lg">Zone {index + 1}</CardTitle>
+                                        {index > 0 && (
+                                          <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => {
+                                              const newConfigs = [...field.value];
+                                              newConfigs.splice(index, 1);
+                                              field.onChange(newConfigs);
+                                            }}
+                                          >
+                                            Remove
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </CardHeader>
+                                    <div className="grid gap-4">
+                                      <div>
+                                        <FormLabel>Duration (minutes)</FormLabel>
+                                        <Slider
+                                          min={5}
+                                          max={60}
+                                          step={5}
+                                          value={[zone.durationMinutes]}
+                                          onValueChange={([value]) => {
+                                            const newConfigs = [...field.value];
+                                            newConfigs[index].durationMinutes = value;
+                                            field.onChange(newConfigs);
+                                          }}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                          <span>{zone.durationMinutes} minutes</span>
+                                          <span>60 minutes</span>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <FormLabel>Interval Before Zone (minutes)</FormLabel>
+                                        <Slider
+                                          min={5}
+                                          max={60}
+                                          step={5}
+                                          value={[zone.intervalMinutes]}
+                                          onValueChange={([value]) => {
+                                            const newConfigs = [...field.value];
+                                            newConfigs[index].intervalMinutes = value;
+                                            field.onChange(newConfigs);
+                                          }}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                          <span>{zone.intervalMinutes} minutes</span>
+                                          <span>60 minutes</span>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <FormLabel>Zone Size (% of previous)</FormLabel>
+                                        <Slider
+                                          min={10}
+                                          max={100}
+                                          step={5}
+                                          value={[zone.radiusMultiplier * 100]}
+                                          onValueChange={([value]) => {
+                                            const newConfigs = [...field.value];
+                                            newConfigs[index].radiusMultiplier = value / 100;
+                                            field.onChange(newConfigs);
+                                          }}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                          <span>{(zone.radiusMultiplier * 100).toFixed(0)}%</span>
+                                          <span>100%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </Card>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    field.onChange([
+                                      ...field.value,
+                                      { durationMinutes: 15, radiusMultiplier: 0.5, intervalMinutes: 15 },
+                                    ]);
+                                  }}
+                                >
+                                  Add Zone
+                                </Button>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
 
                   <Button
                     type="submit"
