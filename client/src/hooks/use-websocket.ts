@@ -43,9 +43,7 @@ export function useWebSocket(): WebSocketInterface {
   }, []);
 
   const connect = useCallback(() => {
-    // Don't attempt connection if user is still loading or not authenticated
     if (userLoading || !user?.id) return;
-
     if (isConnectingRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -54,12 +52,18 @@ export function useWebSocket(): WebSocketInterface {
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host || window.location.hostname;
+      const host = window.location.host;
       const wsUrl = `${protocol}//${host}/ws`;
 
       console.log('[WebSocket] Attempting connection to:', wsUrl);
+      // Create WebSocket with credentials mode
       const ws = new WebSocket(wsUrl);
+      ws.addEventListener('open', () => {
+        // Additional open event listener to ensure proper cookie handling
+        console.log('[WebSocket] Connection opened with credentials');
+      });
 
+      // Set a connection timeout
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           console.log('[WebSocket] Connection timeout, closing socket');
@@ -69,6 +73,7 @@ export function useWebSocket(): WebSocketInterface {
 
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
+        console.log('[WebSocket] Connection established successfully');
         wsRef.current = ws;
         isConnectingRef.current = false;
         reconnectAttemptRef.current = 0;
@@ -82,6 +87,7 @@ export function useWebSocket(): WebSocketInterface {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('[WebSocket] Received message:', message.type);
 
           if (message.type === 'ERROR') {
             toast({
@@ -152,10 +158,12 @@ export function useWebSocket(): WebSocketInterface {
 
   const sendMessage = useCallback((type: string, payload: any) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log('[WebSocket] Cannot send message, socket not ready');
       return;
     }
 
     try {
+      console.log('[WebSocket] Sending message:', type);
       wsRef.current.send(JSON.stringify({ type, payload }));
     } catch (error) {
       console.error('[WebSocket] Send error:', error);

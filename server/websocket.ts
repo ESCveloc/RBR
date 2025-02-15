@@ -17,7 +17,6 @@ interface GameSession extends Session {
 // Extend IncomingMessage to include session
 interface ExtendedIncomingMessage extends IncomingMessage {
   session?: GameSession;
-  userSession?: GameSession;
 }
 
 interface CustomWebSocket extends WebSocket {
@@ -44,22 +43,34 @@ export function setupWebSocketServer(server: Server) {
           return done(true);
         }
 
+        console.log('[WebSocket] Starting connection verification');
+        console.log('[WebSocket] Headers:', JSON.stringify(req.headers, null, 2));
+
         const cookies = cookie.parse(req.headers.cookie || '');
-        const cookieValue = cookies['battle.sid'];
+        console.log('[WebSocket] Parsed cookies:', cookies);
 
-        console.log('[WebSocket] Session cookie:', cookieValue ? 'Found' : 'Not found');
-
-        if (!cookieValue) {
-          console.log('[WebSocket] No session cookie found in request');
+        const sidCookie = cookies['connect.sid'];
+        if (!sidCookie) {
+          console.log('[WebSocket] No connect.sid cookie found');
           return done(false, 401, 'No session cookie found');
         }
 
-        // Extract session ID from signed cookie
-        const sessionId = cookieValue.split('.')[0].slice(2);
+        // Parse signed cookie - remove 's:' prefix and take everything before the dot
+        const sessionId = sidCookie.split('.')[0].replace('s:', '');
         console.log('[WebSocket] Extracted session ID:', sessionId);
 
+        // List all sessions in store for debugging
+        sessionStore.all((err, sessions) => {
+          if (err) {
+            console.error('[WebSocket] Error listing sessions:', err);
+          } else {
+            console.log('[WebSocket] Active sessions:', Object.keys(sessions || {}).length);
+            console.log('[WebSocket] Available session IDs:', Object.keys(sessions || {}));
+          }
+        });
+
         // Get session from store
-        sessionStore.get(sessionId, (err, session: GameSession | null) => {
+        sessionStore.get(sessionId, (err, session) => {
           if (err) {
             console.error('[WebSocket] Session store error:', err);
             return done(false, 500, 'Session store error');
@@ -76,8 +87,7 @@ export function setupWebSocketServer(server: Server) {
           }
 
           console.log('[WebSocket] Session verified for user:', session.user.id);
-          req.session = session;
-          req.userSession = session;
+          req.session = session as GameSession;
           done(true);
         });
       } catch (error) {
@@ -87,10 +97,27 @@ export function setupWebSocketServer(server: Server) {
     }
   });
 
+  // Set up heartbeat
+  const interval = setInterval(() => {
+    wss.clients.forEach((ws: CustomWebSocket) => {
+      if (ws.isAlive === false) {
+        console.log('[WebSocket] Client inactive, terminating');
+        return ws.terminate();
+      }
+
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on('close', () => {
+    clearInterval(interval);
+  });
+
   // Handle new connections
   wss.on('connection', (ws: CustomWebSocket, req: ExtendedIncomingMessage) => {
     ws.isAlive = true;
-    ws.session = req.userSession;
+    ws.session = req.session;
 
     console.log('[WebSocket] New connection established for user:', ws.session?.user?.id);
 
@@ -102,7 +129,6 @@ export function setupWebSocketServer(server: Server) {
     // Handle incoming messages
     ws.on('message', async (data) => {
       try {
-        // Verify session is still valid
         if (!ws.session?.user?.id) {
           console.log('[WebSocket] Unauthorized message attempt');
           ws.send(JSON.stringify({
@@ -113,6 +139,7 @@ export function setupWebSocketServer(server: Server) {
         }
 
         const message: WebSocketMessage = JSON.parse(data.toString());
+        console.log('[WebSocket] Received message:', message.type, 'from user:', ws.session.user.id);
 
         switch (message.type) {
           case "JOIN_GAME":
@@ -123,6 +150,23 @@ export function setupWebSocketServer(server: Server) {
                 type: "JOINED_GAME",
                 payload: { gameId: message.payload.gameId }
               }));
+            }
+            break;
+
+          case "LOCATION_UPDATE":
+            if (ws.gameId && message.payload?.location) {
+              wss.clients.forEach((client: CustomWebSocket) => {
+                if (client.gameId === ws.gameId && client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: "LOCATION_UPDATE",
+                    payload: {
+                      gameId: ws.gameId,
+                      teamId: ws.session?.user?.id,
+                      location: message.payload.location
+                    }
+                  }));
+                }
+              });
             }
             break;
 
