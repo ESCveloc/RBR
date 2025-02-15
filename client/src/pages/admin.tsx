@@ -324,6 +324,7 @@ export default function Admin() {
 
   const updateSettings = useMutation({
     mutationFn: async (values: z.infer<typeof settingsSchema>) => {
+      console.log('Updating settings with values:', values);
       const response = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -332,11 +333,10 @@ export default function Admin() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        console.error('Failed to update settings:', errorText);
+        throw new Error(errorText || "Failed to update settings");
       }
-
-      // Update theme separately
-      await updateTheme.mutateAsync(values.theme);
 
       return response.json();
     },
@@ -348,6 +348,7 @@ export default function Admin() {
       });
     },
     onError: (error: Error) => {
+      console.error('Settings update error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -355,6 +356,14 @@ export default function Admin() {
       });
     },
   });
+
+  const onSettingsSubmit = async (data: z.infer<typeof settingsSchema>) => {
+    try {
+      await updateSettings.mutateAsync(data);
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  };
 
   const updateUserRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: number; role: "admin" | "user" }) => {
@@ -755,9 +764,7 @@ export default function Admin() {
             <CardContent>
               <Form {...settingsForm}>
                 <form 
-                  onSubmit={settingsForm.handleSubmit((data) => {
-                    updateSettings.mutate(data);
-                  })} 
+                  onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} 
                   className="space-y-6"
                 >
                   <Accordion type="single" collapsible className="w-full">
@@ -1062,13 +1069,17 @@ export default function Admin() {
 
                   <Button
                     type="submit"
-                    className="w-full"
-                    disabled={settingsForm.formState.isSubmitting}
+                    className="w-full mt-4"
+                    disabled={updateSettings.isPending}
                   >
-                    {settingsForm.formState.isSubmitting && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {updateSettings.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Settings'
                     )}
-                    Save Settings
                   </Button>
                 </form>
               </Form>

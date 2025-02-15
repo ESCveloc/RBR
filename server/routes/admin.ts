@@ -10,6 +10,9 @@ const router = Router();
 router.get("/settings", async (req, res) => {
   try {
     const [adminSettings] = await db.select().from(settings).limit(1);
+    if (!adminSettings) {
+      return res.status(404).json({ error: "Settings not found" });
+    }
 
     // Read current theme.json
     const themeFilePath = path.join(process.cwd(), "theme.json");
@@ -30,6 +33,7 @@ router.get("/settings", async (req, res) => {
 
 router.put("/settings", async (req, res) => {
   try {
+    console.log('Received settings update:', req.body);
     const { theme, ...otherSettings } = req.body;
 
     // Update settings in database
