@@ -9,6 +9,7 @@ import Game from "@/pages/game";
 import Admin from "@/pages/admin";
 import Team from "@/pages/team";
 import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -98,6 +99,9 @@ function Router() {
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute component={Settings} />
       </Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} admin={true} />
